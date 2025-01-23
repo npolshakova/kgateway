@@ -62,7 +62,7 @@ type helmGateway struct {
 	// stats values
 	Stats *helmStatsConfig `json:"stats,omitempty"`
 
-	// AI extension values
+	// AIRoutePolicy extension values
 	AIExtension *helmAIExtension `json:"aiExtension,omitempty"`
 
 	// AWS values
