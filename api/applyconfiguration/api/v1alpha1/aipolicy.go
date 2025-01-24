@@ -1,5 +1,7 @@
 package v1alpha1
 
+import "k8s.io/apimachinery/pkg/runtime"
+
 // AI config is used to configure the behavior of the LLM provider
 // on the level of individual routes. These route settings, such as prompt enrichment,
 // retrieval augmented generation (RAG), and semantic caching, are applicable only
@@ -297,7 +299,7 @@ type FieldDefault struct {
 	// The name of the field.
 	Field string `json:"field,omitempty"`
 	// The field default value, which can be any JSON Data Type.
-	Value interface{} `json:"value,omitempty"`
+	Value runtime.RawExtension `json:"value,omitempty"`
 	// Whether to override the field's value if it already exists.
 	// Defaults to false.
 	// +kubebuilder:default=false
