@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
@@ -103,6 +104,14 @@ func (p *listenerOptsPluginGwPass) ApplyListenerPlugin(ctx context.Context, pCtx
 	}
 
 	return
+}
+
+func (p *listenerOptsPluginGwPass) ApplyHCM(
+	ctx context.Context,
+	pCtx *ir.HcmContext,
+	out *envoy_hcm.HttpConnectionManager) error {
+	// no-op, hcm config is handled in http listener plugin
+	return nil
 }
 
 func (p *listenerOptsPluginGwPass) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {

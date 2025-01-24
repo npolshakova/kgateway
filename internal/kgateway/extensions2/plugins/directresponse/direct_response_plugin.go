@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	envoyhttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -45,6 +46,11 @@ func (d *directResponse) Equals(in any) bool {
 }
 
 type directResponseGwPass struct {
+}
+
+func (p *directResponseGwPass) ApplyHCM(ctx context.Context, pCtx *ir.HcmContext, out *envoyhttp.HttpConnectionManager) error {
+	// no op
+	return nil
 }
 
 func registerTypes(ourCli versioned.Interface) {

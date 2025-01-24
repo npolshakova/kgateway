@@ -13,6 +13,7 @@ import (
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	awspb "github.com/solo-io/envoy-gloo/go/config/filter/http/aws_lambda/v2"
 	skubeclient "istio.io/istio/pkg/config/schema/kubeclient"
 	"istio.io/istio/pkg/kube/kclient"
@@ -230,6 +231,12 @@ func (p *plugin2) Name() string {
 
 // called 1 time for each listener
 func (p *plugin2) ApplyListenerPlugin(ctx context.Context, pCtx *ir.ListenerContext, out *envoy_config_listener_v3.Listener) {
+}
+
+func (p *plugin2) ApplyHCM(ctx context.Context,
+	pCtx *ir.HcmContext,
+	out *envoy_hcm.HttpConnectionManager) error { //no-op
+	return nil
 }
 
 func (p *plugin2) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {

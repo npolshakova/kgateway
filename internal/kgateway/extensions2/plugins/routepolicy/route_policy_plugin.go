@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	envoyhttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -38,6 +39,11 @@ func (d *routeOptsPlugin) Equals(in any) bool {
 }
 
 type routeOptsPluginGwPass struct {
+}
+
+func (p *routeOptsPluginGwPass) ApplyHCM(ctx context.Context, pCtx *ir.HcmContext, out *envoyhttp.HttpConnectionManager) error {
+	// no op
+	return nil
 }
 
 func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensionplug.Plugin {
