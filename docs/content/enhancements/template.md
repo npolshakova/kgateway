@@ -11,7 +11,7 @@ To get started with this template:
   leading-zero padding) assigned to your enhancement above.
 - [ ] **Fill out this file as best you can.**
   At minimum, you should fill in the "Summary" and "Motivation" sections.
-- [ ] **Create a PR for this KEP.**
+- [ ] **Create a PR for this EP.**
   Assign it to maintainers with relevant context.
 - [ ] **Merge early and iterate.**
   Avoid getting hung up on specific details and instead aim to get the goals of
@@ -39,16 +39,16 @@ One EP corresponds to one "feature" or "enhancement" for its whole lifecycle. On
 # EP-[ID]: [Feature/Enhancement Name] 
 
 <!--
-This is the title of your KEP. Keep it short, simple, and descriptive. A good
-title can help communicate what the KEP is and should be considered as part of
+This is the title of your EP. Keep it short, simple, and descriptive. A good
+title can help communicate what the EP is and should be considered as part of
 any review.
 -->
 
 * Issue: [#ID](URL to GitHub issue)
 
 <!--
-A table of contents is helpful for quickly jumping to sections of a KEP and for
-highlighting any additional information provided beyond the standard KEP
+A table of contents is helpful for quickly jumping to sections of a EP and for
+highlighting any additional information provided beyond the standard EP
 template.
 
 Ensure the TOC is wrapped with
@@ -89,7 +89,7 @@ Include Motivation, concise overview of goals, challenges, and trade-offs.
 This section is for explicitly listing the motivation, goals, and non-goals of
 this EP. Describe why the change is important and the benefits to users. The
 motivation section can optionally provide links to [experience reports] to
-demonstrate the interest in a KEP within the wider Kubernetes community.
+demonstrate the interest in a EP within the wider Kubernetes community.
 
 [experience reports]: https://github.com/golang/go/wiki/ExperienceReports
 -->
@@ -98,7 +98,7 @@ demonstrate the interest in a KEP within the wider Kubernetes community.
 
 <!--
 
-List the specific goals of the KEP. What is it trying to achieve? How will we
+List the specific goals of the EP. What is it trying to achieve? How will we
 know that this has succeeded?
 
 Include specific, actionable outcomes. Ensure that the goals focus on the scope of
@@ -109,7 +109,7 @@ the proposed feature.
 ### Non-Goals 
 
 <!--
-What is out of scope for this KEP? Listing non-goals helps to focus discussion
+What is out of scope for this EP? Listing non-goals helps to focus discussion
 and make progress.
 -->
 
