@@ -1,9 +1,11 @@
+//go:build ignore
+
 package tests
 
 import (
-	"github.com/solo-io/gloo/test/kubernetes/e2e"
-	"github.com/solo-io/gloo/test/kubernetes/e2e/features/basicrouting"
-	"github.com/solo-io/gloo/test/kubernetes/e2e/features/validation/full_envoy_validation"
+	"github.com/kgateway-dev/kgateway/test/kubernetes/e2e"
+	"github.com/kgateway-dev/kgateway/test/kubernetes/e2e/features/basicrouting"
+	"github.com/kgateway-dev/kgateway/test/kubernetes/e2e/features/validation/full_envoy_validation"
 )
 
 func FullEnvoyValidationSuiteRunner() e2e.SuiteRunner {

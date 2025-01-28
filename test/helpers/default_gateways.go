@@ -1,8 +1,10 @@
+//go:build ignore
+
 package helpers
 
 import (
-	v1 "github.com/solo-io/gloo/projects/gateway/pkg/api/v1"
-	"github.com/solo-io/gloo/projects/gateway/pkg/defaults"
+	v1 "github.com/kgateway-dev/kgateway/projects/gateway/pkg/api/v1"
+	"github.com/kgateway-dev/kgateway/projects/gateway/pkg/defaults"
 	"github.com/solo-io/solo-kit/pkg/api/v1/clients"
 )
 

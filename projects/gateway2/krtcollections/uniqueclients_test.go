@@ -7,12 +7,12 @@ import (
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	. "github.com/kgateway-dev/kgateway/projects/gateway2/krtcollections"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/utils"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/wellknown"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/xds"
 	. "github.com/onsi/gomega"
-	. "github.com/solo-io/gloo/projects/gateway2/krtcollections"
-	"github.com/solo-io/gloo/projects/gateway2/utils"
-	"github.com/solo-io/gloo/projects/gateway2/utils/krtutil"
-	glooutils "github.com/solo-io/gloo/projects/gloo/pkg/utils"
-	"github.com/solo-io/gloo/projects/gloo/pkg/xds"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"istio.io/istio/pkg/kube/krt"
@@ -59,7 +59,7 @@ func TestUniqueClients(t *testing.T) {
 						Id: "podname.ns",
 						Metadata: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
-								xds.RoleKey: structpb.NewStringValue(glooutils.GatewayApiProxyValue + "~best-proxy-role"),
+								xds.RoleKey: structpb.NewStringValue(wellknown.GatewayApiProxyValue + "~best-proxy-role"),
 							},
 						},
 					},
@@ -76,13 +76,13 @@ func TestUniqueClients(t *testing.T) {
 						Id: "podname.ns",
 						Metadata: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
-								xds.RoleKey: structpb.NewStringValue(glooutils.GatewayApiProxyValue + "~best-proxy-role"),
+								xds.RoleKey: structpb.NewStringValue(wellknown.GatewayApiProxyValue + "~best-proxy-role"),
 							},
 						},
 					},
 				},
 			},
-			result: sets.New(fmt.Sprintf(glooutils.GatewayApiProxyValue + "~best-proxy-role")),
+			result: sets.New(fmt.Sprintf(wellknown.GatewayApiProxyValue + "~best-proxy-role")),
 		},
 	}
 

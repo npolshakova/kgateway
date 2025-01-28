@@ -10,16 +10,16 @@ import (
 	"istio.io/istio/pkg/kube/krt"
 
 	envoy_config_endpoint_v3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
-	"github.com/solo-io/gloo/pkg/utils/statsutils"
-	"github.com/solo-io/gloo/projects/gateway2/endpoints"
-	"github.com/solo-io/gloo/projects/gateway2/extensions2/common"
-	extensionsplug "github.com/solo-io/gloo/projects/gateway2/extensions2/plugin"
-	"github.com/solo-io/gloo/projects/gateway2/ir"
-	"github.com/solo-io/gloo/projects/gateway2/krtcollections"
-	"github.com/solo-io/gloo/projects/gateway2/query"
-	"github.com/solo-io/gloo/projects/gateway2/reports"
-	gwtranslator "github.com/solo-io/gloo/projects/gateway2/translator/gateway"
-	"github.com/solo-io/gloo/projects/gateway2/translator/irtranslator"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/endpoints"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/extensions2/common"
+	extensionsplug "github.com/kgateway-dev/kgateway/projects/gateway2/extensions2/plugin"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/ir"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/krtcollections"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/query"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/reports"
+	gwtranslator "github.com/kgateway-dev/kgateway/projects/gateway2/translator/gateway"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/translator/irtranslator"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/utils"
 	"github.com/solo-io/go-utils/contextutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -32,7 +32,7 @@ type CombinedTranslator struct {
 
 	waitForSync []cache.InformerSynced
 
-	gwtranslator       extensionsplug.K8sGwTranslator
+	gwtranslator       extensionsplug.KGwTranslator
 	irtranslator       *irtranslator.Translator
 	upstreamTranslator *irtranslator.UpstreamTranslator
 	endpointPlugins    []extensionsplug.EndpointPlugin
@@ -106,9 +106,9 @@ func (s *CombinedTranslator) HasSynced() bool {
 
 // buildProxy performs translation of a kube Gateway -> gloov1.Proxy (really a wrapper type)
 func (s *CombinedTranslator) buildProxy(kctx krt.HandlerContext, ctx context.Context, gw ir.Gateway, r reports.Reporter) *ir.GatewayIR {
-	stopwatch := statsutils.NewTranslatorStopWatch("CombinedTranslator")
+	stopwatch := utils.NewTranslatorStopWatch("CombinedTranslator")
 	stopwatch.Start()
-	var gatewayTranslator extensionsplug.K8sGwTranslator = s.gwtranslator
+	var gatewayTranslator extensionsplug.KGwTranslator = s.gwtranslator
 	if s.extensions.ContributesGwTranslator != nil {
 		maybeGatewayTranslator := s.extensions.ContributesGwTranslator(gw.Obj)
 		if maybeGatewayTranslator != nil {

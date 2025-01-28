@@ -1,3 +1,5 @@
+//go:build ignore
+
 package cluster
 
 import (
@@ -9,9 +11,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	glooruntime "github.com/kgateway-dev/kgateway/test/kubernetes/testutils/runtime"
+	"github.com/kgateway-dev/kgateway/test/testutils"
 	"github.com/rotisserie/eris"
-	glooruntime "github.com/solo-io/gloo/test/kubernetes/testutils/runtime"
-	"github.com/solo-io/gloo/test/testutils"
 	"github.com/solo-io/go-utils/contextutils"
 )
 

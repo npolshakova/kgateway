@@ -1,11 +1,13 @@
+//go:build ignore
+
 package testutils
 
 import (
 	"encoding/json"
 	"path"
 
-	"github.com/solo-io/gloo/install/helm/gloo/generate"
-	"github.com/solo-io/gloo/pkg/utils/helmutils"
+	"github.com/kgateway-dev/kgateway/install/helm/gloo/generate"
+	"github.com/kgateway-dev/kgateway/pkg/utils/helmutils"
 	"helm.sh/helm/v3/pkg/strvals"
 	"knative.dev/pkg/test/helpers"
 	k8syamlutil "sigs.k8s.io/yaml"

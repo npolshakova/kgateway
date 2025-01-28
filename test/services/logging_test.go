@@ -1,9 +1,11 @@
+//go:build ignore
+
 package services_test
 
 import (
+	"github.com/kgateway-dev/kgateway/test/services"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/solo-io/gloo/test/services"
 	"go.uber.org/zap/zapcore"
 )
 

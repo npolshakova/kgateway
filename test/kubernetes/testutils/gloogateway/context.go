@@ -1,8 +1,10 @@
+//go:build ignore
+
 package gloogateway
 
 import (
+	"github.com/kgateway-dev/kgateway/test/testutils"
 	"github.com/rotisserie/eris"
-	"github.com/solo-io/gloo/test/testutils"
 )
 
 // Context contains the set of properties for a given installation of Gloo Gateway

@@ -8,17 +8,15 @@ import (
 	envoy_config_bootstrap "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3"
 	"github.com/ghodss/yaml"
+	"github.com/kgateway-dev/kgateway/pkg/schemes"
+	"github.com/kgateway-dev/kgateway/pkg/version"
+	gw2_v1alpha1 "github.com/kgateway-dev/kgateway/projects/gateway2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/deployer"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/wellknown"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/xds"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
-	"github.com/solo-io/gloo/pkg/schemes"
-	"github.com/solo-io/gloo/pkg/version"
-	gw2_v1alpha1 "github.com/solo-io/gloo/projects/gateway2/api/v1alpha1"
-	"github.com/solo-io/gloo/projects/gateway2/deployer"
-	"github.com/solo-io/gloo/projects/gateway2/wellknown"
-	wellknownkube "github.com/solo-io/gloo/projects/gloo/pkg/api/v1/kube/wellknown"
-	glooutils "github.com/solo-io/gloo/projects/gloo/pkg/utils"
-	"github.com/solo-io/gloo/projects/gloo/pkg/xds"
 	jsonpb "google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,7 +36,13 @@ import (
 	//
 	// There is some import within this package that this suite relies on. Chasing that down is
 	// *hard* tho due to the import tree, and best done in a followup.
-	_ "github.com/solo-io/gloo/projects/gloo/pkg/translator"
+	// _ "github.com/kgateway-dev/kgateway/projects/gloo/pkg/translator"
+	//
+	// The above TODO is a result of proto types being registered for free somewhere through
+	// the translator import. What we really need is to register all proto types, which is
+	// "correctly" available to use via `envoyinit`; note that the autogeneration of these types
+	// is currently broken. see: https://github.com/kgateway-dev/kgateway/issues/10491
+	_ "github.com/kgateway-dev/kgateway/projects/envoyinit/hack/filter_types"
 )
 
 // testBootstrap implements resources.Resource in order to use protoutils.UnmarshalYAML
@@ -443,10 +447,10 @@ var _ = Describe("Deployer", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(gvks).To(HaveLen(4))
 			Expect(gvks).To(ConsistOf(
-				wellknownkube.DeploymentGVK,
-				wellknownkube.ServiceGVK,
-				wellknownkube.ServiceAccountGVK,
-				wellknownkube.ConfigMapGVK,
+				wellknown.DeploymentGVK,
+				wellknown.ServiceGVK,
+				wellknown.ServiceAccountGVK,
+				wellknown.ConfigMapGVK,
 			))
 		})
 
@@ -1091,15 +1095,12 @@ var _ = Describe("Deployer", func() {
 				if sdsContainer.SecurityContext != nil {
 					Expect(sdsContainer.SecurityContext.RunAsUser).To(BeNil())
 				}
-
 				if gwContainer.SecurityContext != nil {
 					Expect(gwContainer.SecurityContext.RunAsUser).To(BeNil())
 				}
-
 				if istioProxyContainer.SecurityContext != nil {
 					Expect(istioProxyContainer.SecurityContext.RunAsUser).To(BeNil())
 				}
-
 				if aiContainer.SecurityContext != nil {
 					Expect(aiContainer.SecurityContext.RunAsUser).To(BeNil())
 				}
@@ -1242,7 +1243,7 @@ var _ = Describe("Deployer", func() {
 						APIVersion: "gateway.solo.io/v1beta1",
 					},
 					Spec: api.GatewaySpec{
-						GatewayClassName: "gloo-gateway",
+						GatewayClassName: wellknown.GatewayClassName,
 					},
 				},
 				defaultGwp: defaultGatewayParams(),
@@ -1276,7 +1277,7 @@ var _ = Describe("Deployer", func() {
 						APIVersion: "gateway.solo.io/v1beta1",
 					},
 					Spec: api.GatewaySpec{
-						GatewayClassName: "gloo-gateway",
+						GatewayClassName: wellknown.GatewayClassName,
 						Listeners: []api.Listener{
 							{
 								Name: "listener-1",
@@ -1339,7 +1340,7 @@ var _ = Describe("Deployer", func() {
 					// make sure the envoy node metadata looks right
 					node := envoyConfig["node"].(map[string]any)
 					Expect(node).To(HaveKeyWithValue("metadata", map[string]any{
-						xds.RoleKey: fmt.Sprintf("%s~%s~%s", glooutils.GatewayApiProxyValue, gw.Namespace, gw.Name),
+						xds.RoleKey: fmt.Sprintf("%s~%s~%s", wellknown.GatewayApiProxyValue, gw.Namespace, gw.Name),
 					}))
 
 					// make sure the stats listener is enabled
@@ -1384,7 +1385,7 @@ var _ = Describe("Deployer", func() {
 					// make sure the envoy node metadata looks right
 					node := envoyConfig["node"].(map[string]any)
 					Expect(node).To(HaveKeyWithValue("metadata", map[string]any{
-						xds.RoleKey: fmt.Sprintf("%s~%s~%s", glooutils.GatewayApiProxyValue, gw.Namespace, gw.Name),
+						xds.RoleKey: fmt.Sprintf("%s~%s~%s", wellknown.GatewayApiProxyValue, gw.Namespace, gw.Name),
 					}))
 
 					// make sure the stats listener is enabled

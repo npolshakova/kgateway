@@ -1,8 +1,10 @@
+//go:build ignore
+
 package test
 
 import (
+	glootestutils "github.com/kgateway-dev/kgateway/test/testutils"
 	. "github.com/onsi/ginkgo/v2"
-	glootestutils "github.com/solo-io/gloo/test/testutils"
 
 	. "github.com/onsi/gomega"
 	. "github.com/solo-io/k8s-utils/manifesttestutils"

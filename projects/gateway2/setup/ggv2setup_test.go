@@ -30,10 +30,10 @@ import (
 
 	discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/go-logr/zapr"
-	"github.com/solo-io/gloo/projects/gateway2/controller"
-	"github.com/solo-io/gloo/projects/gateway2/krtcollections"
-	"github.com/solo-io/gloo/projects/gateway2/proxy_syncer"
-	ggv2setup "github.com/solo-io/gloo/projects/gateway2/setup"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/controller"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/krtcollections"
+	"github.com/kgateway-dev/kgateway/projects/gateway2/proxy_syncer"
+	ggv2setup "github.com/kgateway-dev/kgateway/projects/gateway2/setup"
 	"github.com/solo-io/go-utils/contextutils"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -45,7 +45,6 @@ import (
 	istiokube "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/slices"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
@@ -119,7 +118,7 @@ func TestScenarios(t *testing.T) {
 	testEnv := &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "crds"),
-			filepath.Join("..", "..", "..", "install", "helm", "gloo", "crds"),
+			filepath.Join("..", "..", "..", "install", "helm", "kgateway", "crds"),
 			filepath.Join("testdata", "istiocrds"),
 		},
 		ErrorIfCRDPathMissing: true,
@@ -189,9 +188,7 @@ func TestScenarios(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ggv2setup.StartGGv2WithConfig(ctx, setupOpts, cfg, builder, nil, nil,
-			types.NamespacedName{Name: "default", Namespace: "default"},
-		)
+		ggv2setup.StartGGv2WithConfig(ctx, setupOpts, cfg, builder, nil, nil)
 	}()
 	// give ggv2 time to initialize so we don't get
 	// "ggv2 not initialized" error
