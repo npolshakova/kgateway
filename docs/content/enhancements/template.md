@@ -56,23 +56,6 @@ Ensure the TOC is wrapped with
 tags, and then generate with `hack/update-toc.sh`.
 -->
 
-<!-- toc -->
-- [Background](#Background)
-- [Motivation](#motivation)
-    - [Goals](#goals)
-    - [Non-Goals](#non-goals)
-- [Implementation Details](#implementation-details)
-    - [Configuration](#configuration)
-    - [Plugin](#plugin)
-    - [Controllers](#controllers)
-    - [Deployer](#deployer)
-    - [Translator and Proxy Syncer](#translator-and-proxy-syncer)
-    - [Reporting](#reporting)
-    - [Test Plan](#test-plan)
-- [Alternatives](#alternatives)
-- [Open Questions](#open-questions)
-<!-- /toc -->
-
 ## Background 
 
 <!-- 
@@ -120,44 +103,33 @@ This section should contain enough information that the specifics of your
 change are understandable. This may include API specs (though not always
 required) or even code snippets. If there's any ambiguity about HOW your
 proposal will be implemented, this is the place to discuss them.
--->
+
 
 ### Configuration
-
-<!--
 Specify changes to any configuration APIs, CRDs, or user-facing options to enable/disable
 the feature. Include references to relevant files or configurations that need updates.
--->
 
 ### Plugin
-
-<!--
-    Describe how the feature will be added as a plugin (if applicable).
-    Include references to existing plugin frameworks or structures.
-    Highlight the plugin's responsibilities and integration points.
--->
+Describe how the feature will be added as a plugin (if applicable).
+Include references to existing plugin frameworks or structures.
+Highlight the plugin's responsibilities and integration points.
 
 ### Controllers
-<!--
-    Outline the responsibilities of new or updated controllers.
-    Specify conditions for their operation and integration with existing resources.
-    Mention required RBAC updates or new permissions.
--->
+Outline the responsibilities of new or updated controllers.
+Specify conditions for their operation and integration with existing resources.
+Mention required RBAC updates or new permissions.
 
 ### Deployer
-<!--
-    Detail deployment-specific updates, e.g., Helm chart modifications, custom deployer changes, etc.
-    Include any prerequisites or dependencies for deployment.
--->
+Detail deployment-specific updates, e.g., Helm chart modifications, custom deployer changes, etc.
+Include any prerequisites or dependencies for deployment.
+
 ### Translator and Proxy Syncer
-<!--
-    Specify updates to translators, syncers, or other intermediary components.
-    Highlight how these components interact with the feature's resources or backend.
--->
+Specify updates to translators, syncers, or other intermediary components.
+Highlight how these components interact with the feature's resources or backend.
+
 ### Reporting
-<!--
-    Describe changes to status reporting or monitoring frameworks.
-    Include any caveats or limitations in initial reporting.
+Describe changes to status reporting or monitoring frameworks.
+Include any caveats or limitations in initial reporting.
 -->
 
 ### Test Plan 
