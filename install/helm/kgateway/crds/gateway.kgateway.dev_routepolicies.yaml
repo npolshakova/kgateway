@@ -135,10 +135,15 @@ spec:
                           regex:
                             properties:
                               action:
-                                type: integer
+                                type: string
                               builtins:
+                                enum:
+                                - SSN
+                                - CREDIT_CARD
+                                - PHONE_NUMBER
+                                - EMAIL
                                 items:
-                                  type: integer
+                                  type: string
                                 type: array
                               regexMatch:
                                 items:
@@ -155,18 +160,24 @@ spec:
                               forwardHeaders:
                                 items:
                                   properties:
-                                    key:
+                                    name:
+                                      maxLength: 256
+                                      minLength: 1
+                                      pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
                                       type: string
-                                    matchType:
-                                      default: EXACT
+                                    type:
+                                      default: Exact
                                       enum:
-                                      - EXACT
-                                      - PREFIX
-                                      - SUFFIX
-                                      - CONTAINS
-                                      - REGEX
-                                      format: int64
-                                      type: integer
+                                      - Exact
+                                      - RegularExpression
+                                      type: string
+                                    value:
+                                      maxLength: 4096
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - name
+                                  - value
                                   type: object
                                 type: array
                               host:
@@ -181,10 +192,15 @@ spec:
                           regex:
                             properties:
                               action:
-                                type: integer
+                                type: string
                               builtins:
+                                enum:
+                                - SSN
+                                - CREDIT_CARD
+                                - PHONE_NUMBER
+                                - EMAIL
                                 items:
-                                  type: integer
+                                  type: string
                                 type: array
                               regexMatch:
                                 items:
@@ -201,18 +217,24 @@ spec:
                               forwardHeaders:
                                 items:
                                   properties:
-                                    key:
+                                    name:
+                                      maxLength: 256
+                                      minLength: 1
+                                      pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
                                       type: string
-                                    matchType:
-                                      default: EXACT
+                                    type:
+                                      default: Exact
                                       enum:
-                                      - EXACT
-                                      - PREFIX
-                                      - SUFFIX
-                                      - CONTAINS
-                                      - REGEX
-                                      format: int64
-                                      type: integer
+                                      - Exact
+                                      - RegularExpression
+                                      type: string
+                                    value:
+                                      maxLength: 4096
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - name
+                                  - value
                                   type: object
                                 type: array
                               host:
@@ -227,7 +249,7 @@ spec:
                     enum:
                     - CHAT
                     - CHAT_STREAMING
-                    type: integer
+                    type: string
                 type: object
               targetRef:
                 properties:

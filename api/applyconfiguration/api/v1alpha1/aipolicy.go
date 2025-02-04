@@ -1,6 +1,9 @@
 package v1alpha1
 
-import "k8s.io/apimachinery/pkg/runtime"
+import (
+	"k8s.io/apimachinery/pkg/runtime"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+)
 
 // AI config is used to configure the behavior of the LLM provider
 // on the level of individual routes. These route settings, such as prompt enrichment,
@@ -69,13 +72,13 @@ type AIPromptEnrichment struct {
 }
 
 // RouteType is the type of route to the LLM provider API.
-type RouteType int
+type RouteType string
 
 const (
 	// The LLM generates the full response before responding to a client.
-	CHAT RouteType = iota
+	CHAT RouteType = "CHAT"
 	// Stream responses to a client, which allows the LLM to stream out tokens as they are generated.
-	CHAT_STREAMING
+	CHAT_STREAMING RouteType = "CHAT_STREAMING"
 )
 
 // An entry for a message to prepend or append to each prompt.
@@ -90,17 +93,17 @@ type Message struct {
 // BuiltIn regex patterns for specific types of strings in prompts.
 // For example, if you specify `CREDIT_CARD`, any credit card numbers
 // in the request or response are matched.
-type BuiltIn int
+type BuiltIn string
 
 const (
 	// Default regex matching for Social Security numbers.
-	SSN BuiltIn = iota
+	SSN BuiltIn = "SSN"
 	// Default regex matching for credit card numbers.
-	CREDIT_CARD
+	CREDIT_CARD BuiltIn = "CREDIT_CARD"
 	// Default regex matching for phone numbers.
-	PHONE_NUMBER
+	PHONE_NUMBER BuiltIn = "PHONE_NUMBER"
 	// Default regex matching for email addresses.
-	EMAIL
+	EMAIL BuiltIn = "EMAIL"
 )
 
 // RegexMatch configures the regular expression (regex) matching for prompt guards and data masking.
@@ -113,13 +116,13 @@ type RegexMatch struct {
 
 // Action to take if a regex pattern is matched in a request or response.
 // This setting applies only to request matches. PromptguardResponse matches are always masked by default.
-type Action int
+type Action string
 
 const (
 	// Mask the matched data in the request.
-	MASK Action = iota
+	MASK Action = "MASK"
 	// Reject the request if the regex matches content in the request.
-	REJECT
+	REJECT Action = "REJECT"
 )
 
 // Regex configures the regular expression (regex) matching for prompt guards and data masking.
@@ -129,37 +132,12 @@ type Regex struct {
 	Matches []RegexMatch `json:"regexMatch,omitempty"`
 	// A list of built-in regex patterns to match against the request or response.
 	// Matches and built-ins are additive.
+	// +kubebuilder:validation:Enum=SSN;CREDIT_CARD;PHONE_NUMBER;EMAIL
 	Builtins []BuiltIn `json:"builtins,omitempty"`
 	// The action to take if a regex pattern is matched in a request or response.
 	// This setting applies only to request matches. PromptguardResponse matches are always masked by default.
 	// Defaults to `MASK`.
 	Action Action `json:"action,omitempty"`
-}
-
-// MatchType is the header string match type.
-type MatchType int64
-
-const (
-	// The string must match exactly the specified string.
-	EXACT MatchType = iota
-	// The string must have the specified prefix.
-	PREFIX
-	// The string must have the specified suffix.
-	SUFFIX
-	// The header string must contain the specified string.
-	CONTAINS
-	// The string must match the specified [RE2-style regular expression](https://github.com/google/re2/wiki/) pattern.
-	REGEX
-)
-
-// HeaderMatch describes how to match a given string in HTTP headers. Match is case-sensitive.
-type HeaderMatch struct {
-	// The header key string to match against.
-	Key string `json:"key,omitempty"`
-	// The type of match to use.
-	// +kubebuilder:validation:Enum=EXACT;PREFIX;SUFFIX;CONTAINS;REGEX
-	// +kubebuilder:default=EXACT
-	MatchType MatchType `json:"matchType,omitempty"`
 }
 
 // Webhook configures a webhook to forward requests or responses to for prompt guarding.
@@ -171,7 +149,7 @@ type Webhook struct {
 	Port uint32 `json:"port,omitempty"`
 
 	// ForwardHeaders define headers to forward with the request to the webhook.
-	ForwardHeaders []HeaderMatch `json:"forwardHeaders,omitempty"`
+	ForwardHeaders []gwv1.HTTPHeaderMatch `json:"forwardHeaders,omitempty"`
 }
 
 // CustomResponse configures a response to return to the client if request content

@@ -57,8 +57,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.GeminiConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("GracefulShutdownSpec"):
 		return &apiv1alpha1.GracefulShutdownSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("HeaderMatch"):
-		return &apiv1alpha1.HeaderMatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Host"):
 		return &apiv1alpha1.HostApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("HttpListenerPolicy"):
@@ -77,8 +75,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ListenerPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ListenerPolicySpec"):
 		return &apiv1alpha1.ListenerPolicySpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("LLMBackend"):
-		return &apiv1alpha1.LLMBackendApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LLMProviders"):
 		return &apiv1alpha1.LLMProvidersApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LocalPolicyTargetReference"):

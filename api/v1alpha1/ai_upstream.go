@@ -7,14 +7,10 @@ type AIUpstream struct {
 	// or to use a different backend that is API-compliant with the upstream version.
 	CustomHost Host `json:"customHost,omitempty"`
 
-	// The LLM provider backend to use.
-	LLM LLMBackend `json:"llm,omitempty"`
-}
-
-// LLMBackend configures the AI gateway to use a single LLM provider backend.
-type LLMBackend struct {
-	LLMProviders `json:",inline"` // Embeds all fields from LLMProviders directly into LLMBackend as inline fields.
-	MultiPool    *MultiPoolConfig `json:"multipool,omitempty"`
+	// The LLM configures the AI gateway to use a single LLM provider backend.
+	LLM LLMProviders `json:"llm,inline"`
+	// The MultiPool configures the backends for multiple hosts or models from the same provider in one Upstream resource.
+	MultiPool *MultiPoolConfig `json:"multipool,omitempty"`
 }
 
 // LLMProviders configures the AI gateway to use a single LLM provider backend.
