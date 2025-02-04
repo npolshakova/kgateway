@@ -5,8 +5,9 @@ package v1alpha1
 // AIUpstreamApplyConfiguration represents a declarative configuration of the AIUpstream type for use
 // with apply.
 type AIUpstreamApplyConfiguration struct {
-	CustomHost *HostApplyConfiguration       `json:"customHost,omitempty"`
-	LLM        *LLMBackendApplyConfiguration `json:"llm,omitempty"`
+	CustomHost *HostApplyConfiguration            `json:"customHost,omitempty"`
+	LLM        *LLMProvidersApplyConfiguration    `json:",inline"`
+	MultiPool  *MultiPoolConfigApplyConfiguration `json:"multipool,omitempty"`
 }
 
 // AIUpstreamApplyConfiguration constructs a declarative configuration of the AIUpstream type for use with
@@ -26,7 +27,15 @@ func (b *AIUpstreamApplyConfiguration) WithCustomHost(value *HostApplyConfigurat
 // WithLLM sets the LLM field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LLM field is set to the value of the last call.
-func (b *AIUpstreamApplyConfiguration) WithLLM(value *LLMBackendApplyConfiguration) *AIUpstreamApplyConfiguration {
+func (b *AIUpstreamApplyConfiguration) WithLLM(value *LLMProvidersApplyConfiguration) *AIUpstreamApplyConfiguration {
 	b.LLM = value
+	return b
+}
+
+// WithMultiPool sets the MultiPool field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MultiPool field is set to the value of the last call.
+func (b *AIUpstreamApplyConfiguration) WithMultiPool(value *MultiPoolConfigApplyConfiguration) *AIUpstreamApplyConfiguration {
+	b.MultiPool = value
 	return b
 }
