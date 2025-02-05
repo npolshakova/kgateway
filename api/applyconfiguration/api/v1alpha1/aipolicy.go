@@ -5,20 +5,20 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-// AI config is used to configure the behavior of the LLM provider
+// AIRoutePolicy config is used to configure the behavior of the LLM provider
 // on the level of individual routes. These route settings, such as prompt enrichment,
 // retrieval augmented generation (RAG), and semantic caching, are applicable only
 // for routes that send requests to an LLM provider backend.
-type AI struct {
+type AIRoutePolicy struct {
 
 	// Enrich requests sent to the LLM provider by appending and prepending system prompts.
 	// This can be configured only for LLM providers that use the `CHAT` API route type.
-	PromptEnrichment AIPromptEnrichment `json:"prompt_enrichment,omitempty"`
+	PromptEnrichment *AIPromptEnrichment `json:"promptEnrichment,omitempty"`
 
 	// Set up prompt guards to block unwanted requests to the LLM provider and mask sensitive data.
 	// Prompt guards can be used to reject requests based on the content of the prompt, as well as
 	// mask responses based on the content of the response.
-	PromptGuard AIPromptGuard `json:"prompt_guard,omitempty"`
+	PromptGuard *AIPromptGuard `json:"promptGuard,omitempty"`
 
 	// Provide defaults to merge with user input fields.
 	// Defaults do _not_ override the user input fields, unless you explicitly set `override` to `true`.
@@ -27,7 +27,7 @@ type AI struct {
 	// The type of route to the LLM provider API. Currently, `CHAT` and `CHAT_STREAMING` are supported.
 	// +kubebuilder:validation:Enum=CHAT;CHAT_STREAMING
 	// +kube:default=CHAT
-	RouteType RouteType `json:"route_type,omitempty"`
+	RouteType RouteType `json:"routeType,omitempty"`
 }
 
 // AIPromptEnrichment defines the config to enrich requests sent to the LLM provider by appending and prepending system prompts.
@@ -93,6 +93,7 @@ type Message struct {
 // BuiltIn regex patterns for specific types of strings in prompts.
 // For example, if you specify `CREDIT_CARD`, any credit card numbers
 // in the request or response are matched.
+// +kubebuilder:validation:Enum=SSN;CREDIT_CARD;PHONE_NUMBER;EMAIL
 type BuiltIn string
 
 const (
@@ -132,21 +133,19 @@ type Regex struct {
 	Matches []RegexMatch `json:"regexMatch,omitempty"`
 	// A list of built-in regex patterns to match against the request or response.
 	// Matches and built-ins are additive.
-	// +kubebuilder:validation:Enum=SSN;CREDIT_CARD;PHONE_NUMBER;EMAIL
 	Builtins []BuiltIn `json:"builtins,omitempty"`
 	// The action to take if a regex pattern is matched in a request or response.
 	// This setting applies only to request matches. PromptguardResponse matches are always masked by default.
 	// Defaults to `MASK`.
+	// +kubebuilder:default=MASK
 	Action Action `json:"action,omitempty"`
 }
 
 // Webhook configures a webhook to forward requests or responses to for prompt guarding.
 type Webhook struct {
 	// Host to send the traffic to.
-	Host string `json:"host,omitempty"`
-
-	// Port to send the traffic to
-	Port uint32 `json:"port,omitempty"`
+	// +kubebuilder:validation:Required
+	Host *Host `json:"host"`
 
 	// ForwardHeaders define headers to forward with the request to the webhook.
 	ForwardHeaders []gwv1.HTTPHeaderMatch `json:"forwardHeaders,omitempty"`
@@ -161,7 +160,9 @@ type CustomResponse struct {
 	Message string `json:"message,omitempty"`
 
 	// The status code to return to the client. Defaults to 403.
-	// +kubebuilder:default="403"
+	// +kubebuilder:default=403
+	// +kubebuilder:validation:Minimum=200
+	// +kubebuilder:validation:Maximum=599
 	StatusCode uint32 `json:"statusCode,omitempty"`
 }
 
@@ -172,16 +173,16 @@ type OpenAIModeration struct {
 	// +kubebuilder:default="omni-moderation-latest"
 	Model string `json:"model,omitempty"`
 
-	// The authorization token that the AI gateway uses
+	// The authorization token that the AIRoutePolicy gateway uses
 	// to access the OpenAI moderation model.
-	AuthToken SingleAuthToken `json:"authToken,omitempty"`
+	AuthToken *SingleAuthToken `json:"authToken,omitempty"`
 }
 
 // Moderation configures an external moderation model endpoint. This endpoint evaluates
 // request prompt data against predefined content rules to determine if the content
 // adheres to those rules.
 //
-// Any requests routed through the AI Gateway are processed by the specified
+// Any requests routed through the AIRoutePolicy Gateway are processed by the specified
 // moderation model. If the model identifies the content as harmful based on its rules,
 // the request is automatically rejected.
 //
@@ -191,7 +192,9 @@ type Moderation struct {
 	// Pass prompt data through an external moderation model endpoint,
 	// which compares the request prompt input to predefined content rules.
 	// Configure an OpenAI moderation endpoint.
-	OpenAIModeration OpenAIModeration `json:"openAIModeration,omitempty"`
+	OpenAIModeration *OpenAIModeration `json:"openAIModeration"`
+
+	// TODO: support other moderation models
 }
 
 // PromptguardRequest defines the prompt guards to apply to requests sent by the client.
@@ -199,26 +202,26 @@ type PromptguardRequest struct {
 
 	// A custom response message to return to the client. If not specified, defaults to
 	// "The request was rejected due to inappropriate content".
-	CustomResponse CustomResponse `json:"customResponse,omitempty"`
+	CustomResponse *CustomResponse `json:"customResponse,omitempty"`
 
 	// Regular expression (regex) matching for prompt guards and data masking.
-	Regex Regex `json:"regex,omitempty"`
+	Regex *Regex `json:"regex,omitempty"`
 
 	// Configure a webhook to forward requests to for prompt guarding.
-	Webhook Webhook `json:"webhook,omitempty"`
+	Webhook *Webhook `json:"webhook,omitempty"`
 
 	// Pass prompt data through an external moderation model endpoint,
 	// which compares the request prompt input to predefined content rules.
-	Moderation Moderation `json:"moderation,omitempty"`
+	Moderation *Moderation `json:"moderation,omitempty"`
 }
 
 // PromptguardResponse configures the response that the prompt guard applies to responses returned by the LLM provider.
 type PromptguardResponse struct {
 	// Regular expression (regex) matching for prompt guards and data masking.
-	Regex Regex `json:"regex,omitempty"`
+	Regex *Regex `json:"regex,omitempty"`
 
 	// Configure a webhook to forward responses to for prompt guarding.
-	Webhook Webhook `json:"webhook,omitempty"`
+	Webhook *Webhook `json:"webhook,omitempty"`
 }
 
 // AIPromptGuard configures a prompt guards to block unwanted requests to the LLM provider and mask sensitive data.
@@ -247,9 +250,9 @@ type PromptguardResponse struct {
 // ```
 type AIPromptGuard struct {
 	// Prompt guards to apply to requests sent by the client.
-	Request PromptguardRequest `json:"request,omitempty"`
+	Request *PromptguardRequest `json:"request,omitempty"`
 	// Prompt guards to apply to responses returned by the LLM provider.
-	Response PromptguardResponse `json:"response,omitempty"`
+	Response *PromptguardResponse `json:"response,omitempty"`
 }
 
 // FieldDefault provides defaults to merge with user input fields.

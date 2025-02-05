@@ -6,7 +6,7 @@ package v1alpha1
 // with apply.
 type AIUpstreamApplyConfiguration struct {
 	CustomHost *HostApplyConfiguration            `json:"customHost,omitempty"`
-	LLM        *LLMProvidersApplyConfiguration    `json:",inline"`
+	LLM        *LLMProvidersApplyConfiguration    `json:"llm,omitempty"`
 	MultiPool  *MultiPoolConfigApplyConfiguration `json:"multipool,omitempty"`
 }
 
