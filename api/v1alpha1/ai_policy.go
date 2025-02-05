@@ -6,7 +6,7 @@ import "k8s.io/apimachinery/pkg/runtime"
 // on the level of individual routes. These route settings, such as prompt enrichment,
 // retrieval augmented generation (RAG), and semantic caching, are applicable only
 // for routes that send requests to an LLM provider backend.
-type AI struct {
+type AIRoutePolicy struct {
 
 	// Enrich requests sent to the LLM provider by appending and prepending system prompts.
 	// This can be configured only for LLM providers that use the `CHAT` API route type.

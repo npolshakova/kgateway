@@ -17,8 +17,6 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=gateway.kgateway.dev, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithKind("AI"):
-		return &apiv1alpha1.AIApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("AiExtension"):
 		return &apiv1alpha1.AiExtensionApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("AiExtensionStats"):
@@ -27,6 +25,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.AIPromptEnrichmentApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("AIPromptGuard"):
 		return &apiv1alpha1.AIPromptGuardApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("AIRoutePolicy"):
+		return &apiv1alpha1.AIRoutePolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("AIUpstream"):
 		return &apiv1alpha1.AIUpstreamApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("AnthropicConfig"):
@@ -57,6 +57,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.GeminiConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("GracefulShutdownSpec"):
 		return &apiv1alpha1.GracefulShutdownSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("HeaderMatch"):
+		return &apiv1alpha1.HeaderMatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Host"):
 		return &apiv1alpha1.HostApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("HttpListenerPolicy"):

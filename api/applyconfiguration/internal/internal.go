@@ -23,26 +23,6 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
-- name: com.github.kgateway-dev.kgateway.api.v1alpha1.AI
-  map:
-    fields:
-    - name: defaults
-      type:
-        list:
-          elementType:
-            namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.FieldDefault
-          elementRelationship: atomic
-    - name: prompt_enrichment
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AIPromptEnrichment
-      default: {}
-    - name: prompt_guard
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AIPromptGuard
-      default: {}
-    - name: route_type
-      type:
-        scalar: numeric
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.AIPromptEnrichment
   map:
     fields:
@@ -69,17 +49,38 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.PromptguardResponse
       default: {}
+- name: com.github.kgateway-dev.kgateway.api.v1alpha1.AIRoutePolicy
+  map:
+    fields:
+    - name: defaults
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.FieldDefault
+          elementRelationship: atomic
+    - name: prompt_enrichment
+      type:
+        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AIPromptEnrichment
+      default: {}
+    - name: prompt_guard
+      type:
+        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AIPromptGuard
+      default: {}
+    - name: route_type
+      type:
+        scalar: numeric
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.AIUpstream
   map:
     fields:
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Host
-      default: {}
     - name: llm
       type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.LLMBackend
-      default: {}
+        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.LLMProviders
+    - name: multipool
+      type:
+        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.MultiPoolConfig
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.AiExtension
   map:
     fields:
@@ -128,11 +129,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.SingleAuthToken
-      default: {}
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Host
-      default: {}
     - name: model
       type:
         scalar: string
@@ -152,16 +151,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: apiVersion
       type:
         scalar: string
+      default: ""
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.SingleAuthToken
-      default: {}
     - name: deploymentName
       type:
         scalar: string
+      default: ""
     - name: endpoint
       type:
         scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.CustomLabel
   map:
     fields:
@@ -317,13 +318,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: apiVersion
       type:
         scalar: string
+      default: ""
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.SingleAuthToken
-      default: {}
     - name: model
       type:
         scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.GracefulShutdownSpec
   map:
     fields:
@@ -471,30 +473,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: stats
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.StatsConfig
-- name: com.github.kgateway-dev.kgateway.api.v1alpha1.LLMBackend
-  map:
-    fields:
-    - name: anthropic
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AnthropicConfig
-    - name: azureopenai
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AzureOpenAIConfig
-    - name: gemini
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.GeminiConfig
-    - name: mistral
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.MistralConfig
-    - name: multipool
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.MultiPoolConfig
-    - name: openai
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.OpenAIConfig
-    - name: vertexai
-      type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.VertexAIConfig
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.LLMProviders
   map:
     fields:
@@ -577,11 +555,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.SingleAuthToken
-      default: {}
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Host
-      default: {}
     - name: model
       type:
         scalar: string
@@ -607,11 +583,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.SingleAuthToken
-      default: {}
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Host
-      default: {}
     - name: model
       type:
         scalar: string
@@ -807,7 +781,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: ai
       type:
-        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AI
+        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AIRoutePolicy
     - name: targetRef
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.LocalPolicyTargetReference
@@ -893,7 +867,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: secretRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
-      default: {}
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.StaticUpstream
   map:
     fields:
@@ -968,25 +941,28 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: apiVersion
       type:
         scalar: string
+      default: ""
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.SingleAuthToken
-      default: {}
     - name: location
       type:
         scalar: string
+      default: ""
     - name: model
       type:
         scalar: string
+      default: ""
     - name: modelPath
       type:
         scalar: string
     - name: projectId
       type:
         scalar: string
+      default: ""
     - name: publisher
       type:
-        scalar: numeric
+        scalar: string
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.Webhook
   map:
     fields:

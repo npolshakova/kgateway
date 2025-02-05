@@ -35,107 +35,6 @@ spec:
             properties:
               ai:
                 properties:
-                  anthropic:
-                    properties:
-                      apiVersion:
-                        type: string
-                      authToken:
-                        properties:
-                          inline:
-                            type: string
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: 1 == (self.inline != null?1:0) + (self.secretRef
-                                != null?1:0)
-                            - message: Inline token must be set when kind is INLINE
-                              rule: self.kind != 'INLINE' || self.inline != null
-                          kind:
-                            enum:
-                            - INLINE
-                            - SECRETREF
-                            - PASSTHROUGH
-                            type: string
-                          secretRef:
-                            properties:
-                              name:
-                                default: ""
-                                type: string
-                            type: object
-                            x-kubernetes-map-type: atomic
-                            x-kubernetes-validations:
-                            - message: There must be one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (self.inline != null ? 1 : 0) + (self.secretRef
-                                != null ? 1 : 0)'
-                            - message: SecretRef must be set when kind is SECRETREF
-                              rule: self.kind != 'SECRETREF' || self.secretRef !=
-                                null
-                        required:
-                        - kind
-                        type: object
-                      customHost:
-                        properties:
-                          host:
-                            maxLength: 253
-                            minLength: 1
-                            type: string
-                          port:
-                            format: int32
-                            maximum: 65535
-                            minimum: 1
-                            type: integer
-                        required:
-                        - host
-                        - port
-                        type: object
-                      model:
-                        type: string
-                    type: object
-                  azureopenai:
-                    properties:
-                      apiVersion:
-                        type: string
-                      authToken:
-                        properties:
-                          inline:
-                            type: string
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: 1 == (self.inline != null?1:0) + (self.secretRef
-                                != null?1:0)
-                            - message: Inline token must be set when kind is INLINE
-                              rule: self.kind != 'INLINE' || self.inline != null
-                          kind:
-                            enum:
-                            - INLINE
-                            - SECRETREF
-                            - PASSTHROUGH
-                            type: string
-                          secretRef:
-                            properties:
-                              name:
-                                default: ""
-                                type: string
-                            type: object
-                            x-kubernetes-map-type: atomic
-                            x-kubernetes-validations:
-                            - message: There must be one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (self.inline != null ? 1 : 0) + (self.secretRef
-                                != null ? 1 : 0)'
-                            - message: SecretRef must be set when kind is SECRETREF
-                              rule: self.kind != 'SECRETREF' || self.secretRef !=
-                                null
-                        required:
-                        - kind
-                        type: object
-                      deploymentName:
-                        type: string
-                      endpoint:
-                        type: string
-                    type: object
                   customHost:
                     properties:
                       host:
@@ -151,103 +50,312 @@ spec:
                     - host
                     - port
                     type: object
-                  gemini:
+                  llm:
                     properties:
-                      apiVersion:
-                        type: string
-                      authToken:
+                      anthropic:
                         properties:
-                          inline:
+                          apiVersion:
                             type: string
+                          authToken:
+                            properties:
+                              inline:
+                                type: string
+                              kind:
+                                enum:
+                                - Inline
+                                - SecretRef
+                                - Passthrough
+                                type: string
+                              secretRef:
+                                properties:
+                                  name:
+                                    default: ""
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - kind
+                            type: object
                             x-kubernetes-validations:
                             - message: There must one and only one SingleAuthToken
                                 type set
-                              rule: 1 == (self.inline != null?1:0) + (self.secretRef
-                                != null?1:0)
-                            - message: Inline token must be set when kind is INLINE
-                              rule: self.kind != 'INLINE' || self.inline != null
-                          kind:
-                            enum:
-                            - INLINE
-                            - SECRETREF
-                            - PASSTHROUGH
-                            type: string
-                          secretRef:
+                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
+                                ? 0 : 1)'
+                            - message: Inline token must be set when kind is Inline
+                                or SecretRef must be set when kind is SecretRef
+                              rule: (self.kind == 'Inline' && has(self.inline)) ||
+                                (self.kind == 'SecretRef' && has(self.secretRef))
+                          customHost:
                             properties:
-                              name:
-                                default: ""
+                              host:
+                                maxLength: 253
+                                minLength: 1
                                 type: string
+                              port:
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                            required:
+                            - host
+                            - port
                             type: object
-                            x-kubernetes-map-type: atomic
-                            x-kubernetes-validations:
-                            - message: There must be one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (self.inline != null ? 1 : 0) + (self.secretRef
-                                != null ? 1 : 0)'
-                            - message: SecretRef must be set when kind is SECRETREF
-                              rule: self.kind != 'SECRETREF' || self.secretRef !=
-                                null
-                        required:
-                        - kind
-                        type: object
-                      model:
-                        type: string
-                    type: object
-                  mistral:
-                    properties:
-                      authToken:
-                        properties:
-                          inline:
+                          model:
                             type: string
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: 1 == (self.inline != null?1:0) + (self.secretRef
-                                != null?1:0)
-                            - message: Inline token must be set when kind is INLINE
-                              rule: self.kind != 'INLINE' || self.inline != null
-                          kind:
-                            enum:
-                            - INLINE
-                            - SECRETREF
-                            - PASSTHROUGH
-                            type: string
-                          secretRef:
-                            properties:
-                              name:
-                                default: ""
-                                type: string
-                            type: object
-                            x-kubernetes-map-type: atomic
-                            x-kubernetes-validations:
-                            - message: There must be one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (self.inline != null ? 1 : 0) + (self.secretRef
-                                != null ? 1 : 0)'
-                            - message: SecretRef must be set when kind is SECRETREF
-                              rule: self.kind != 'SECRETREF' || self.secretRef !=
-                                null
                         required:
-                        - kind
+                        - authToken
                         type: object
-                      customHost:
+                      azureopenai:
                         properties:
-                          host:
-                            maxLength: 253
+                          apiVersion:
                             minLength: 1
                             type: string
-                          port:
-                            format: int32
-                            maximum: 65535
-                            minimum: 1
-                            type: integer
+                          authToken:
+                            properties:
+                              inline:
+                                type: string
+                              kind:
+                                enum:
+                                - Inline
+                                - SecretRef
+                                - Passthrough
+                                type: string
+                              secretRef:
+                                properties:
+                                  name:
+                                    default: ""
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - kind
+                            type: object
+                            x-kubernetes-validations:
+                            - message: There must one and only one SingleAuthToken
+                                type set
+                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
+                                ? 0 : 1)'
+                            - message: Inline token must be set when kind is Inline
+                                or SecretRef must be set when kind is SecretRef
+                              rule: (self.kind == 'Inline' && has(self.inline)) ||
+                                (self.kind == 'SecretRef' && has(self.secretRef))
+                          deploymentName:
+                            minLength: 1
+                            type: string
+                          endpoint:
+                            minLength: 1
+                            type: string
                         required:
-                        - host
-                        - port
+                        - apiVersion
+                        - authToken
+                        - deploymentName
+                        - endpoint
                         type: object
-                      model:
-                        type: string
+                      gemini:
+                        properties:
+                          apiVersion:
+                            type: string
+                          authToken:
+                            properties:
+                              inline:
+                                type: string
+                              kind:
+                                enum:
+                                - Inline
+                                - SecretRef
+                                - Passthrough
+                                type: string
+                              secretRef:
+                                properties:
+                                  name:
+                                    default: ""
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - kind
+                            type: object
+                            x-kubernetes-validations:
+                            - message: There must one and only one SingleAuthToken
+                                type set
+                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
+                                ? 0 : 1)'
+                            - message: Inline token must be set when kind is Inline
+                                or SecretRef must be set when kind is SecretRef
+                              rule: (self.kind == 'Inline' && has(self.inline)) ||
+                                (self.kind == 'SecretRef' && has(self.secretRef))
+                          model:
+                            type: string
+                        required:
+                        - apiVersion
+                        - authToken
+                        - model
+                        type: object
+                      mistral:
+                        properties:
+                          authToken:
+                            properties:
+                              inline:
+                                type: string
+                              kind:
+                                enum:
+                                - Inline
+                                - SecretRef
+                                - Passthrough
+                                type: string
+                              secretRef:
+                                properties:
+                                  name:
+                                    default: ""
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - kind
+                            type: object
+                            x-kubernetes-validations:
+                            - message: There must one and only one SingleAuthToken
+                                type set
+                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
+                                ? 0 : 1)'
+                            - message: Inline token must be set when kind is Inline
+                                or SecretRef must be set when kind is SecretRef
+                              rule: (self.kind == 'Inline' && has(self.inline)) ||
+                                (self.kind == 'SecretRef' && has(self.secretRef))
+                          customHost:
+                            properties:
+                              host:
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                              port:
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                            required:
+                            - host
+                            - port
+                            type: object
+                          model:
+                            type: string
+                        required:
+                        - authToken
+                        type: object
+                      openai:
+                        properties:
+                          authToken:
+                            properties:
+                              inline:
+                                type: string
+                              kind:
+                                enum:
+                                - Inline
+                                - SecretRef
+                                - Passthrough
+                                type: string
+                              secretRef:
+                                properties:
+                                  name:
+                                    default: ""
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - kind
+                            type: object
+                            x-kubernetes-validations:
+                            - message: There must one and only one SingleAuthToken
+                                type set
+                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
+                                ? 0 : 1)'
+                            - message: Inline token must be set when kind is Inline
+                                or SecretRef must be set when kind is SecretRef
+                              rule: (self.kind == 'Inline' && has(self.inline)) ||
+                                (self.kind == 'SecretRef' && has(self.secretRef))
+                          customHost:
+                            properties:
+                              host:
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                              port:
+                                format: int32
+                                maximum: 65535
+                                minimum: 1
+                                type: integer
+                            required:
+                            - host
+                            - port
+                            type: object
+                          model:
+                            type: string
+                        required:
+                        - authToken
+                        type: object
+                      vertexai:
+                        properties:
+                          apiVersion:
+                            minLength: 1
+                            type: string
+                          authToken:
+                            properties:
+                              inline:
+                                type: string
+                              kind:
+                                enum:
+                                - Inline
+                                - SecretRef
+                                - Passthrough
+                                type: string
+                              secretRef:
+                                properties:
+                                  name:
+                                    default: ""
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - kind
+                            type: object
+                            x-kubernetes-validations:
+                            - message: There must one and only one SingleAuthToken
+                                type set
+                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
+                                ? 0 : 1)'
+                            - message: Inline token must be set when kind is Inline
+                                or SecretRef must be set when kind is SecretRef
+                              rule: (self.kind == 'Inline' && has(self.inline)) ||
+                                (self.kind == 'SecretRef' && has(self.secretRef))
+                          location:
+                            minLength: 1
+                            type: string
+                          model:
+                            minLength: 1
+                            type: string
+                          modelPath:
+                            type: string
+                          projectId:
+                            minLength: 1
+                            type: string
+                          publisher:
+                            enum:
+                            - GOOGLE
+                            type: string
+                        required:
+                        - apiVersion
+                        - authToken
+                        - location
+                        - model
+                        - projectId
+                        type: object
                     type: object
+                    x-kubernetes-validations:
+                    - message: There must one and only one LLMProviders type set
+                      rule: 1 == (self.openai != null?1:0) + (self.azureopenai !=
+                        null?1:0) + (self.anthropic != null?1:0) + (self.gemini !=
+                        null?1:0) + (self.vertexai != null?1:0) + (self.mistral !=
+                        null?1:0)
                   multipool:
                     properties:
                       priorities:
@@ -264,20 +372,11 @@ spec:
                                         properties:
                                           inline:
                                             type: string
-                                            x-kubernetes-validations:
-                                            - message: There must one and only one
-                                                SingleAuthToken type set
-                                              rule: 1 == (self.inline != null?1:0)
-                                                + (self.secretRef != null?1:0)
-                                            - message: Inline token must be set when
-                                                kind is INLINE
-                                              rule: self.kind != 'INLINE' || self.inline
-                                                != null
                                           kind:
                                             enum:
-                                            - INLINE
-                                            - SECRETREF
-                                            - PASSTHROUGH
+                                            - Inline
+                                            - SecretRef
+                                            - Passthrough
                                             type: string
                                           secretRef:
                                             properties:
@@ -286,19 +385,19 @@ spec:
                                                 type: string
                                             type: object
                                             x-kubernetes-map-type: atomic
-                                            x-kubernetes-validations:
-                                            - message: There must be one and only
-                                                one SingleAuthToken type set
-                                              rule: '1 == (self.inline != null ? 1
-                                                : 0) + (self.secretRef != null ? 1
-                                                : 0)'
-                                            - message: SecretRef must be set when
-                                                kind is SECRETREF
-                                              rule: self.kind != 'SECRETREF' || self.secretRef
-                                                != null
                                         required:
                                         - kind
                                         type: object
+                                        x-kubernetes-validations:
+                                        - message: There must one and only one SingleAuthToken
+                                            type set
+                                          rule: '1 == (!has(self.inline) ? 0 : 1)
+                                            + (!has(self.secretRef) ? 0 : 1)'
+                                        - message: Inline token must be set when kind
+                                            is Inline or SecretRef must be set when
+                                            kind is SecretRef
+                                          rule: (self.kind == 'Inline' && has(self.inline))
+                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       customHost:
                                         properties:
                                           host:
@@ -316,29 +415,23 @@ spec:
                                         type: object
                                       model:
                                         type: string
+                                    required:
+                                    - authToken
                                     type: object
                                   azureopenai:
                                     properties:
                                       apiVersion:
+                                        minLength: 1
                                         type: string
                                       authToken:
                                         properties:
                                           inline:
                                             type: string
-                                            x-kubernetes-validations:
-                                            - message: There must one and only one
-                                                SingleAuthToken type set
-                                              rule: 1 == (self.inline != null?1:0)
-                                                + (self.secretRef != null?1:0)
-                                            - message: Inline token must be set when
-                                                kind is INLINE
-                                              rule: self.kind != 'INLINE' || self.inline
-                                                != null
                                           kind:
                                             enum:
-                                            - INLINE
-                                            - SECRETREF
-                                            - PASSTHROUGH
+                                            - Inline
+                                            - SecretRef
+                                            - Passthrough
                                             type: string
                                           secretRef:
                                             properties:
@@ -347,23 +440,30 @@ spec:
                                                 type: string
                                             type: object
                                             x-kubernetes-map-type: atomic
-                                            x-kubernetes-validations:
-                                            - message: There must be one and only
-                                                one SingleAuthToken type set
-                                              rule: '1 == (self.inline != null ? 1
-                                                : 0) + (self.secretRef != null ? 1
-                                                : 0)'
-                                            - message: SecretRef must be set when
-                                                kind is SECRETREF
-                                              rule: self.kind != 'SECRETREF' || self.secretRef
-                                                != null
                                         required:
                                         - kind
                                         type: object
+                                        x-kubernetes-validations:
+                                        - message: There must one and only one SingleAuthToken
+                                            type set
+                                          rule: '1 == (!has(self.inline) ? 0 : 1)
+                                            + (!has(self.secretRef) ? 0 : 1)'
+                                        - message: Inline token must be set when kind
+                                            is Inline or SecretRef must be set when
+                                            kind is SecretRef
+                                          rule: (self.kind == 'Inline' && has(self.inline))
+                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       deploymentName:
+                                        minLength: 1
                                         type: string
                                       endpoint:
+                                        minLength: 1
                                         type: string
+                                    required:
+                                    - apiVersion
+                                    - authToken
+                                    - deploymentName
+                                    - endpoint
                                     type: object
                                   gemini:
                                     properties:
@@ -373,20 +473,11 @@ spec:
                                         properties:
                                           inline:
                                             type: string
-                                            x-kubernetes-validations:
-                                            - message: There must one and only one
-                                                SingleAuthToken type set
-                                              rule: 1 == (self.inline != null?1:0)
-                                                + (self.secretRef != null?1:0)
-                                            - message: Inline token must be set when
-                                                kind is INLINE
-                                              rule: self.kind != 'INLINE' || self.inline
-                                                != null
                                           kind:
                                             enum:
-                                            - INLINE
-                                            - SECRETREF
-                                            - PASSTHROUGH
+                                            - Inline
+                                            - SecretRef
+                                            - Passthrough
                                             type: string
                                           secretRef:
                                             properties:
@@ -395,21 +486,25 @@ spec:
                                                 type: string
                                             type: object
                                             x-kubernetes-map-type: atomic
-                                            x-kubernetes-validations:
-                                            - message: There must be one and only
-                                                one SingleAuthToken type set
-                                              rule: '1 == (self.inline != null ? 1
-                                                : 0) + (self.secretRef != null ? 1
-                                                : 0)'
-                                            - message: SecretRef must be set when
-                                                kind is SECRETREF
-                                              rule: self.kind != 'SECRETREF' || self.secretRef
-                                                != null
                                         required:
                                         - kind
                                         type: object
+                                        x-kubernetes-validations:
+                                        - message: There must one and only one SingleAuthToken
+                                            type set
+                                          rule: '1 == (!has(self.inline) ? 0 : 1)
+                                            + (!has(self.secretRef) ? 0 : 1)'
+                                        - message: Inline token must be set when kind
+                                            is Inline or SecretRef must be set when
+                                            kind is SecretRef
+                                          rule: (self.kind == 'Inline' && has(self.inline))
+                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       model:
                                         type: string
+                                    required:
+                                    - apiVersion
+                                    - authToken
+                                    - model
                                     type: object
                                   mistral:
                                     properties:
@@ -417,20 +512,11 @@ spec:
                                         properties:
                                           inline:
                                             type: string
-                                            x-kubernetes-validations:
-                                            - message: There must one and only one
-                                                SingleAuthToken type set
-                                              rule: 1 == (self.inline != null?1:0)
-                                                + (self.secretRef != null?1:0)
-                                            - message: Inline token must be set when
-                                                kind is INLINE
-                                              rule: self.kind != 'INLINE' || self.inline
-                                                != null
                                           kind:
                                             enum:
-                                            - INLINE
-                                            - SECRETREF
-                                            - PASSTHROUGH
+                                            - Inline
+                                            - SecretRef
+                                            - Passthrough
                                             type: string
                                           secretRef:
                                             properties:
@@ -439,19 +525,19 @@ spec:
                                                 type: string
                                             type: object
                                             x-kubernetes-map-type: atomic
-                                            x-kubernetes-validations:
-                                            - message: There must be one and only
-                                                one SingleAuthToken type set
-                                              rule: '1 == (self.inline != null ? 1
-                                                : 0) + (self.secretRef != null ? 1
-                                                : 0)'
-                                            - message: SecretRef must be set when
-                                                kind is SECRETREF
-                                              rule: self.kind != 'SECRETREF' || self.secretRef
-                                                != null
                                         required:
                                         - kind
                                         type: object
+                                        x-kubernetes-validations:
+                                        - message: There must one and only one SingleAuthToken
+                                            type set
+                                          rule: '1 == (!has(self.inline) ? 0 : 1)
+                                            + (!has(self.secretRef) ? 0 : 1)'
+                                        - message: Inline token must be set when kind
+                                            is Inline or SecretRef must be set when
+                                            kind is SecretRef
+                                          rule: (self.kind == 'Inline' && has(self.inline))
+                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       customHost:
                                         properties:
                                           host:
@@ -469,6 +555,8 @@ spec:
                                         type: object
                                       model:
                                         type: string
+                                    required:
+                                    - authToken
                                     type: object
                                   openai:
                                     properties:
@@ -476,20 +564,11 @@ spec:
                                         properties:
                                           inline:
                                             type: string
-                                            x-kubernetes-validations:
-                                            - message: There must one and only one
-                                                SingleAuthToken type set
-                                              rule: 1 == (self.inline != null?1:0)
-                                                + (self.secretRef != null?1:0)
-                                            - message: Inline token must be set when
-                                                kind is INLINE
-                                              rule: self.kind != 'INLINE' || self.inline
-                                                != null
                                           kind:
                                             enum:
-                                            - INLINE
-                                            - SECRETREF
-                                            - PASSTHROUGH
+                                            - Inline
+                                            - SecretRef
+                                            - Passthrough
                                             type: string
                                           secretRef:
                                             properties:
@@ -498,19 +577,19 @@ spec:
                                                 type: string
                                             type: object
                                             x-kubernetes-map-type: atomic
-                                            x-kubernetes-validations:
-                                            - message: There must be one and only
-                                                one SingleAuthToken type set
-                                              rule: '1 == (self.inline != null ? 1
-                                                : 0) + (self.secretRef != null ? 1
-                                                : 0)'
-                                            - message: SecretRef must be set when
-                                                kind is SECRETREF
-                                              rule: self.kind != 'SECRETREF' || self.secretRef
-                                                != null
                                         required:
                                         - kind
                                         type: object
+                                        x-kubernetes-validations:
+                                        - message: There must one and only one SingleAuthToken
+                                            type set
+                                          rule: '1 == (!has(self.inline) ? 0 : 1)
+                                            + (!has(self.secretRef) ? 0 : 1)'
+                                        - message: Inline token must be set when kind
+                                            is Inline or SecretRef must be set when
+                                            kind is SecretRef
+                                          rule: (self.kind == 'Inline' && has(self.inline))
+                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       customHost:
                                         properties:
                                           host:
@@ -528,29 +607,23 @@ spec:
                                         type: object
                                       model:
                                         type: string
+                                    required:
+                                    - authToken
                                     type: object
                                   vertexai:
                                     properties:
                                       apiVersion:
+                                        minLength: 1
                                         type: string
                                       authToken:
                                         properties:
                                           inline:
                                             type: string
-                                            x-kubernetes-validations:
-                                            - message: There must one and only one
-                                                SingleAuthToken type set
-                                              rule: 1 == (self.inline != null?1:0)
-                                                + (self.secretRef != null?1:0)
-                                            - message: Inline token must be set when
-                                                kind is INLINE
-                                              rule: self.kind != 'INLINE' || self.inline
-                                                != null
                                           kind:
                                             enum:
-                                            - INLINE
-                                            - SECRETREF
-                                            - PASSTHROUGH
+                                            - Inline
+                                            - SecretRef
+                                            - Passthrough
                                             type: string
                                           secretRef:
                                             properties:
@@ -559,29 +632,40 @@ spec:
                                                 type: string
                                             type: object
                                             x-kubernetes-map-type: atomic
-                                            x-kubernetes-validations:
-                                            - message: There must be one and only
-                                                one SingleAuthToken type set
-                                              rule: '1 == (self.inline != null ? 1
-                                                : 0) + (self.secretRef != null ? 1
-                                                : 0)'
-                                            - message: SecretRef must be set when
-                                                kind is SECRETREF
-                                              rule: self.kind != 'SECRETREF' || self.secretRef
-                                                != null
                                         required:
                                         - kind
                                         type: object
+                                        x-kubernetes-validations:
+                                        - message: There must one and only one SingleAuthToken
+                                            type set
+                                          rule: '1 == (!has(self.inline) ? 0 : 1)
+                                            + (!has(self.secretRef) ? 0 : 1)'
+                                        - message: Inline token must be set when kind
+                                            is Inline or SecretRef must be set when
+                                            kind is SecretRef
+                                          rule: (self.kind == 'Inline' && has(self.inline))
+                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       location:
+                                        minLength: 1
                                         type: string
                                       model:
+                                        minLength: 1
                                         type: string
                                       modelPath:
                                         type: string
                                       projectId:
+                                        minLength: 1
                                         type: string
                                       publisher:
-                                        type: integer
+                                        enum:
+                                        - GOOGLE
+                                        type: string
+                                    required:
+                                    - apiVersion
+                                    - authToken
+                                    - location
+                                    - model
+                                    - projectId
                                     type: object
                                 type: object
                                 x-kubernetes-validations:
@@ -591,121 +675,20 @@ spec:
                                     != null?1:0) + (self.anthropic != null?1:0) +
                                     (self.gemini != null?1:0) + (self.vertexai !=
                                     null?1:0) + (self.mistral != null?1:0)
+                              maxItems: 20
+                              minItems: 1
                               type: array
                           type: object
+                        maxItems: 20
+                        minItems: 1
                         type: array
-                    type: object
-                  openai:
-                    properties:
-                      authToken:
-                        properties:
-                          inline:
-                            type: string
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: 1 == (self.inline != null?1:0) + (self.secretRef
-                                != null?1:0)
-                            - message: Inline token must be set when kind is INLINE
-                              rule: self.kind != 'INLINE' || self.inline != null
-                          kind:
-                            enum:
-                            - INLINE
-                            - SECRETREF
-                            - PASSTHROUGH
-                            type: string
-                          secretRef:
-                            properties:
-                              name:
-                                default: ""
-                                type: string
-                            type: object
-                            x-kubernetes-map-type: atomic
-                            x-kubernetes-validations:
-                            - message: There must be one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (self.inline != null ? 1 : 0) + (self.secretRef
-                                != null ? 1 : 0)'
-                            - message: SecretRef must be set when kind is SECRETREF
-                              rule: self.kind != 'SECRETREF' || self.secretRef !=
-                                null
-                        required:
-                        - kind
-                        type: object
-                      customHost:
-                        properties:
-                          host:
-                            maxLength: 253
-                            minLength: 1
-                            type: string
-                          port:
-                            format: int32
-                            maximum: 65535
-                            minimum: 1
-                            type: integer
-                        required:
-                        - host
-                        - port
-                        type: object
-                      model:
-                        type: string
-                    type: object
-                  vertexai:
-                    properties:
-                      apiVersion:
-                        type: string
-                      authToken:
-                        properties:
-                          inline:
-                            type: string
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: 1 == (self.inline != null?1:0) + (self.secretRef
-                                != null?1:0)
-                            - message: Inline token must be set when kind is INLINE
-                              rule: self.kind != 'INLINE' || self.inline != null
-                          kind:
-                            enum:
-                            - INLINE
-                            - SECRETREF
-                            - PASSTHROUGH
-                            type: string
-                          secretRef:
-                            properties:
-                              name:
-                                default: ""
-                                type: string
-                            type: object
-                            x-kubernetes-map-type: atomic
-                            x-kubernetes-validations:
-                            - message: There must be one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (self.inline != null ? 1 : 0) + (self.secretRef
-                                != null ? 1 : 0)'
-                            - message: SecretRef must be set when kind is SECRETREF
-                              rule: self.kind != 'SECRETREF' || self.secretRef !=
-                                null
-                        required:
-                        - kind
-                        type: object
-                      location:
-                        type: string
-                      model:
-                        type: string
-                      modelPath:
-                        type: string
-                      projectId:
-                        type: string
-                      publisher:
-                        type: integer
+                    required:
+                    - priorities
                     type: object
                 type: object
                 x-kubernetes-validations:
-                - message: There must one and only one LLMProviders type set
-                  rule: 1 == (self.openai != null?1:0) + (self.azureopenai != null?1:0)
-                    + (self.anthropic != null?1:0) + (self.gemini != null?1:0) + (self.vertexai
-                    != null?1:0) + (self.mistral != null?1:0)
+                - message: There must one and only one LLM or MultiPool can be set
+                  rule: 1 == (self.llm != null?1:0) + (self.multipool != null?1:0)
               aws:
                 properties:
                   region:

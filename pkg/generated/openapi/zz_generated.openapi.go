@@ -16,9 +16,9 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/kgateway-dev/kgateway/api/v1alpha1.AI":                         schema_kgateway_dev_kgateway_api_v1alpha1_AI(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptEnrichment":         schema_kgateway_dev_kgateway_api_v1alpha1_AIPromptEnrichment(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptGuard":              schema_kgateway_dev_kgateway_api_v1alpha1_AIPromptGuard(ref),
+		"github.com/kgateway-dev/kgateway/api/v1alpha1.AIRoutePolicy":              schema_kgateway_dev_kgateway_api_v1alpha1_AIRoutePolicy(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.AIUpstream":                 schema_kgateway_dev_kgateway_api_v1alpha1_AIUpstream(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.AiExtension":                schema_kgateway_dev_kgateway_api_v1alpha1_AiExtension(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.AiExtensionStats":           schema_kgateway_dev_kgateway_api_v1alpha1_AiExtensionStats(ref),
@@ -49,7 +49,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.IstioContainer":             schema_kgateway_dev_kgateway_api_v1alpha1_IstioContainer(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.IstioIntegration":           schema_kgateway_dev_kgateway_api_v1alpha1_IstioIntegration(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.KubernetesProxyConfig":      schema_kgateway_dev_kgateway_api_v1alpha1_KubernetesProxyConfig(ref),
-		"github.com/kgateway-dev/kgateway/api/v1alpha1.LLMBackend":                 schema_kgateway_dev_kgateway_api_v1alpha1_LLMBackend(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.LLMProviders":               schema_kgateway_dev_kgateway_api_v1alpha1_LLMProviders(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.ListenerPolicy":             schema_kgateway_dev_kgateway_api_v1alpha1_ListenerPolicy(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.ListenerPolicyList":         schema_kgateway_dev_kgateway_api_v1alpha1_ListenerPolicyList(ref),
@@ -438,56 +437,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 	}
 }
 
-func schema_kgateway_dev_kgateway_api_v1alpha1_AI(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "AI config is used to configure the behavior of the LLM provider on the level of individual routes. These route settings, such as prompt enrichment, retrieval augmented generation (RAG), and semantic caching, are applicable only for routes that send requests to an LLM provider backend.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"prompt_enrichment": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Enrich requests sent to the LLM provider by appending and prepending system prompts. This can be configured only for LLM providers that use the `CHAT` API route type.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptEnrichment"),
-						},
-					},
-					"prompt_guard": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Set up prompt guards to block unwanted requests to the LLM provider and mask sensitive data. Prompt guards can be used to reject requests based on the content of the prompt, as well as mask responses based on the content of the response.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptGuard"),
-						},
-					},
-					"defaults": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Provide defaults to merge with user input fields. Defaults do _not_ override the user input fields, unless you explicitly set `override` to `true`.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kgateway-dev/kgateway/api/v1alpha1.FieldDefault"),
-									},
-								},
-							},
-						},
-					},
-					"route_type": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The type of route to the LLM provider API. Currently, `CHAT` and `CHAT_STREAMING` are supported.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptEnrichment", "github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptGuard", "github.com/kgateway-dev/kgateway/api/v1alpha1.FieldDefault"},
-	}
-}
-
 func schema_kgateway_dev_kgateway_api_v1alpha1_AIPromptEnrichment(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -560,6 +509,56 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AIPromptGuard(ref common.Referenc
 	}
 }
 
+func schema_kgateway_dev_kgateway_api_v1alpha1_AIRoutePolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AI config is used to configure the behavior of the LLM provider on the level of individual routes. These route settings, such as prompt enrichment, retrieval augmented generation (RAG), and semantic caching, are applicable only for routes that send requests to an LLM provider backend.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"prompt_enrichment": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Enrich requests sent to the LLM provider by appending and prepending system prompts. This can be configured only for LLM providers that use the `CHAT` API route type.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptEnrichment"),
+						},
+					},
+					"prompt_guard": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Set up prompt guards to block unwanted requests to the LLM provider and mask sensitive data. Prompt guards can be used to reject requests based on the content of the prompt, as well as mask responses based on the content of the response.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptGuard"),
+						},
+					},
+					"defaults": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Provide defaults to merge with user input fields. Defaults do _not_ override the user input fields, unless you explicitly set `override` to `true`.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/api/v1alpha1.FieldDefault"),
+									},
+								},
+							},
+						},
+					},
+					"route_type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The type of route to the LLM provider API. Currently, `CHAT` and `CHAT_STREAMING` are supported.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptEnrichment", "github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptGuard", "github.com/kgateway-dev/kgateway/api/v1alpha1.FieldDefault"},
+	}
+}
+
 func schema_kgateway_dev_kgateway_api_v1alpha1_AIUpstream(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -569,22 +568,26 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AIUpstream(ref common.ReferenceCa
 					"customHost": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Host"),
 						},
 					},
 					"llm": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The LLM provider backend to use.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.LLMBackend"),
+							Description: "The LLM configures the AIRoutePolicy gateway to use a single LLM provider backend.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.LLMProviders"),
+						},
+					},
+					"multipool": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The MultiPool configures the backends for multiple hosts or models from the same provider in one Upstream resource.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.MultiPoolConfig"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/api/v1alpha1.LLMBackend"},
+			"github.com/kgateway-dev/kgateway/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/api/v1alpha1.LLMProviders", "github.com/kgateway-dev/kgateway/api/v1alpha1.MultiPoolConfig"},
 	}
 }
 
@@ -592,7 +595,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AiExtension(ref common.ReferenceC
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Configuration for the AI extension.",
+				Description: "Configuration for the AIRoutePolicy extension.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"enabled": {
@@ -650,7 +653,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AiExtension(ref common.ReferenceC
 					},
 					"stats": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Additional stats config for AI Extension. This config can be useful for adding custom labels to the request metrics.\n\nExample: ```yaml stats:\n  customLabels:\n    - name: \"subject\"\n      metadataNamespace: \"envoy.filters.http.jwt_authn\"\n      metadataKey: \"principal:sub\"\n    - name: \"issuer\"\n      metadataNamespace: \"envoy.filters.http.jwt_authn\"\n      metadataKey: \"principal:iss\"\n```",
+							Description: "Additional stats config for AIRoutePolicy Extension. This config can be useful for adding custom labels to the request metrics.\n\nExample: ```yaml stats:\n  customLabels:\n    - name: \"subject\"\n      metadataNamespace: \"envoy.filters.http.jwt_authn\"\n      metadataKey: \"principal:sub\"\n    - name: \"issuer\"\n      metadataNamespace: \"envoy.filters.http.jwt_authn\"\n      metadataKey: \"principal:iss\"\n```",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AiExtensionStats"),
 						},
 					},
@@ -670,7 +673,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AiExtensionStats(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"customLabels": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Set of custom labels to be added to the request metrics. These will be added on each request which goes through the AI Extension.",
+							Description: "Set of custom labels to be added to the request metrics. These will be added on each request which goes through the AIRoutePolicy Extension.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -698,15 +701,13 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AnthropicConfig(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AI gateway uses to access the Anthropic API. This token is automatically sent in the `x-api-key` header of the request.",
-							Default:     map[string]interface{}{},
+							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Anthropic API. This token is automatically sent in the `x-api-key` header of the request.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.SingleAuthToken"),
 						},
 					},
 					"customHost": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Host"),
 						},
 					},
@@ -725,6 +726,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AnthropicConfig(ref common.Refere
 						},
 					},
 				},
+				Required: []string{"authToken"},
 			},
 		},
 		Dependencies: []string{
@@ -767,14 +769,14 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AzureOpenAIConfig(ref common.Refe
 				Properties: map[string]spec.Schema{
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AI gateway uses to access the Azure OpenAI API. This token is automatically sent in the `api-key` header of the request.",
-							Default:     map[string]interface{}{},
+							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Azure OpenAI API. This token is automatically sent in the `api-key` header of the request.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.SingleAuthToken"),
 						},
 					},
 					"endpoint": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The endpoint for the Azure OpenAI API to use, such as `my-endpoint.openai.azure.com`. If the scheme is included, it is stripped.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -782,6 +784,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AzureOpenAIConfig(ref common.Refe
 					"deploymentName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The name of the Azure OpenAI model deployment to use. For more information, see the [Azure OpenAI model docs](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -789,11 +792,13 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AzureOpenAIConfig(ref common.Refe
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The version of the Azure OpenAI API to use. For more information, see the [Azure OpenAI API version reference](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#api-specs).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
+				Required: []string{"authToken", "endpoint", "deploymentName", "apiVersion"},
 			},
 		},
 		Dependencies: []string{
@@ -1258,14 +1263,14 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_GeminiConfig(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AI gateway uses to access the Gemini API. This token is automatically sent in the `key` query parameter of the request.",
-							Default:     map[string]interface{}{},
+							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Gemini API. This token is automatically sent in the `key` query parameter of the request.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.SingleAuthToken"),
 						},
 					},
 					"model": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The Gemini model to use. For more information, see the [Gemini models docs](https://ai.google.dev/gemini-api/docs/models/gemini).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1273,11 +1278,13 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_GeminiConfig(ref common.Reference
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The version of the Gemini API to use. For more information, see the [Gemini API version docs](https://ai.google.dev/gemini-api/docs/api-versions).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
+				Required: []string{"authToken", "model", "apiVersion"},
 			},
 		},
 		Dependencies: []string{
@@ -1687,7 +1694,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_KubernetesProxyConfig(ref common.
 					},
 					"aiExtension": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the AI extension.",
+							Description: "Configuration for the AIRoutePolicy extension.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AiExtension"),
 						},
 					},
@@ -1706,62 +1713,11 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_KubernetesProxyConfig(ref common.
 	}
 }
 
-func schema_kgateway_dev_kgateway_api_v1alpha1_LLMBackend(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "LLMBackend configures the AI gateway to use a single LLM provider backend.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"openai": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.OpenAIConfig"),
-						},
-					},
-					"azureopenai": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AzureOpenAIConfig"),
-						},
-					},
-					"anthropic": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AnthropicConfig"),
-						},
-					},
-					"gemini": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.GeminiConfig"),
-						},
-					},
-					"vertexai": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.VertexAIConfig"),
-						},
-					},
-					"mistral": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.MistralConfig"),
-						},
-					},
-					"multipool": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Embeds all fields from LLMProviders directly into LLMBackend as inline fields.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.MultiPoolConfig"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/api/v1alpha1.AnthropicConfig", "github.com/kgateway-dev/kgateway/api/v1alpha1.AzureOpenAIConfig", "github.com/kgateway-dev/kgateway/api/v1alpha1.GeminiConfig", "github.com/kgateway-dev/kgateway/api/v1alpha1.MistralConfig", "github.com/kgateway-dev/kgateway/api/v1alpha1.MultiPoolConfig", "github.com/kgateway-dev/kgateway/api/v1alpha1.OpenAIConfig", "github.com/kgateway-dev/kgateway/api/v1alpha1.VertexAIConfig"},
-	}
-}
-
 func schema_kgateway_dev_kgateway_api_v1alpha1_LLMProviders(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "LLMProviders configures the AI gateway to use a single LLM provider backend.",
+				Description: "LLMProviders configures the AIRoutePolicy gateway to use a single LLM provider backend.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"openai": {
@@ -1991,20 +1947,18 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_MistralConfig(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "MistralConfig configures the settings for the [Mistral AI](https://docs.mistral.ai/getting-started/quickstart/) LLM provider.",
+				Description: "MistralConfig configures the settings for the [Mistral AIRoutePolicy](https://docs.mistral.ai/getting-started/quickstart/) LLM provider.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AI gateway uses to access the OpenAI API. This token is automatically sent in the `Authorization` header of the request and prefixed with `Bearer`.",
-							Default:     map[string]interface{}{},
+							Description: "The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API. This token is automatically sent in the `Authorization` header of the request and prefixed with `Bearer`.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.SingleAuthToken"),
 						},
 					},
 					"customHost": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Host"),
 						},
 					},
@@ -2016,6 +1970,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_MistralConfig(ref common.Referenc
 						},
 					},
 				},
+				Required: []string{"authToken"},
 			},
 		},
 		Dependencies: []string{
@@ -2083,15 +2038,13 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_OpenAIConfig(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AI gateway uses to access the OpenAI API. This token is automatically sent in the `Authorization` header of the request and prefixed with `Bearer`.",
-							Default:     map[string]interface{}{},
+							Description: "The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API. This token is automatically sent in the `Authorization` header of the request and prefixed with `Bearer`.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.SingleAuthToken"),
 						},
 					},
 					"customHost": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Host"),
 						},
 					},
@@ -2681,14 +2634,14 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_RoutePolicySpec(ref common.Refere
 					},
 					"ai": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AI"),
+							Ref: ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AIRoutePolicy"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/api/v1alpha1.AI", "github.com/kgateway-dev/kgateway/api/v1alpha1.LocalPolicyTargetReference"},
+			"github.com/kgateway-dev/kgateway/api/v1alpha1.AIRoutePolicy", "github.com/kgateway-dev/kgateway/api/v1alpha1.LocalPolicyTargetReference"},
 	}
 }
 
@@ -2869,12 +2822,12 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_SingleAuthToken(ref common.Refere
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "SingleAuthToken configures the authorization token that the AI gateway uses to access the LLM provider API. This token is automatically sent in a request header, depending on the LLM provider.",
+				Description: "SingleAuthToken configures the authorization token that the AIRoutePolicy gateway uses to access the LLM provider API. This token is automatically sent in a request header, depending on the LLM provider.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind specifies which type of authorization token is being used. Must be one of: \"INLINE\", \"SECRETREF\", \"PASSTHROUGH\".",
+							Description: "Kind specifies which type of authorization token is being used. Must be one of: \"Inline\", \"SecretRef\", \"Passthrough\".",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -2882,7 +2835,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_SingleAuthToken(ref common.Refere
 					},
 					"inline": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Provide the token directly in the configuration for the Upstream. This option is the least secure. Only use this option for quick tests such as trying out AI Gateway.",
+							Description: "Provide the token directly in the configuration for the Upstream. This option is the least secure. Only use this option for quick tests such as trying out AIRoutePolicy Gateway.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2890,7 +2843,6 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_SingleAuthToken(ref common.Refere
 					"secretRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Store the API key in a Kubernetes secret in the same namespace as the Upstream. Then, refer to the secret in the Upstream configuration. This option is more secure than an inline token, because the API key is encoded and you can restrict access to secrets through RBAC rules. You might use this option in proofs of concept, controlled development and staging environments, or well-controlled prod environments that use secrets.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
 						},
 					},
@@ -3133,40 +3085,43 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_VertexAIConfig(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "VertexAIConfig settings for the [Vertex AI](https://cloud.google.com/vertex-ai/docs) LLM provider. To find the values for the project ID, project location, and publisher, you can check the fields of an API request, such as `https://{LOCATION}-aiplatform.googleapis.com/{VERSION}/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/{PROVIDER}/<model-path>`.",
+				Description: "VertexAIConfig settings for the [Vertex AIRoutePolicy](https://cloud.google.com/vertex-ai/docs) LLM provider. To find the values for the project ID, project location, and publisher, you can check the fields of an API request, such as `https://{LOCATION}-aiplatform.googleapis.com/{VERSION}/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/{PROVIDER}/<model-path>`.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AI gateway uses to access the Vertex AI API. This token is automatically sent in the `key` header of the request.",
-							Default:     map[string]interface{}{},
+							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Vertex AIRoutePolicy API. This token is automatically sent in the `key` header of the request.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.SingleAuthToken"),
 						},
 					},
 					"model": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The Vertex AI model to use. For more information, see the [Vertex AI model docs](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models).",
+							Description: "The Vertex AIRoutePolicy model to use. For more information, see the [Vertex AIRoutePolicy model docs](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The version of the Vertex AI API to use. For more information, see the [Vertex AI API reference](https://cloud.google.com/vertex-ai/docs/reference#versions).",
+							Description: "The version of the Vertex AIRoutePolicy API to use. For more information, see the [Vertex AIRoutePolicy API reference](https://cloud.google.com/vertex-ai/docs/reference#versions).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"projectId": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The ID of the Google Cloud Project that you use for the Vertex AI.",
+							Description: "The ID of the Google Cloud Project that you use for the Vertex AIRoutePolicy.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"location": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The location of the Google Cloud Project that you use for the Vertex AI.",
+							Description: "The location of the Google Cloud Project that you use for the Vertex AIRoutePolicy.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -3181,11 +3136,12 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_VertexAIConfig(ref common.Referen
 					"publisher": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The type of publisher model to use. Currently, only Google is supported.",
-							Type:        []string{"integer"},
-							Format:      "int32",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
+				Required: []string{"authToken", "model", "apiVersion", "projectId", "location"},
 			},
 		},
 		Dependencies: []string{

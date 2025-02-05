@@ -93,20 +93,11 @@ spec:
                                     properties:
                                       inline:
                                         type: string
-                                        x-kubernetes-validations:
-                                        - message: There must one and only one SingleAuthToken
-                                            type set
-                                          rule: 1 == (self.inline != null?1:0) + (self.secretRef
-                                            != null?1:0)
-                                        - message: Inline token must be set when kind
-                                            is INLINE
-                                          rule: self.kind != 'INLINE' || self.inline
-                                            != null
                                       kind:
                                         enum:
-                                        - INLINE
-                                        - SECRETREF
-                                        - PASSTHROUGH
+                                        - Inline
+                                        - SecretRef
+                                        - Passthrough
                                         type: string
                                       secretRef:
                                         properties:
@@ -115,18 +106,19 @@ spec:
                                             type: string
                                         type: object
                                         x-kubernetes-map-type: atomic
-                                        x-kubernetes-validations:
-                                        - message: There must be one and only one
-                                            SingleAuthToken type set
-                                          rule: '1 == (self.inline != null ? 1 : 0)
-                                            + (self.secretRef != null ? 1 : 0)'
-                                        - message: SecretRef must be set when kind
-                                            is SECRETREF
-                                          rule: self.kind != 'SECRETREF' || self.secretRef
-                                            != null
                                     required:
                                     - kind
                                     type: object
+                                    x-kubernetes-validations:
+                                    - message: There must one and only one SingleAuthToken
+                                        type set
+                                      rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
+                                        ? 0 : 1)'
+                                    - message: Inline token must be set when kind
+                                        is Inline or SecretRef must be set when kind
+                                        is SecretRef
+                                      rule: (self.kind == 'Inline' && has(self.inline))
+                                        || (self.kind == 'SecretRef' && has(self.secretRef))
                                   model:
                                     default: omni-moderation-latest
                                     type: string
@@ -135,15 +127,10 @@ spec:
                           regex:
                             properties:
                               action:
-                                type: string
+                                type: integer
                               builtins:
-                                enum:
-                                - SSN
-                                - CREDIT_CARD
-                                - PHONE_NUMBER
-                                - EMAIL
                                 items:
-                                  type: string
+                                  type: integer
                                 type: array
                               regexMatch:
                                 items:
@@ -160,24 +147,18 @@ spec:
                               forwardHeaders:
                                 items:
                                   properties:
-                                    name:
-                                      maxLength: 256
-                                      minLength: 1
-                                      pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
+                                    key:
                                       type: string
-                                    type:
-                                      default: Exact
+                                    matchType:
+                                      default: EXACT
                                       enum:
-                                      - Exact
-                                      - RegularExpression
-                                      type: string
-                                    value:
-                                      maxLength: 4096
-                                      minLength: 1
-                                      type: string
-                                  required:
-                                  - name
-                                  - value
+                                      - EXACT
+                                      - PREFIX
+                                      - SUFFIX
+                                      - CONTAINS
+                                      - REGEX
+                                      format: int64
+                                      type: integer
                                   type: object
                                 type: array
                               host:
@@ -192,15 +173,10 @@ spec:
                           regex:
                             properties:
                               action:
-                                type: string
+                                type: integer
                               builtins:
-                                enum:
-                                - SSN
-                                - CREDIT_CARD
-                                - PHONE_NUMBER
-                                - EMAIL
                                 items:
-                                  type: string
+                                  type: integer
                                 type: array
                               regexMatch:
                                 items:
@@ -217,24 +193,18 @@ spec:
                               forwardHeaders:
                                 items:
                                   properties:
-                                    name:
-                                      maxLength: 256
-                                      minLength: 1
-                                      pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
+                                    key:
                                       type: string
-                                    type:
-                                      default: Exact
+                                    matchType:
+                                      default: EXACT
                                       enum:
-                                      - Exact
-                                      - RegularExpression
-                                      type: string
-                                    value:
-                                      maxLength: 4096
-                                      minLength: 1
-                                      type: string
-                                  required:
-                                  - name
-                                  - value
+                                      - EXACT
+                                      - PREFIX
+                                      - SUFFIX
+                                      - CONTAINS
+                                      - REGEX
+                                      format: int64
+                                      type: integer
                                   type: object
                                 type: array
                               host:
@@ -249,7 +219,7 @@ spec:
                     enum:
                     - CHAT
                     - CHAT_STREAMING
-                    type: string
+                    type: integer
                 type: object
               targetRef:
                 properties:
