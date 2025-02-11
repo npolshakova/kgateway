@@ -62,7 +62,9 @@ func (d *upstreamDestination) Equals(in any) bool {
 }
 
 type UpstreamIr struct {
-	AwsSecret *ir.Secret
+	AwsSecret     *ir.Secret
+	AISecret      *ir.Secret
+	AIMultiSecret map[string]*ir.Secret
 }
 
 func (u *UpstreamIr) data() map[string][]byte {
@@ -160,19 +162,72 @@ func buildTranslateFunc(secrets *krtcollections.SecretIndex) func(krtctx krt.Han
 		var ir UpstreamIr
 		if i.Spec.Aws != nil {
 			ns := i.GetNamespace()
-			secretRef := gwv1.SecretObjectReference{
-				Name: gwv1.ObjectName(i.Spec.Aws.SecretRef.Name),
+			secret := getSecretIr(secrets, krtctx, i.Spec.Aws.SecretRef.Name, ns)
+			ir.AwsSecret = secret
+		}
+
+		if i.Spec.AI != nil {
+			if i.Spec.AI.LLM != nil {
+				ns := i.GetNamespace()
+				provider := i.Spec.AI.LLM
+				if provider.OpenAI != nil {
+					authKind := provider.OpenAI.AuthToken.Kind
+					if authKind == v1alpha1.SecretRef {
+						secret := getSecretIr(secrets, krtctx, provider.OpenAI.AuthToken.SecretRef.Name, ns)
+						ir.AISecret = secret
+					}
+				} else if provider.VertexAI != nil {
+					authKind := provider.OpenAI.AuthToken.Kind
+					if authKind == v1alpha1.SecretRef {
+						secret := getSecretIr(secrets, krtctx, provider.OpenAI.AuthToken.SecretRef.Name, ns)
+						ir.AISecret = secret
+					}
+				} else if provider.Mistral != nil {
+					authKind := provider.OpenAI.AuthToken.Kind
+					if authKind == v1alpha1.SecretRef {
+						secret := getSecretIr(secrets, krtctx, provider.OpenAI.AuthToken.SecretRef.Name, ns)
+						ir.AISecret = secret
+					}
+				} else if provider.Gemini != nil {
+					authKind := provider.OpenAI.AuthToken.Kind
+					if authKind == v1alpha1.SecretRef {
+						secret := getSecretIr(secrets, krtctx, provider.OpenAI.AuthToken.SecretRef.Name, ns)
+						ir.AISecret = secret
+					}
+				} else if provider.AzureOpenAI != nil {
+					authKind := provider.OpenAI.AuthToken.Kind
+					if authKind == v1alpha1.SecretRef {
+						secret := getSecretIr(secrets, krtctx, provider.OpenAI.AuthToken.SecretRef.Name, ns)
+						ir.AISecret = secret
+					}
+				} else if provider.Anthropic != nil {
+					authKind := provider.OpenAI.AuthToken.Kind
+					if authKind == v1alpha1.SecretRef {
+						secret := getSecretIr(secrets, krtctx, provider.OpenAI.AuthToken.SecretRef.Name, ns)
+						ir.AISecret = secret
+					}
+				}
 			}
-			secret, _ := secrets.GetSecret(krtctx, krtcollections.From{GroupKind: v1alpha1.UpstreamGVK.GroupKind(), Namespace: ns}, secretRef)
-			if secret != nil {
-				ir.AwsSecret = secret
-			} else {
-				// TODO: handle error and write it to status
-				// return error
+			if i.Spec.AI.MultiPool != nil {
+
 			}
 		}
 		return &ir
 	}
+}
+
+func getSecretIr(secrets *krtcollections.SecretIndex, krtctx krt.HandlerContext, secretName, ns string) *ir.Secret {
+	secretRef := gwv1.SecretObjectReference{
+		Name: gwv1.ObjectName(secretName),
+	}
+	secret, _ := secrets.GetSecret(krtctx, krtcollections.From{GroupKind: v1alpha1.UpstreamGVK.GroupKind(), Namespace: ns}, secretRef)
+	if secret != nil {
+		return secret
+	} else {
+		// TODO: handle error and write it to status
+		// return error
+	}
+	return nil
 }
 
 func processUpstream(ctx context.Context, in ir.Upstream, out *envoy_config_cluster_v3.Cluster) {
@@ -195,6 +250,8 @@ func processUpstream(ctx context.Context, in ir.Upstream, out *envoy_config_clus
 		processStatic(ctx, spec.Static, out)
 	case spec.Aws != nil:
 		processAws(ctx, spec.Aws, ir, out)
+	case spec.AI != nil:
+		processAIUpstream(ctx, spec.AI, ir, out)
 	}
 }
 

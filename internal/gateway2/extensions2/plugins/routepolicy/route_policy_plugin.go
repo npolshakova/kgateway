@@ -107,6 +107,13 @@ func (p *routeOptsPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.Rout
 		outputRoute.GetRoute().Timeout = durationpb.New(time.Second * time.Duration(policy.spec.Timeout))
 	}
 
+	if policy.spec.AI != nil {
+		err := processAIRoutePolicy(ctx, policy.spec.AI, outputRoute, pCtx)
+		if err != nil {
+			// TODO: error
+		}
+	}
+
 	return nil
 }
 
