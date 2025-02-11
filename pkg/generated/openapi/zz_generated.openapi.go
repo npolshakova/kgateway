@@ -40,7 +40,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.GatewayParametersStatus":    schema_kgateway_dev_kgateway_api_v1alpha1_GatewayParametersStatus(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.GeminiConfig":               schema_kgateway_dev_kgateway_api_v1alpha1_GeminiConfig(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.GracefulShutdownSpec":       schema_kgateway_dev_kgateway_api_v1alpha1_GracefulShutdownSpec(ref),
-		"github.com/kgateway-dev/kgateway/api/v1alpha1.HeaderMatch":                schema_kgateway_dev_kgateway_api_v1alpha1_HeaderMatch(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.Host":                       schema_kgateway_dev_kgateway_api_v1alpha1_Host(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.HttpListenerPolicy":         schema_kgateway_dev_kgateway_api_v1alpha1_HttpListenerPolicy(ref),
 		"github.com/kgateway-dev/kgateway/api/v1alpha1.HttpListenerPolicyList":     schema_kgateway_dev_kgateway_api_v1alpha1_HttpListenerPolicyList(ref),
@@ -441,7 +440,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AIPromptEnrichment(ref common.Ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AIPromptEnrichment defines the config to enrich requests sent to the LLM provider by appending and prepending system prompts. This can be configured only for LLM providers that use the CHAT API type.\n\nPrompt enrichment allows you to add additional context to the prompt before sending it to the model. Unlike RAG or other dynamic context methods, prompt enrichment is static and is applied to every request.\n\n**Note**: Some providers, including Anthropic, do not support SYSTEM role messages, and instead have a dedicated system field in the input JSON. In this case, use the [`defaults` setting](#fielddefault) to set the system field.\n\nThe following example prepends a system prompt of `Answer all questions in French.` and appends `Describe the painting as if you were a famous art critic from the 17th century.` to each request that is sent to the `openai` HTTPRoute. ```yaml\n\n\tname: openai-opt\n\tnamespace: kgateway-system\n\nspec:\n\n\ttargetRefs:\n\t- group: gateway.networking.k8s.io\n\t  kind: HTTPRoute\n\t  name: openai\n\toptions:\n\t  ai:\n\t    promptEnrichment:\n\t      prepend:\n\t      - role: SYSTEM\n\t        content: \"Answer all questions in French.\"\n\t      append:\n\t      - role: USER\n\t        content: \"Describe the painting as if you were a famous art critic from the 17th century.\"\n\n```",
+				Description: "AIPromptEnrichment defines the config to enrich requests sent to the LLM provider by appending and prepending system prompts. This can be configured only for LLM providers that use the CHAT API type.\n\nPrompt enrichment allows you to add additional context to the prompt before sending it to the model. Unlike RAG or other dynamic context methods, prompt enrichment is static and is applied to every request.\n\n**Note**: Some providers, including Anthropic, do not support SYSTEM role messages, and instead have a dedicated system field in the input JSON. In this case, use the [`defaults` setting](#fielddefault) to set the system field.\n\nThe following example prepends a system prompt of `Answer all questions in French.` and appends `Describe the painting as if you were a famous art critic from the 17th century.` to each request that is sent to the `openai` HTTPRoute. ```yaml\n\n\tname: openai-opt\n\tnamespace: kgateway-system\n\nspec:\n\n\ttargetRefs:\n\t- group: gateway.networking.k8s.io\n\t  kind: HTTPRoute\n\t  name: openai\n\taiRoutePolicy:\n\t    promptEnrichment:\n\t      prepend:\n\t      - role: SYSTEM\n\t        content: \"Answer all questions in French.\"\n\t      append:\n\t      - role: USER\n\t        content: \"Describe the painting as if you were a famous art critic from the 17th century.\"\n\n```",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"prepend": {
@@ -490,14 +489,12 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AIPromptGuard(ref common.Referenc
 					"request": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Prompt guards to apply to requests sent by the client.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.PromptguardRequest"),
 						},
 					},
 					"response": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Prompt guards to apply to responses returned by the LLM provider.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.PromptguardResponse"),
 						},
 					},
@@ -513,20 +510,18 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AIRoutePolicy(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AI config is used to configure the behavior of the LLM provider on the level of individual routes. These route settings, such as prompt enrichment, retrieval augmented generation (RAG), and semantic caching, are applicable only for routes that send requests to an LLM provider backend.",
+				Description: "AIRoutePolicy config is used to configure the behavior of the LLM provider on the level of individual routes. These route settings, such as prompt enrichment, retrieval augmented generation (RAG), and semantic caching, are applicable only for routes that send requests to an LLM provider backend.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"prompt_enrichment": {
+					"promptEnrichment": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Enrich requests sent to the LLM provider by appending and prepending system prompts. This can be configured only for LLM providers that use the `CHAT` API route type.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptEnrichment"),
 						},
 					},
-					"prompt_guard": {
+					"promptGuard": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Set up prompt guards to block unwanted requests to the LLM provider and mask sensitive data. Prompt guards can be used to reject requests based on the content of the prompt, as well as mask responses based on the content of the response.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.AIPromptGuard"),
 						},
 					},
@@ -544,11 +539,11 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_AIRoutePolicy(ref common.Referenc
 							},
 						},
 					},
-					"route_type": {
+					"routeType": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The type of route to the LLM provider API. Currently, `CHAT` and `CHAT_STREAMING` are supported.",
-							Type:        []string{"integer"},
-							Format:      "int32",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -1318,33 +1313,6 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_GracefulShutdownSpec(ref common.R
 	}
 }
 
-func schema_kgateway_dev_kgateway_api_v1alpha1_HeaderMatch(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "HeaderMatch describes how to match a given string in HTTP headers. Match is case-sensitive.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"key": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The header key string to match against.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"matchType": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The type of match to use.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func schema_kgateway_dev_kgateway_api_v1alpha1_Host(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1982,17 +1950,17 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_Moderation(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Moderation configures an external moderation model endpoint. This endpoint evaluates request prompt data against predefined content rules to determine if the content adheres to those rules.\n\nAny requests routed through the AI Gateway are processed by the specified moderation model. If the model identifies the content as harmful based on its rules, the request is automatically rejected.\n\nYou can configure a moderation endpoint either as a standalone prompt guard setting or alongside other request and response guard settings.",
+				Description: "Moderation configures an external moderation model endpoint. This endpoint evaluates request prompt data against predefined content rules to determine if the content adheres to those rules.\n\nAny requests routed through the AIRoutePolicy Gateway are processed by the specified moderation model. If the model identifies the content as harmful based on its rules, the request is automatically rejected.\n\nYou can configure a moderation endpoint either as a standalone prompt guard setting or alongside other request and response guard settings.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"openAIModeration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Pass prompt data through an external moderation model endpoint, which compares the request prompt input to predefined content rules. Configure an OpenAI moderation endpoint.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.OpenAIModeration"),
 						},
 					},
 				},
+				Required: []string{"openAIModeration"},
 			},
 		},
 		Dependencies: []string{
@@ -2079,8 +2047,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_OpenAIModeration(ref common.Refer
 					},
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AI gateway uses to access the OpenAI moderation model.",
-							Default:     map[string]interface{}{},
+							Description: "The authorization token that the AIRoutePolicy gateway uses to access the OpenAI moderation model.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.SingleAuthToken"),
 						},
 					},
@@ -2360,28 +2327,24 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_PromptguardRequest(ref common.Ref
 					"customResponse": {
 						SchemaProps: spec.SchemaProps{
 							Description: "A custom response message to return to the client. If not specified, defaults to \"The request was rejected due to inappropriate content\".",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.CustomResponse"),
 						},
 					},
 					"regex": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Regular expression (regex) matching for prompt guards and data masking.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Regex"),
 						},
 					},
 					"webhook": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Configure a webhook to forward requests to for prompt guarding.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Webhook"),
 						},
 					},
 					"moderation": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Pass prompt data through an external moderation model endpoint, which compares the request prompt input to predefined content rules.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Moderation"),
 						},
 					},
@@ -2403,14 +2366,12 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_PromptguardResponse(ref common.Re
 					"regex": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Regular expression (regex) matching for prompt guards and data masking.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Regex"),
 						},
 					},
 					"webhook": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Configure a webhook to forward responses to for prompt guarding.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Webhook"),
 						},
 					},
@@ -2470,9 +2431,9 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_Regex(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int32",
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
 									},
 								},
 							},
@@ -2481,8 +2442,8 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_Regex(ref common.ReferenceCallbac
 					"action": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The action to take if a regex pattern is matched in a request or response. This setting applies only to request matches. PromptguardResponse matches are always masked by default. Defaults to `MASK`.",
-							Type:        []string{"integer"},
-							Format:      "int32",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -3159,15 +3120,7 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_Webhook(ref common.ReferenceCallb
 					"host": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Host to send the traffic to.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"port": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Port to send the traffic to",
-							Type:        []string{"integer"},
-							Format:      "int64",
+							Ref:         ref("github.com/kgateway-dev/kgateway/api/v1alpha1.Host"),
 						},
 					},
 					"forwardHeaders": {
@@ -3178,17 +3131,18 @@ func schema_kgateway_dev_kgateway_api_v1alpha1_Webhook(ref common.ReferenceCallb
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kgateway-dev/kgateway/api/v1alpha1.HeaderMatch"),
+										Ref:     ref("sigs.k8s.io/gateway-api/apis/v1.HTTPHeaderMatch"),
 									},
 								},
 							},
 						},
 					},
 				},
+				Required: []string{"host"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/api/v1alpha1.HeaderMatch"},
+			"github.com/kgateway-dev/kgateway/api/v1alpha1.Host", "sigs.k8s.io/gateway-api/apis/v1.HTTPHeaderMatch"},
 	}
 }
 

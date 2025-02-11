@@ -44,11 +44,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: request
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.PromptguardRequest
-      default: {}
     - name: response
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.PromptguardResponse
-      default: {}
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.AIRoutePolicy
   map:
     fields:
@@ -58,17 +56,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.FieldDefault
           elementRelationship: atomic
-    - name: prompt_enrichment
+    - name: promptEnrichment
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AIPromptEnrichment
-      default: {}
-    - name: prompt_guard
+    - name: promptGuard
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.AIPromptGuard
-      default: {}
-    - name: route_type
+    - name: routeType
       type:
-        scalar: numeric
+        scalar: string
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.AIUpstream
   map:
     fields:
@@ -335,15 +331,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: sleepTimeSeconds
       type:
         scalar: numeric
-- name: com.github.kgateway-dev.kgateway.api.v1alpha1.HeaderMatch
-  map:
-    fields:
-    - name: key
-      type:
-        scalar: string
-    - name: matchType
-      type:
-        scalar: numeric
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.Host
   map:
     fields:
@@ -567,7 +554,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: openAIModeration
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.OpenAIModeration
-      default: {}
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.MultiPoolConfig
   map:
     fields:
@@ -595,7 +581,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.SingleAuthToken
-      default: {}
     - name: model
       type:
         scalar: string
@@ -698,30 +683,24 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: customResponse
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.CustomResponse
-      default: {}
     - name: moderation
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Moderation
-      default: {}
     - name: regex
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Regex
-      default: {}
     - name: webhook
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Webhook
-      default: {}
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.PromptguardResponse
   map:
     fields:
     - name: regex
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Regex
-      default: {}
     - name: webhook
       type:
         namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Webhook
-      default: {}
 - name: com.github.kgateway-dev.kgateway.api.v1alpha1.ProxyDeployment
   map:
     fields:
@@ -733,12 +712,12 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: action
       type:
-        scalar: numeric
+        scalar: string
     - name: builtins
       type:
         list:
           elementType:
-            scalar: numeric
+            scalar: string
           elementRelationship: atomic
     - name: regexMatch
       type:
@@ -970,14 +949,11 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.HeaderMatch
+            namedType: io.k8s.sigs.gateway-api.apis.v1.HTTPHeaderMatch
           elementRelationship: atomic
     - name: host
       type:
-        scalar: string
-    - name: port
-      type:
-        scalar: numeric
+        namedType: com.github.kgateway-dev.kgateway.api.v1alpha1.Host
 - name: io.k8s.api.core.v1.Affinity
   map:
     fields:
@@ -1973,6 +1949,20 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: separable
 - name: io.k8s.apimachinery.pkg.util.intstr.IntOrString
   scalar: untyped
+- name: io.k8s.sigs.gateway-api.apis.v1.HTTPHeaderMatch
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: type
+      type:
+        scalar: string
+    - name: value
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.sigs.gateway-api.apis.v1.ParentReference
   map:
     fields:

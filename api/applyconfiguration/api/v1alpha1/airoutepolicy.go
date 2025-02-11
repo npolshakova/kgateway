@@ -9,10 +9,10 @@ import (
 // AIRoutePolicyApplyConfiguration represents a declarative configuration of the AIRoutePolicy type for use
 // with apply.
 type AIRoutePolicyApplyConfiguration struct {
-	PromptEnrichment *AIPromptEnrichmentApplyConfiguration `json:"prompt_enrichment,omitempty"`
-	PromptGuard      *AIPromptGuardApplyConfiguration      `json:"prompt_guard,omitempty"`
+	PromptEnrichment *AIPromptEnrichmentApplyConfiguration `json:"promptEnrichment,omitempty"`
+	PromptGuard      *AIPromptGuardApplyConfiguration      `json:"promptGuard,omitempty"`
 	Defaults         []FieldDefaultApplyConfiguration      `json:"defaults,omitempty"`
-	RouteType        *apiv1alpha1.RouteType                `json:"route_type,omitempty"`
+	RouteType        *apiv1alpha1.RouteType                `json:"routeType,omitempty"`
 }
 
 // AIRoutePolicyApplyConfiguration constructs a declarative configuration of the AIRoutePolicy type for use with

@@ -49,7 +49,7 @@ spec:
                           x-kubernetes-preserve-unknown-fields: true
                       type: object
                     type: array
-                  prompt_enrichment:
+                  promptEnrichment:
                     properties:
                       append:
                         items:
@@ -70,7 +70,7 @@ spec:
                           type: object
                         type: array
                     type: object
-                  prompt_guard:
+                  promptGuard:
                     properties:
                       request:
                         properties:
@@ -81,8 +81,10 @@ spec:
                                   content
                                 type: string
                               statusCode:
-                                default: "403"
+                                default: 403
                                 format: int32
+                                maximum: 599
+                                minimum: 200
                                 type: integer
                             type: object
                           moderation:
@@ -123,14 +125,22 @@ spec:
                                     default: omni-moderation-latest
                                     type: string
                                 type: object
+                            required:
+                            - openAIModeration
                             type: object
                           regex:
                             properties:
                               action:
-                                type: integer
+                                default: MASK
+                                type: string
                               builtins:
                                 items:
-                                  type: integer
+                                  enum:
+                                  - SSN
+                                  - CREDIT_CARD
+                                  - PHONE_NUMBER
+                                  - EMAIL
+                                  type: string
                                 type: array
                               regexMatch:
                                 items:
@@ -147,25 +157,43 @@ spec:
                               forwardHeaders:
                                 items:
                                   properties:
-                                    key:
+                                    name:
+                                      maxLength: 256
+                                      minLength: 1
+                                      pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
                                       type: string
-                                    matchType:
-                                      default: EXACT
+                                    type:
+                                      default: Exact
                                       enum:
-                                      - EXACT
-                                      - PREFIX
-                                      - SUFFIX
-                                      - CONTAINS
-                                      - REGEX
-                                      format: int64
-                                      type: integer
+                                      - Exact
+                                      - RegularExpression
+                                      type: string
+                                    value:
+                                      maxLength: 4096
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - name
+                                  - value
                                   type: object
                                 type: array
                               host:
-                                type: string
-                              port:
-                                format: int32
-                                type: integer
+                                properties:
+                                  host:
+                                    maxLength: 253
+                                    minLength: 1
+                                    type: string
+                                  port:
+                                    format: int32
+                                    maximum: 65535
+                                    minimum: 1
+                                    type: integer
+                                required:
+                                - host
+                                - port
+                                type: object
+                            required:
+                            - host
                             type: object
                         type: object
                       response:
@@ -173,10 +201,16 @@ spec:
                           regex:
                             properties:
                               action:
-                                type: integer
+                                default: MASK
+                                type: string
                               builtins:
                                 items:
-                                  type: integer
+                                  enum:
+                                  - SSN
+                                  - CREDIT_CARD
+                                  - PHONE_NUMBER
+                                  - EMAIL
+                                  type: string
                                 type: array
                               regexMatch:
                                 items:
@@ -193,33 +227,51 @@ spec:
                               forwardHeaders:
                                 items:
                                   properties:
-                                    key:
+                                    name:
+                                      maxLength: 256
+                                      minLength: 1
+                                      pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
                                       type: string
-                                    matchType:
-                                      default: EXACT
+                                    type:
+                                      default: Exact
                                       enum:
-                                      - EXACT
-                                      - PREFIX
-                                      - SUFFIX
-                                      - CONTAINS
-                                      - REGEX
-                                      format: int64
-                                      type: integer
+                                      - Exact
+                                      - RegularExpression
+                                      type: string
+                                    value:
+                                      maxLength: 4096
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - name
+                                  - value
                                   type: object
                                 type: array
                               host:
-                                type: string
-                              port:
-                                format: int32
-                                type: integer
+                                properties:
+                                  host:
+                                    maxLength: 253
+                                    minLength: 1
+                                    type: string
+                                  port:
+                                    format: int32
+                                    maximum: 65535
+                                    minimum: 1
+                                    type: integer
+                                required:
+                                - host
+                                - port
+                                type: object
+                            required:
+                            - host
                             type: object
                         type: object
                     type: object
-                  route_type:
+                  routeType:
                     enum:
                     - CHAT
                     - CHAT_STREAMING
-                    type: integer
+                    type: string
                 type: object
               targetRef:
                 properties:
