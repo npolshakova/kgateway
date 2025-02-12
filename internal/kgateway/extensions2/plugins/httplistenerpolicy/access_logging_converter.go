@@ -16,7 +16,6 @@ import (
 	envoymatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/rotisserie/eris"
 	"github.com/solo-io/go-utils/contextutils"
 	"go.uber.org/zap"
@@ -26,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
-
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
-	kgateway_wellknown "github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	kwellknown "github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
 // convertAccessLogConfig transforms a list of AccessLog configurations into Envoy AccessLog configurations
@@ -347,7 +346,7 @@ func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyacc
 		alCfg = &envoyaccesslog.AccessLogFilter{
 			FilterSpecifier: &envoyaccesslog.AccessLogFilter_ExtensionFilter{
 				ExtensionFilter: &envoyaccesslog.ExtensionFilter{
-					Name: kgateway_wellknown.CELExtensionFilter,
+					Name: kwellknown.CELExtensionFilter,
 					ConfigType: &envoyaccesslog.ExtensionFilter_TypedConfig{
 						TypedConfig: celCfg,
 					},
