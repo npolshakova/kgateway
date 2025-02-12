@@ -21,8 +21,9 @@ import (
 )
 
 type httpListenerOptsPlugin struct {
-	ct   time.Time
-	spec v1alpha1.HTTPListenerPolicySpec
+	ct           time.Time
+	spec         v1alpha1.HTTPListenerPolicySpec
+	grpcBackends []*ir.Upstream
 }
 
 func (d *httpListenerOptsPlugin) CreationTime() time.Time {
@@ -62,6 +63,7 @@ func (p *httpListenerOptsPluginGwPass) ApplyListenerPlugin(ctx context.Context, 
 
 func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensionplug.Plugin {
 
+	// need upstreams for backend refs
 	col := krtutil.SetupCollectionDynamic[v1alpha1.HTTPListenerPolicy](
 		ctx,
 		commoncol.Client,
@@ -70,6 +72,21 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 	)
 	gk := v1alpha1.HTTPListenerPolicyGVK.GroupKind()
 	policyCol := krt.NewCollection(col, func(krtctx krt.HandlerContext, i *v1alpha1.HTTPListenerPolicy) *ir.PolicyWrapper {
+		//var grpcBackends []*ir.Upstream
+		//if i.Spec.AccessLog != nil {
+		//	for _, log := range i.Spec.AccessLog {
+		//		if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
+		//			upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, i, log.GrpcService.BackendRef.BackendObjectReference)
+		//			if err != nil {
+		//				// TODO: report error on status
+		//				contextutils.LoggerFrom(ctx).Error(err, "failed to get upstream from ref")
+		//				return nil
+		//			}
+		//			grpcBackends = append(grpcBackends, upstream)
+		//		}
+		//	}
+		//}
+
 		var pol = &ir.PolicyWrapper{
 			ObjectSource: ir.ObjectSource{
 				Group:     gk.Group,
@@ -77,8 +94,12 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 				Namespace: i.Namespace,
 				Name:      i.Name,
 			},
-			Policy:     i,
-			PolicyIR:   &httpListenerOptsPlugin{ct: i.CreationTimestamp.Time, spec: i.Spec},
+			Policy: i,
+			PolicyIR: &httpListenerOptsPlugin{
+				ct:   i.CreationTimestamp.Time,
+				spec: i.Spec,
+				//grpcBackends: grpcBackends,
+			},
 			TargetRefs: convert(i.Spec.TargetRef),
 		}
 		return pol

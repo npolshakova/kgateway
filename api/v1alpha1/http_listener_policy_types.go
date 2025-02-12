@@ -73,8 +73,7 @@ type GrpcService struct {
 
 	// The static cluster defined in bootstrap config to route to
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	StaticClusterName string `json:"staticClusterName"`
+	BackendRef *gwv1.BackendRef `json:"backendRef"`
 
 	// Additional request headers to log in the access log
 	AdditionalRequestHeadersToLog []string `json:"additionalRequestHeadersToLog,omitempty"`
@@ -90,22 +89,22 @@ type GrpcService struct {
 type AccessLogFilter struct {
 	*FilterType `json:",inline"` // embedded to allow for validation
 	// +kube:validation:MinItems=2
-	AndFilter []*FilterType `json:"andFilter,omitempty"`
+	AndFilter []FilterType `json:"andFilter,omitempty"`
 	// +kube:validation:MinItems=2
-	OrFilter []*FilterType `json:"orFilter,omitempty"`
+	OrFilter []FilterType `json:"orFilter,omitempty"`
 }
 
 // FilterType represents the type of filter to apply (only one of these should be set).
 type FilterType struct {
-	StatusCodeFilter     *StatusCodeFilter     `json:"statusCodeFilter,omitempty"`
-	DurationFilter       *DurationFilter       `json:"durationFilter,omitempty"`
-	NotHealthCheckFilter *NotHealthCheckFilter `json:"notHealthCheckFilter,omitempty"`
-	TraceableFilter      *TraceableFilter      `json:"traceableFilter,omitempty"`
-	RuntimeFilter        *RuntimeFilter        `json:"runtimeFilter,omitempty"`
-	HeaderFilter         *HeaderFilter         `json:"headerFilter,omitempty"`
-	ResponseFlagFilter   *ResponseFlagFilter   `json:"responseFlagFilter,omitempty"`
-	GrpcStatusFilter     *GrpcStatusFilter     `json:"grpcStatusFilter,omitempty"`
-	CELFilter            *CELFilter            `json:"celFilter,omitempty"`
+	StatusCodeFilter     *StatusCodeFilter   `json:"statusCodeFilter,omitempty"`
+	DurationFilter       *DurationFilter     `json:"durationFilter,omitempty"`
+	NotHealthCheckFilter bool                `json:"notHealthCheckFilter,omitempty"`
+	TraceableFilter      bool                `json:"traceableFilter,omitempty"`
+	RuntimeFilter        *RuntimeFilter      `json:"runtimeFilter,omitempty"`
+	HeaderFilter         *HeaderFilter       `json:"headerFilter,omitempty"`
+	ResponseFlagFilter   *ResponseFlagFilter `json:"responseFlagFilter,omitempty"`
+	GrpcStatusFilter     *GrpcStatusFilter   `json:"grpcStatusFilter,omitempty"`
+	CELFilter            *CELFilter          `json:"celFilter,omitempty"`
 }
 
 // ComparisonFilter represents a filter based on a comparison.
@@ -113,22 +112,10 @@ type ComparisonFilter struct {
 	// +kubebuilder:validation:Required
 	Op Op `json:"op,omitempty"`
 
-	// Value to compare against. Note that the `defaultValue` field must be defined unless
-	// the `runtimeKey` matches a key that is defined in Envoy's [runtime configuration layer](https://www.envoyproxy.io/docs/envoy/v1.30.0/configuration/operations/runtime#config-runtime-bootstrap).
-	// Gloo Gateway does not include a key by default. To specify a key-value pair, use the
-	// [gatewayProxies.NAME.customStaticLayer]({{< versioned_link_path fromRoot="/reference/helm_chart_values/" >}})
-	// Helm value or set the key at runtime by using the gateway proxy admin interface.
-	Value *RuntimeUInt32 `json:"value,omitempty"`
-}
-
-// RuntimeUInt32 configures the runtime derived uint32 with a default when not specified.
-type RuntimeUInt32 struct {
-	// Default value if runtime value is not available.
+	// Value to compare against.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=4294967295
-	DefaultValue uint32 `json:"defaultValue,omitempty"`
-	// Runtime key to get value for comparison. This value is used if defined.
-	RuntimeKey string `json:"runtimeKey,omitempty"`
+	Value uint32 `json:"value,omitempty"`
 }
 
 // Op represents comparison operators.
@@ -142,21 +129,10 @@ const (
 )
 
 // StatusCodeFilter filters based on HTTP status code.
-type StatusCodeFilter struct {
-	Comparison *ComparisonFilter `json:"comparison,omitempty"`
-}
+type StatusCodeFilter ComparisonFilter
 
 // DurationFilter filters based on request duration.
-type DurationFilter struct {
-	// +kubebuilder:validation:Required
-	Comparison *ComparisonFilter `json:"comparison,omitempty"`
-}
-
-// NotHealthCheckFilter filters requests that are not health check requests.
-type NotHealthCheckFilter struct{}
-
-// TraceableFilter filters requests that are traceable.
-type TraceableFilter struct{}
+type DurationFilter ComparisonFilter
 
 // RuntimeFilter filters random sampling of requests.
 type RuntimeFilter struct {

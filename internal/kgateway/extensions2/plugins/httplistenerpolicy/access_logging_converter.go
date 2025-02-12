@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	envoyaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
+	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoyroute "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoyalfile "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/file/v3"
@@ -172,10 +173,10 @@ func addAccessLogFilter(logger *zap.Logger, accessLogCfg *envoyaccesslog.AccessL
 }
 
 // translateOrFilters translates a slice of filter types
-func translateOrFilters(logger *zap.Logger, filters []*v1alpha1.FilterType) ([]*envoyaccesslog.AccessLogFilter, error) {
+func translateOrFilters(logger *zap.Logger, filters []v1alpha1.FilterType) ([]*envoyaccesslog.AccessLogFilter, error) {
 	result := make([]*envoyaccesslog.AccessLogFilter, 0, len(filters))
 	for _, filter := range filters {
-		cfg, err := translateFilter(logger, filter)
+		cfg, err := translateFilter(logger, &filter)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +193,7 @@ func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyacc
 	var alCfg *envoyaccesslog.AccessLogFilter
 	switch {
 	case filter.StatusCodeFilter != nil:
-		op, err := toEnvoyComparisonOpType(filter.StatusCodeFilter.Comparison.Op)
+		op, err := toEnvoyComparisonOpType(filter.StatusCodeFilter.Op)
 		if err != nil {
 			return nil, err
 		}
@@ -203,8 +204,7 @@ func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyacc
 					Comparison: &envoyaccesslog.ComparisonFilter{
 						Op: op,
 						Value: &envoycore.RuntimeUInt32{
-							DefaultValue: filter.StatusCodeFilter.Comparison.Value.DefaultValue,
-							RuntimeKey:   filter.StatusCodeFilter.Comparison.Value.RuntimeKey,
+							DefaultValue: filter.StatusCodeFilter.Value,
 						},
 					},
 				},
@@ -212,7 +212,7 @@ func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyacc
 		}
 
 	case filter.DurationFilter != nil:
-		op, err := toEnvoyComparisonOpType(filter.DurationFilter.Comparison.Op)
+		op, err := toEnvoyComparisonOpType(filter.DurationFilter.Op)
 		if err != nil {
 			return nil, err
 		}
@@ -223,22 +223,21 @@ func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyacc
 					Comparison: &envoyaccesslog.ComparisonFilter{
 						Op: op,
 						Value: &envoycore.RuntimeUInt32{
-							DefaultValue: filter.DurationFilter.Comparison.Value.DefaultValue,
-							RuntimeKey:   filter.DurationFilter.Comparison.Value.RuntimeKey,
+							DefaultValue: filter.DurationFilter.Value,
 						},
 					},
 				},
 			},
 		}
 
-	case filter.NotHealthCheckFilter != nil:
+	case filter.NotHealthCheckFilter == false:
 		alCfg = &envoyaccesslog.AccessLogFilter{
 			FilterSpecifier: &envoyaccesslog.AccessLogFilter_NotHealthCheckFilter{
 				NotHealthCheckFilter: &envoyaccesslog.NotHealthCheckFilter{},
 			},
 		}
 
-	case filter.TraceableFilter != nil:
+	case filter.TraceableFilter == true:
 		alCfg = &envoyaccesslog.AccessLogFilter{
 			FilterSpecifier: &envoyaccesslog.AccessLogFilter_TraceableFilter{
 				TraceableFilter: &envoyaccesslog.TraceableFilter{},
@@ -368,10 +367,10 @@ func validateFilter(filter *v1alpha1.FilterType) error {
 	if filter.DurationFilter != nil {
 		count++
 	}
-	if filter.NotHealthCheckFilter != nil {
+	if filter.NotHealthCheckFilter != true {
 		count++
 	}
-	if filter.TraceableFilter != nil {
+	if filter.TraceableFilter != true {
 		count++
 	}
 	if filter.RuntimeFilter != nil {
@@ -420,10 +419,16 @@ func copyGrpcSettings(cfg *envoygrpc.HttpGrpcAccessLogConfig, grpcService *v1alp
 		return eris.New("grpc service object cannot be nil")
 	}
 
+	var upstream *envoy_config_cluster_v3.Cluster
+	//backendRef := grpcService.BackendRef
+	//if upstream == nil {
+	//	return eris.New("upstream backend ref not found")
+	//}
+
 	svc := &envoycore.GrpcService{
 		TargetSpecifier: &envoycore.GrpcService_EnvoyGrpc_{
 			EnvoyGrpc: &envoycore.GrpcService_EnvoyGrpc{
-				ClusterName: grpcService.StaticClusterName,
+				ClusterName: upstream.GetName(),
 			},
 		},
 	}

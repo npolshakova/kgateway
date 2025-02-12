@@ -58,7 +58,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderFilter
     - name: notHealthCheckFilter
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.NotHealthCheckFilter
+        scalar: boolean
     - name: orFilter
       type:
         list:
@@ -76,7 +76,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.StatusCodeFilter
     - name: traceableFilter
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.TraceableFilter
+        scalar: boolean
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AiExtension
   map:
     fields:
@@ -133,15 +133,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ComparisonFilter
-  map:
-    fields:
-    - name: op
-      type:
-        scalar: string
-    - name: value
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RuntimeUInt32
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.CustomLabel
   map:
     fields:
@@ -205,9 +196,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.DurationFilter
   map:
     fields:
-    - name: comparison
+    - name: op
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ComparisonFilter
+        scalar: string
+    - name: value
+      type:
+        scalar: numeric
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.EnvoyBootstrap
   map:
     fields:
@@ -264,7 +258,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderFilter
     - name: notHealthCheckFilter
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.NotHealthCheckFilter
+        scalar: boolean
     - name: responseFlagFilter
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ResponseFlagFilter
@@ -276,7 +270,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.StatusCodeFilter
     - name: traceableFilter
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.TraceableFilter
+        scalar: boolean
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.FractionalPercent
   map:
     fields:
@@ -358,11 +352,10 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
-    - name: logName
+    - name: backendRef
       type:
-        scalar: string
-      default: ""
-    - name: staticClusterName
+        namedType: io.k8s.sigs.gateway-api.apis.v1.BackendRef
+    - name: logName
       type:
         scalar: string
       default: ""
@@ -566,18 +559,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.NotHealthCheckFilter
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Pod
   map:
     fields:
@@ -721,15 +702,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: useIndependentRandomness
       type:
         scalar: boolean
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RuntimeUInt32
-  map:
-    fields:
-    - name: defaultValue
-      type:
-        scalar: numeric
-    - name: runtimeKey
-      type:
-        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SdsBootstrap
   map:
     fields:
@@ -822,21 +794,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.StatusCodeFilter
   map:
     fields:
-    - name: comparison
+    - name: op
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ComparisonFilter
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.TraceableFilter
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
+        scalar: string
+    - name: value
+      type:
+        scalar: numeric
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Upstream
   map:
     fields:
@@ -1873,6 +1836,28 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: separable
 - name: io.k8s.apimachinery.pkg.util.intstr.IntOrString
   scalar: untyped
+- name: io.k8s.sigs.gateway-api.apis.v1.BackendRef
+  map:
+    fields:
+    - name: group
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: namespace
+      type:
+        scalar: string
+    - name: port
+      type:
+        scalar: numeric
+    - name: weight
+      type:
+        scalar: numeric
 - name: io.k8s.sigs.gateway-api.apis.v1.HTTPHeaderMatch
   map:
     fields:

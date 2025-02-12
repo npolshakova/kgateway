@@ -305,15 +305,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 						},
 						Filter: &v1alpha1.AccessLogFilter{
 							FilterType: &v1alpha1.FilterType{
-								StatusCodeFilter: &v1alpha1.StatusCodeFilter{
-									Comparison: &v1alpha1.ComparisonFilter{
-										Op: v1alpha1.EQ,
-										Value: &v1alpha1.RuntimeUInt32{
-											DefaultValue: 0,
-											RuntimeKey:   "test-key",
-										},
-									},
-								},
+								StatusCodeFilter: &v1alpha1.StatusCodeFilter{Value: 0},
 							},
 						},
 					},
@@ -420,13 +412,8 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 						Filter: &v1alpha1.AccessLogFilter{
 							FilterType: &v1alpha1.FilterType{
 								DurationFilter: &v1alpha1.DurationFilter{
-									Comparison: &v1alpha1.ComparisonFilter{
-										Op: v1alpha1.EQ,
-										Value: &v1alpha1.RuntimeUInt32{
-											DefaultValue: 0,
-											RuntimeKey:   "test-key",
-										},
-									},
+									Op:    v1alpha1.EQ,
+									Value: 0,
 								},
 							},
 						},
@@ -465,7 +452,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 						},
 						Filter: &v1alpha1.AccessLogFilter{
 							FilterType: &v1alpha1.FilterType{
-								NotHealthCheckFilter: &v1alpha1.NotHealthCheckFilter{},
+								NotHealthCheckFilter: true,
 							},
 						},
 					},
@@ -495,7 +482,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 						},
 						Filter: &v1alpha1.AccessLogFilter{
 							FilterType: &v1alpha1.FilterType{
-								TraceableFilter: &v1alpha1.TraceableFilter{},
+								TraceableFilter: true,
 							},
 						},
 					},

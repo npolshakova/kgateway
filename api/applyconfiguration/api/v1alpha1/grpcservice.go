@@ -2,14 +2,18 @@
 
 package v1alpha1
 
+import (
+	v1 "sigs.k8s.io/gateway-api/apis/v1"
+)
+
 // GrpcServiceApplyConfiguration represents a declarative configuration of the GrpcService type for use
 // with apply.
 type GrpcServiceApplyConfiguration struct {
-	LogName                         *string  `json:"logName,omitempty"`
-	StaticClusterName               *string  `json:"staticClusterName,omitempty"`
-	AdditionalRequestHeadersToLog   []string `json:"additionalRequestHeadersToLog,omitempty"`
-	AdditionalResponseHeadersToLog  []string `json:"additionalResponseHeadersToLog,omitempty"`
-	AdditionalResponseTrailersToLog []string `json:"additionalResponseTrailersToLog,omitempty"`
+	LogName                         *string        `json:"logName,omitempty"`
+	BackendRef                      *v1.BackendRef `json:"backendRef,omitempty"`
+	AdditionalRequestHeadersToLog   []string       `json:"additionalRequestHeadersToLog,omitempty"`
+	AdditionalResponseHeadersToLog  []string       `json:"additionalResponseHeadersToLog,omitempty"`
+	AdditionalResponseTrailersToLog []string       `json:"additionalResponseTrailersToLog,omitempty"`
 }
 
 // GrpcServiceApplyConfiguration constructs a declarative configuration of the GrpcService type for use with
@@ -26,11 +30,11 @@ func (b *GrpcServiceApplyConfiguration) WithLogName(value string) *GrpcServiceAp
 	return b
 }
 
-// WithStaticClusterName sets the StaticClusterName field in the declarative configuration to the given value
+// WithBackendRef sets the BackendRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the StaticClusterName field is set to the value of the last call.
-func (b *GrpcServiceApplyConfiguration) WithStaticClusterName(value string) *GrpcServiceApplyConfiguration {
-	b.StaticClusterName = &value
+// If called multiple times, the BackendRef field is set to the value of the last call.
+func (b *GrpcServiceApplyConfiguration) WithBackendRef(value v1.BackendRef) *GrpcServiceApplyConfiguration {
+	b.BackendRef = &value
 	return b
 }
 

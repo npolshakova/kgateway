@@ -54,7 +54,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ListenerPolicyList":         schema_kgateway_v2_api_v1alpha1_ListenerPolicyList(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ListenerPolicySpec":         schema_kgateway_v2_api_v1alpha1_ListenerPolicySpec(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReference": schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetReference(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.NotHealthCheckFilter":       schema_kgateway_v2_api_v1alpha1_NotHealthCheckFilter(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Pod":                        schema_kgateway_v2_api_v1alpha1_Pod(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.PolicyAncestorStatus":       schema_kgateway_v2_api_v1alpha1_PolicyAncestorStatus(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.PolicyStatus":               schema_kgateway_v2_api_v1alpha1_PolicyStatus(ref),
@@ -64,7 +63,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RoutePolicyList":            schema_kgateway_v2_api_v1alpha1_RoutePolicyList(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RoutePolicySpec":            schema_kgateway_v2_api_v1alpha1_RoutePolicySpec(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeFilter":              schema_kgateway_v2_api_v1alpha1_RuntimeFilter(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeUInt32":              schema_kgateway_v2_api_v1alpha1_RuntimeUInt32(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SdsBootstrap":               schema_kgateway_v2_api_v1alpha1_SdsBootstrap(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SdsContainer":               schema_kgateway_v2_api_v1alpha1_SdsContainer(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SelfManagedGateway":         schema_kgateway_v2_api_v1alpha1_SelfManagedGateway(ref),
@@ -73,7 +71,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StaticUpstream":             schema_kgateway_v2_api_v1alpha1_StaticUpstream(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatsConfig":                schema_kgateway_v2_api_v1alpha1_StatsConfig(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatusCodeFilter":           schema_kgateway_v2_api_v1alpha1_StatusCodeFilter(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TraceableFilter":            schema_kgateway_v2_api_v1alpha1_TraceableFilter(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Upstream":                   schema_kgateway_v2_api_v1alpha1_Upstream(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.UpstreamList":               schema_kgateway_v2_api_v1alpha1_UpstreamList(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.UpstreamSpec":               schema_kgateway_v2_api_v1alpha1_UpstreamSpec(ref),
@@ -481,12 +478,14 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 					},
 					"notHealthCheckFilter": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.NotHealthCheckFilter"),
+							Type:   []string{"boolean"},
+							Format: "",
 						},
 					},
 					"traceableFilter": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TraceableFilter"),
+							Type:   []string{"boolean"},
+							Format: "",
 						},
 					},
 					"runtimeFilter": {
@@ -520,7 +519,8 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterType"),
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterType"),
 									},
 								},
 							},
@@ -532,7 +532,8 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterType"),
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterType"),
 									},
 								},
 							},
@@ -542,7 +543,7 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DurationFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterType", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GrpcStatusFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.NotHealthCheckFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ResponseFlagFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatusCodeFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TraceableFilter"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DurationFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterType", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GrpcStatusFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ResponseFlagFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatusCodeFilter"},
 	}
 }
 
@@ -710,15 +711,14 @@ func schema_kgateway_v2_api_v1alpha1_ComparisonFilter(ref common.ReferenceCallba
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Value to compare against. Note that the `defaultValue` field must be defined unless the `runtimeKey` matches a key that is defined in Envoy's [runtime configuration layer](https://www.envoyproxy.io/docs/envoy/v1.30.0/configuration/operations/runtime#config-runtime-bootstrap). Gloo Gateway does not include a key by default. To specify a key-value pair, use the [gatewayProxies.NAME.customStaticLayer]({{< versioned_link_path fromRoot=\"/reference/helm_chart_values/\" >}}) Helm value or set the key at runtime by using the gateway proxy admin interface.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeUInt32"),
+							Description: "Value to compare against.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
 			},
 		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeUInt32"},
 	}
 }
 
@@ -907,16 +907,22 @@ func schema_kgateway_v2_api_v1alpha1_DurationFilter(ref common.ReferenceCallback
 				Description: "DurationFilter filters based on request duration.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"comparison": {
+					"op": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ComparisonFilter"),
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value to compare against.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
 			},
 		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ComparisonFilter"},
 	}
 }
 
@@ -1051,12 +1057,14 @@ func schema_kgateway_v2_api_v1alpha1_FilterType(ref common.ReferenceCallback) co
 					},
 					"notHealthCheckFilter": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.NotHealthCheckFilter"),
+							Type:   []string{"boolean"},
+							Format: "",
 						},
 					},
 					"traceableFilter": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TraceableFilter"),
+							Type:   []string{"boolean"},
+							Format: "",
 						},
 					},
 					"runtimeFilter": {
@@ -1088,7 +1096,7 @@ func schema_kgateway_v2_api_v1alpha1_FilterType(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DurationFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GrpcStatusFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.NotHealthCheckFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ResponseFlagFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatusCodeFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TraceableFilter"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DurationFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GrpcStatusFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ResponseFlagFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RuntimeFilter", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatusCodeFilter"},
 	}
 }
 
@@ -1291,12 +1299,10 @@ func schema_kgateway_v2_api_v1alpha1_GrpcService(ref common.ReferenceCallback) c
 							Format:      "",
 						},
 					},
-					"staticClusterName": {
+					"backendRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The static cluster defined in bootstrap config to route to",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Ref:         ref("sigs.k8s.io/gateway-api/apis/v1.BackendRef"),
 						},
 					},
 					"additionalRequestHeadersToLog": {
@@ -1345,9 +1351,11 @@ func schema_kgateway_v2_api_v1alpha1_GrpcService(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"logName", "staticClusterName"},
+				Required: []string{"logName", "backendRef"},
 			},
 		},
+		Dependencies: []string{
+			"sigs.k8s.io/gateway-api/apis/v1.BackendRef"},
 	}
 }
 
@@ -1946,17 +1954,6 @@ func schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetReference(ref common.Refer
 	}
 }
 
-func schema_kgateway_v2_api_v1alpha1_NotHealthCheckFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NotHealthCheckFilter filters requests that are not health check requests.",
-				Type:        []string{"object"},
-			},
-		},
-	}
-}
-
 func schema_kgateway_v2_api_v1alpha1_Pod(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2387,33 +2384,6 @@ func schema_kgateway_v2_api_v1alpha1_RuntimeFilter(ref common.ReferenceCallback)
 	}
 }
 
-func schema_kgateway_v2_api_v1alpha1_RuntimeUInt32(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "RuntimeUInt32 configures the runtime derived uint32 with a default when not specified.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"defaultValue": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Default value if runtime value is not available.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"runtimeKey": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Runtime key to get value for comparison. This value is used if defined.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func schema_kgateway_v2_api_v1alpha1_SdsBootstrap(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2662,25 +2632,20 @@ func schema_kgateway_v2_api_v1alpha1_StatusCodeFilter(ref common.ReferenceCallba
 				Description: "StatusCodeFilter filters based on HTTP status code.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"comparison": {
+					"op": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ComparisonFilter"),
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value to compare against.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ComparisonFilter"},
-	}
-}
-
-func schema_kgateway_v2_api_v1alpha1_TraceableFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "TraceableFilter filters requests that are traceable.",
-				Type:        []string{"object"},
 			},
 		},
 	}

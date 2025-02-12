@@ -2,16 +2,12 @@
 
 package v1alpha1
 
-import (
-	apiv1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-)
-
 // AccessLogFilterApplyConfiguration represents a declarative configuration of the AccessLogFilter type for use
 // with apply.
 type AccessLogFilterApplyConfiguration struct {
 	FilterTypeApplyConfiguration `json:",inline"`
-	AndFilter                    []*apiv1alpha1.FilterType `json:"andFilter,omitempty"`
-	OrFilter                     []*apiv1alpha1.FilterType `json:"orFilter,omitempty"`
+	AndFilter                    []FilterTypeApplyConfiguration `json:"andFilter,omitempty"`
+	OrFilter                     []FilterTypeApplyConfiguration `json:"orFilter,omitempty"`
 }
 
 // AccessLogFilterApplyConfiguration constructs a declarative configuration of the AccessLogFilter type for use with
@@ -23,7 +19,7 @@ func AccessLogFilter() *AccessLogFilterApplyConfiguration {
 // WithAndFilter adds the given value to the AndFilter field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AndFilter field.
-func (b *AccessLogFilterApplyConfiguration) WithAndFilter(values ...**apiv1alpha1.FilterType) *AccessLogFilterApplyConfiguration {
+func (b *AccessLogFilterApplyConfiguration) WithAndFilter(values ...*FilterTypeApplyConfiguration) *AccessLogFilterApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithAndFilter")
@@ -36,7 +32,7 @@ func (b *AccessLogFilterApplyConfiguration) WithAndFilter(values ...**apiv1alpha
 // WithOrFilter adds the given value to the OrFilter field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OrFilter field.
-func (b *AccessLogFilterApplyConfiguration) WithOrFilter(values ...**apiv1alpha1.FilterType) *AccessLogFilterApplyConfiguration {
+func (b *AccessLogFilterApplyConfiguration) WithOrFilter(values ...*FilterTypeApplyConfiguration) *AccessLogFilterApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOrFilter")

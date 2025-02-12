@@ -2,10 +2,15 @@
 
 package v1alpha1
 
+import (
+	v1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+)
+
 // StatusCodeFilterApplyConfiguration represents a declarative configuration of the StatusCodeFilter type for use
 // with apply.
 type StatusCodeFilterApplyConfiguration struct {
-	Comparison *ComparisonFilterApplyConfiguration `json:"comparison,omitempty"`
+	Op    *v1alpha1.Op `json:"op,omitempty"`
+	Value *uint32      `json:"value,omitempty"`
 }
 
 // StatusCodeFilterApplyConfiguration constructs a declarative configuration of the StatusCodeFilter type for use with
@@ -14,10 +19,18 @@ func StatusCodeFilter() *StatusCodeFilterApplyConfiguration {
 	return &StatusCodeFilterApplyConfiguration{}
 }
 
-// WithComparison sets the Comparison field in the declarative configuration to the given value
+// WithOp sets the Op field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Comparison field is set to the value of the last call.
-func (b *StatusCodeFilterApplyConfiguration) WithComparison(value *ComparisonFilterApplyConfiguration) *StatusCodeFilterApplyConfiguration {
-	b.Comparison = value
+// If called multiple times, the Op field is set to the value of the last call.
+func (b *StatusCodeFilterApplyConfiguration) WithOp(value v1alpha1.Op) *StatusCodeFilterApplyConfiguration {
+	b.Op = &value
+	return b
+}
+
+// WithValue sets the Value field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Value field is set to the value of the last call.
+func (b *StatusCodeFilterApplyConfiguration) WithValue(value uint32) *StatusCodeFilterApplyConfiguration {
+	b.Value = &value
 	return b
 }

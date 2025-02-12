@@ -29,8 +29,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.AwsUpstreamApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CELFilter"):
 		return &apiv1alpha1.CELFilterApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ComparisonFilter"):
-		return &apiv1alpha1.ComparisonFilterApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CustomLabel"):
 		return &apiv1alpha1.CustomLabelApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("DirectResponse"):
@@ -97,8 +95,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.RoutePolicySpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeFilter"):
 		return &apiv1alpha1.RuntimeFilterApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeUInt32"):
-		return &apiv1alpha1.RuntimeUInt32ApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SdsBootstrap"):
 		return &apiv1alpha1.SdsBootstrapApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SdsContainer"):

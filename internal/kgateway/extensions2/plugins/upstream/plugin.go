@@ -126,7 +126,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 		}
 	})
 
-	epndpoints := krt.NewCollection(col, func(krtctx krt.HandlerContext, i *v1alpha1.Upstream) *ir.EndpointsForUpstream {
+	endpoints := krt.NewCollection(col, func(krtctx krt.HandlerContext, i *v1alpha1.Upstream) *ir.EndpointsForUpstream {
 		return processEndpoints(i)
 	})
 	return extensionsplug.Plugin{
@@ -135,7 +135,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 				UpstreamInit: ir.UpstreamInit{
 					InitUpstream: processUpstream,
 				},
-				Endpoints: epndpoints,
+				Endpoints: endpoints,
 				Upstreams: ucol,
 			},
 		},

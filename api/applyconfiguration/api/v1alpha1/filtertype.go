@@ -2,17 +2,13 @@
 
 package v1alpha1
 
-import (
-	apiv1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-)
-
 // FilterTypeApplyConfiguration represents a declarative configuration of the FilterType type for use
 // with apply.
 type FilterTypeApplyConfiguration struct {
 	StatusCodeFilter     *StatusCodeFilterApplyConfiguration   `json:"statusCodeFilter,omitempty"`
 	DurationFilter       *DurationFilterApplyConfiguration     `json:"durationFilter,omitempty"`
-	NotHealthCheckFilter *apiv1alpha1.NotHealthCheckFilter     `json:"notHealthCheckFilter,omitempty"`
-	TraceableFilter      *apiv1alpha1.TraceableFilter          `json:"traceableFilter,omitempty"`
+	NotHealthCheckFilter *bool                                 `json:"notHealthCheckFilter,omitempty"`
+	TraceableFilter      *bool                                 `json:"traceableFilter,omitempty"`
 	RuntimeFilter        *RuntimeFilterApplyConfiguration      `json:"runtimeFilter,omitempty"`
 	HeaderFilter         *HeaderFilterApplyConfiguration       `json:"headerFilter,omitempty"`
 	ResponseFlagFilter   *ResponseFlagFilterApplyConfiguration `json:"responseFlagFilter,omitempty"`
@@ -45,7 +41,7 @@ func (b *FilterTypeApplyConfiguration) WithDurationFilter(value *DurationFilterA
 // WithNotHealthCheckFilter sets the NotHealthCheckFilter field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NotHealthCheckFilter field is set to the value of the last call.
-func (b *FilterTypeApplyConfiguration) WithNotHealthCheckFilter(value apiv1alpha1.NotHealthCheckFilter) *FilterTypeApplyConfiguration {
+func (b *FilterTypeApplyConfiguration) WithNotHealthCheckFilter(value bool) *FilterTypeApplyConfiguration {
 	b.NotHealthCheckFilter = &value
 	return b
 }
@@ -53,7 +49,7 @@ func (b *FilterTypeApplyConfiguration) WithNotHealthCheckFilter(value apiv1alpha
 // WithTraceableFilter sets the TraceableFilter field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TraceableFilter field is set to the value of the last call.
-func (b *FilterTypeApplyConfiguration) WithTraceableFilter(value apiv1alpha1.TraceableFilter) *FilterTypeApplyConfiguration {
+func (b *FilterTypeApplyConfiguration) WithTraceableFilter(value bool) *FilterTypeApplyConfiguration {
 	b.TraceableFilter = &value
 	return b
 }
