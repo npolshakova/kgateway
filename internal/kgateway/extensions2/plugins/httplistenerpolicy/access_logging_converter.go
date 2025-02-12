@@ -16,11 +16,13 @@ import (
 	envoymatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/rotisserie/eris"
 	"github.com/solo-io/go-utils/contextutils"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+	"istio.io/istio/pkg/kube/krt"
 	"k8s.io/apimachinery/pkg/runtime"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -32,17 +34,45 @@ import (
 )
 
 // convertAccessLogConfig transforms a list of AccessLog configurations into Envoy AccessLog configurations
-func convertAccessLogConfig(ctx context.Context, pCtx *httpListenerOptsPlugin) ([]*envoyaccesslog.AccessLog, error) {
-	configs := pCtx.spec.AccessLog
+func convertAccessLogConfig(
+	ctx context.Context,
+	policy *v1alpha1.HTTPListenerPolicy,
+	commoncol *common.CommonCollections,
+	krtctx krt.HandlerContext,
+	parentSrc ir.ObjectSource,
+) ([]*envoyaccesslog.AccessLog, error) {
+	configs := policy.Spec.AccessLog
+
 	if configs != nil && len(configs) == 0 {
 		return nil, nil
 	}
 
+	grpcBackends := make(map[string]*ir.Upstream, len(policy.Spec.AccessLog))
+	for _, log := range configs {
+		if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
+			upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, parentSrc, log.GrpcService.BackendRef.BackendObjectReference)
+			if err != nil {
+				// TODO: report error on status
+				return nil, eris.Wrapf(err, "failed to get upstream from ref")
+			}
+			if grpcBackends[log.GrpcService.LogName] != nil {
+				// TODO: report error on status
+				contextutils.LoggerFrom(ctx).Error(err, fmt.Sprintf("Duplicate grpc service log name %s. Using first grpc service config.", log.GrpcService.LogName))
+				continue
+			}
+			grpcBackends[log.GrpcService.LogName] = upstream
+		}
+	}
+
 	logger := contextutils.LoggerFrom(ctx).Desugar()
+	return translateAccessLogs(logger, configs, grpcBackends)
+}
+
+func translateAccessLogs(logger *zap.Logger, configs []v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream) ([]*envoyaccesslog.AccessLog, error) {
 	var results []*envoyaccesslog.AccessLog
 
 	for _, logConfig := range configs {
-		accessLogCfg, err := createAccessLogConfiguration(logger, logConfig, pCtx.grpcBackends)
+		accessLogCfg, err := translateAccessLog(logger, logConfig, grpcBackends)
 		if err != nil {
 			return nil, err
 		}
@@ -52,8 +82,8 @@ func convertAccessLogConfig(ctx context.Context, pCtx *httpListenerOptsPlugin) (
 	return results, nil
 }
 
-// createAccessLogConfiguration creates an Envoy AccessLog configuration for a single log config
-func createAccessLogConfiguration(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream) (*envoyaccesslog.AccessLog, error) {
+// translateAccessLog creates an Envoy AccessLog configuration for a single log config
+func translateAccessLog(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream) (*envoyaccesslog.AccessLog, error) {
 	// Validate mutual exclusivity of sink types
 	if logConfig.FileSink != nil && logConfig.GrpcService != nil {
 		return nil, eris.New("access log config cannot have both file sink and grpc service")

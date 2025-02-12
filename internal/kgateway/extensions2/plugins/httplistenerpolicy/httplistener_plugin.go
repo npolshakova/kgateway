@@ -2,14 +2,16 @@ package httplistenerpolicy
 
 import (
 	"context"
-	"fmt"
+	"slices"
 	"time"
 
+	envoyaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/rotisserie/eris"
 	"github.com/solo-io/go-utils/contextutils"
+	"google.golang.org/protobuf/proto"
 	"istio.io/istio/pkg/kube/krt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -23,9 +25,9 @@ import (
 )
 
 type httpListenerOptsPlugin struct {
-	ct           time.Time
-	spec         v1alpha1.HTTPListenerPolicySpec
-	grpcBackends map[string]*ir.Upstream
+	ct        time.Time
+	spec      v1alpha1.HTTPListenerPolicySpec
+	accessLog []*envoyaccesslog.AccessLog
 }
 
 func (d *httpListenerOptsPlugin) CreationTime() time.Time {
@@ -51,6 +53,12 @@ func (d *httpListenerOptsPlugin) Equals(in any) bool {
 		if d.spec.AccessLog[i] != d2.spec.AccessLog[i] {
 			return false
 		}
+	}
+
+	if !slices.EqualFunc(d.accessLog, d2.accessLog, func(log *envoyaccesslog.AccessLog, log2 *envoyaccesslog.AccessLog) bool {
+		return proto.Equal(log, log2)
+	}) {
+		return false
 	}
 
 	return true
@@ -81,37 +89,23 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 			Name:      i.Name,
 		}
 
-		var grpcBackends map[string]*ir.Upstream
-		if i.Spec.AccessLog != nil {
-			grpcBackends = make(map[string]*ir.Upstream, len(i.Spec.AccessLog))
-			for _, log := range i.Spec.AccessLog {
-				if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
-					upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, objSrc, log.GrpcService.BackendRef.BackendObjectReference)
-					if err != nil {
-						// TODO: report error on status
-						contextutils.LoggerFrom(ctx).Error(err, "failed to get upstream from ref")
-						return nil
-					}
-					if grpcBackends[log.GrpcService.LogName] != nil {
-						// TODO: report error on status
-						contextutils.LoggerFrom(ctx).Error(err, fmt.Sprintf("Duplicate grpc service log name %s. Using first grpc service config.", log.GrpcService.LogName))
-						continue
-					}
-					grpcBackends[log.GrpcService.LogName] = upstream
-				}
-			}
+		accessLog, err := convertAccessLogConfig(ctx, i, commoncol, krtctx, objSrc)
+		if err != nil {
+			// TODO: report error on status
+			contextutils.LoggerFrom(ctx).Error(err)
 		}
 
 		var pol = &ir.PolicyWrapper{
 			ObjectSource: objSrc,
 			Policy:       i,
 			PolicyIR: &httpListenerOptsPlugin{
-				ct:           i.CreationTimestamp.Time,
-				spec:         i.Spec,
-				grpcBackends: grpcBackends,
+				ct:        i.CreationTimestamp.Time,
+				spec:      i.Spec,
+				accessLog: accessLog,
 			},
 			TargetRefs: convert(i.Spec.TargetRef),
 		}
+
 		return pol
 	})
 
@@ -152,12 +146,8 @@ func (p *httpListenerOptsPluginGwPass) ApplyHCM(
 
 	// translate access logging configuration
 	if policy.spec.AccessLog != nil {
-		accessLog, err := convertAccessLogConfig(ctx, policy)
-		if err != nil {
-			return eris.Errorf("failed to convert access log config: %v", err)
-		}
-		if accessLog != nil {
-			out.AccessLog = append(out.GetAccessLog(), accessLog...)
+		if policy.accessLog != nil {
+			out.AccessLog = append(out.GetAccessLog(), policy.accessLog...)
 		}
 	}
 	return nil

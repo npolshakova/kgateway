@@ -14,6 +14,7 @@ import (
 	envoy_req_without_query "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/req_without_query/v3"
 	envoymatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/solo-io/go-utils/contextutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -669,18 +670,15 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 		}
-
 		for _, tc := range testCases {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
+			logger := contextutils.LoggerFrom(ctx).Desugar()
 
 			t.Run(tc.name, func(t *testing.T) {
-				result, err := convertAccessLogConfig(ctx, &httpListenerOptsPlugin{
-					spec: v1alpha1.HTTPListenerPolicySpec{
-						AccessLog: tc.config,
-					},
+				result, err := translateAccessLogs(logger, tc.config,
 					// Example grpcBackends map for upstreams
-					grpcBackends: map[string]*ir.Upstream{
+					map[string]*ir.Upstream{
 						"grpc-log": {
 							ObjectSource: ir.ObjectSource{
 								Name:      "test-service",
@@ -688,7 +686,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 							},
 						},
 					},
-				})
+				)
 				require.NoError(t, err, "failed to convert access log config")
 				// Perform deep equality check
 				assert.Equal(t, len(tc.expected), len(result), "expected length mismatch")
