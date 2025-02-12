@@ -75,16 +75,46 @@ spec:
         - name: reviews
           port: 8080
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+apiVersion: v1
+kind: Service
 metadata:
-  name: log
+  name: log-test
   namespace: gwtest
+  labels:
+    app: log-test
+    service: log-test
 spec:
-  static:
-    hosts:
-      - host: 1.2.3.4
-        port: 8080
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+  selector:
+    app: log-test
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: log-slice
+  namespace: gwtest
+  labels:
+    kubernetes.io/service-name: log-test
+    app: log-test
+    service: log-test
+addressType: IPv4
+endpoints:
+  - addresses:
+      - 10.244.1.11
+    conditions:
+      ready: true
+    nodeName: worker
+    targetRef:
+      kind: Pod
+      name: log-test
+      namespace: gwtest
+ports:
+  - name: grpc
+    port: 50051
+    protocol: TCP
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: HTTPListenerPolicy
@@ -100,9 +130,8 @@ spec:
     - grpcService:
         logName: "test-accesslog-service"
         backendRef:
-          name: log
-          kind: Upstream
-          group: gateway.kgateway.dev
+          name: log-test
+          port: 50051
       filter:
           headerFilter:
               header:
