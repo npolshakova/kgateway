@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	envoyaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
-	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoyroute "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoyalfile "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/file/v3"
@@ -25,14 +24,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
+
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	kgateway_wellknown "github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
 // convertAccessLogConfig transforms a list of AccessLog configurations into Envoy AccessLog configurations
-func convertAccessLogConfig(ctx context.Context, configs []v1alpha1.AccessLog) ([]*envoyaccesslog.AccessLog, error) {
-	if len(configs) == 0 {
+func convertAccessLogConfig(ctx context.Context, pCtx *httpListenerOptsPlugin) ([]*envoyaccesslog.AccessLog, error) {
+	configs := pCtx.spec.AccessLog
+	if configs != nil && len(configs) == 0 {
 		return nil, nil
 	}
 
@@ -40,7 +42,7 @@ func convertAccessLogConfig(ctx context.Context, configs []v1alpha1.AccessLog) (
 	var results []*envoyaccesslog.AccessLog
 
 	for _, logConfig := range configs {
-		accessLogCfg, err := createAccessLogConfiguration(logger, logConfig)
+		accessLogCfg, err := createAccessLogConfiguration(logger, logConfig, pCtx.grpcBackends)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +53,7 @@ func convertAccessLogConfig(ctx context.Context, configs []v1alpha1.AccessLog) (
 }
 
 // createAccessLogConfiguration creates an Envoy AccessLog configuration for a single log config
-func createAccessLogConfiguration(logger *zap.Logger, logConfig v1alpha1.AccessLog) (*envoyaccesslog.AccessLog, error) {
+func createAccessLogConfiguration(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream) (*envoyaccesslog.AccessLog, error) {
 	// Validate mutual exclusivity of sink types
 	if logConfig.FileSink != nil && logConfig.GrpcService != nil {
 		return nil, eris.New("access log config cannot have both file sink and grpc service")
@@ -66,7 +68,7 @@ func createAccessLogConfiguration(logger *zap.Logger, logConfig v1alpha1.AccessL
 	case logConfig.FileSink != nil:
 		accessLogCfg, err = createFileAccessLog(logger, logConfig.FileSink)
 	case logConfig.GrpcService != nil:
-		accessLogCfg, err = createGrpcAccessLog(logger, logConfig.GrpcService)
+		accessLogCfg, err = createGrpcAccessLog(logger, logConfig.GrpcService, grpcBackends)
 	default:
 		return nil, eris.New("no access log sink specified")
 	}
@@ -128,9 +130,9 @@ func createFileAccessLog(logger *zap.Logger, fileSink *v1alpha1.FileSink) (*envo
 }
 
 // createGrpcAccessLog generates a gRPC-based access log configuration
-func createGrpcAccessLog(logger *zap.Logger, grpcService *v1alpha1.GrpcService) (*envoyaccesslog.AccessLog, error) {
+func createGrpcAccessLog(logger *zap.Logger, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream) (*envoyaccesslog.AccessLog, error) {
 	var cfg envoygrpc.HttpGrpcAccessLogConfig
-	if err := copyGrpcSettings(&cfg, grpcService); err != nil {
+	if err := copyGrpcSettings(&cfg, grpcService, grpcBackends); err != nil {
 		logger.Error(fmt.Sprintf("error converting grpc access log config: %s", err.Error()))
 		return nil, err
 	}
@@ -230,14 +232,14 @@ func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyacc
 			},
 		}
 
-	case filter.NotHealthCheckFilter == false:
+	case filter.NotHealthCheckFilter:
 		alCfg = &envoyaccesslog.AccessLogFilter{
 			FilterSpecifier: &envoyaccesslog.AccessLogFilter_NotHealthCheckFilter{
 				NotHealthCheckFilter: &envoyaccesslog.NotHealthCheckFilter{},
 			},
 		}
 
-	case filter.TraceableFilter == true:
+	case filter.TraceableFilter:
 		alCfg = &envoyaccesslog.AccessLogFilter{
 			FilterSpecifier: &envoyaccesslog.AccessLogFilter_TraceableFilter{
 				TraceableFilter: &envoyaccesslog.TraceableFilter{},
@@ -367,10 +369,10 @@ func validateFilter(filter *v1alpha1.FilterType) error {
 	if filter.DurationFilter != nil {
 		count++
 	}
-	if filter.NotHealthCheckFilter != true {
+	if filter.NotHealthCheckFilter {
 		count++
 	}
-	if filter.TraceableFilter != true {
+	if filter.TraceableFilter {
 		count++
 	}
 	if filter.RuntimeFilter != nil {
@@ -414,16 +416,19 @@ func convertJsonFormat(jsonFormat *runtime.RawExtension) *structpb.Struct {
 	return structVal
 }
 
-func copyGrpcSettings(cfg *envoygrpc.HttpGrpcAccessLogConfig, grpcService *v1alpha1.GrpcService) error {
+func copyGrpcSettings(cfg *envoygrpc.HttpGrpcAccessLogConfig, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream) error {
 	if grpcService == nil {
 		return eris.New("grpc service object cannot be nil")
 	}
 
-	var upstream *envoy_config_cluster_v3.Cluster
-	//backendRef := grpcService.BackendRef
-	//if upstream == nil {
-	//	return eris.New("upstream backend ref not found")
-	//}
+	if grpcService.LogName == "" {
+		return eris.New("grpc service log name cannot be empty")
+	}
+
+	upstream := grpcBackends[grpcService.LogName]
+	if upstream == nil {
+		return eris.New("upstream backend ref not found")
+	}
 
 	svc := &envoycore.GrpcService{
 		TargetSpecifier: &envoycore.GrpcService_EnvoyGrpc_{

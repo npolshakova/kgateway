@@ -2,12 +2,14 @@ package httplistenerpolicy
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/rotisserie/eris"
+	"github.com/solo-io/go-utils/contextutils"
 	"istio.io/istio/pkg/kube/krt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -23,7 +25,7 @@ import (
 type httpListenerOptsPlugin struct {
 	ct           time.Time
 	spec         v1alpha1.HTTPListenerPolicySpec
-	grpcBackends []*ir.Upstream
+	grpcBackends map[string]*ir.Upstream
 }
 
 func (d *httpListenerOptsPlugin) CreationTime() time.Time {
@@ -72,33 +74,41 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 	)
 	gk := v1alpha1.HTTPListenerPolicyGVK.GroupKind()
 	policyCol := krt.NewCollection(col, func(krtctx krt.HandlerContext, i *v1alpha1.HTTPListenerPolicy) *ir.PolicyWrapper {
-		//var grpcBackends []*ir.Upstream
-		//if i.Spec.AccessLog != nil {
-		//	for _, log := range i.Spec.AccessLog {
-		//		if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
-		//			upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, i, log.GrpcService.BackendRef.BackendObjectReference)
-		//			if err != nil {
-		//				// TODO: report error on status
-		//				contextutils.LoggerFrom(ctx).Error(err, "failed to get upstream from ref")
-		//				return nil
-		//			}
-		//			grpcBackends = append(grpcBackends, upstream)
-		//		}
-		//	}
-		//}
+		objSrc := ir.ObjectSource{
+			Group:     gk.Group,
+			Kind:      gk.Kind,
+			Namespace: i.Namespace,
+			Name:      i.Name,
+		}
+
+		var grpcBackends map[string]*ir.Upstream
+		if i.Spec.AccessLog != nil {
+			grpcBackends = make(map[string]*ir.Upstream, len(i.Spec.AccessLog))
+			for _, log := range i.Spec.AccessLog {
+				if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
+					upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, objSrc, log.GrpcService.BackendRef.BackendObjectReference)
+					if err != nil {
+						// TODO: report error on status
+						contextutils.LoggerFrom(ctx).Error(err, "failed to get upstream from ref")
+						return nil
+					}
+					if grpcBackends[log.GrpcService.LogName] != nil {
+						// TODO: report error on status
+						contextutils.LoggerFrom(ctx).Error(err, fmt.Sprintf("Duplicate grpc service log name %s. Using first grpc service config.", log.GrpcService.LogName))
+						continue
+					}
+					grpcBackends[log.GrpcService.LogName] = upstream
+				}
+			}
+		}
 
 		var pol = &ir.PolicyWrapper{
-			ObjectSource: ir.ObjectSource{
-				Group:     gk.Group,
-				Kind:      gk.Kind,
-				Namespace: i.Namespace,
-				Name:      i.Name,
-			},
-			Policy: i,
+			ObjectSource: objSrc,
+			Policy:       i,
 			PolicyIR: &httpListenerOptsPlugin{
-				ct:   i.CreationTimestamp.Time,
-				spec: i.Spec,
-				//grpcBackends: grpcBackends,
+				ct:           i.CreationTimestamp.Time,
+				spec:         i.Spec,
+				grpcBackends: grpcBackends,
 			},
 			TargetRefs: convert(i.Spec.TargetRef),
 		}
@@ -142,7 +152,7 @@ func (p *httpListenerOptsPluginGwPass) ApplyHCM(
 
 	// translate access logging configuration
 	if policy.spec.AccessLog != nil {
-		accessLog, err := convertAccessLogConfig(ctx, policy.spec.AccessLog)
+		accessLog, err := convertAccessLogConfig(ctx, policy)
 		if err != nil {
 			return eris.Errorf("failed to convert access log config: %v", err)
 		}

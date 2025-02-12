@@ -97,16 +97,15 @@ spec:
     kind: Gateway
     name: http-gw-for-test
   accessLog:
-      - grpcService:
-          logName: "test-accesslog-service"
-          backendRef:
-            group: gateway.kgateway.dev/v1alpha1
-            kind: Upstream
-            name: log
-            namespace: gwtest
-        filter:
-            headerFilter:
-                header:
-                  value: "test"
-                  name: "x-my-cool-test-filter"
-                  type: "Exact"
+    - grpcService:
+        logName: "test-accesslog-service"
+        backendRef:
+          name: log
+          kind: Upstream
+          group: gateway.kgateway.dev
+      filter:
+          headerFilter:
+              header:
+                value: "test"
+                name: "x-my-cool-test-filter"
+                type: "Exact"

@@ -100,10 +100,9 @@ spec:
       - grpcService:
           logName: "test-accesslog-service"
           backendRef:
-            group: gateway.kgateway.dev/v1alpha1
-            kind: Upstream
             name: log
-            namespace: gwtest
+            kind: Upstream
+            group: gateway.kgateway.dev
         filter:
           celFilter:
             match: "request.headers['test'].contains('cool-beans')"

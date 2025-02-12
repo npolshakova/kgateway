@@ -14,6 +14,7 @@ import (
 	envoy_req_without_query "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/req_without_query/v3"
 	envoymatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -108,7 +109,11 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 					},
 					{
 						GrpcService: &v1alpha1.GrpcService{
-							StaticClusterName:               "log-cluster",
+							BackendRef: &gwv1.BackendRef{
+								BackendObjectReference: gwv1.BackendObjectReference{
+									Name: "test-service",
+								},
+							},
 							LogName:                         "grpc-log",
 							AdditionalRequestHeadersToLog:   []string{"x-request-id"},
 							AdditionalResponseHeadersToLog:  []string{"x-response-id"},
@@ -159,7 +164,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 									GrpcService: &envoycore.GrpcService{
 										TargetSpecifier: &envoycore.GrpcService_EnvoyGrpc_{
 											EnvoyGrpc: &envoycore.GrpcService_EnvoyGrpc{
-												ClusterName: "log-cluster",
+												ClusterName: "test-service",
 											},
 										},
 									},
@@ -269,8 +274,12 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				config: []v1alpha1.AccessLog{
 					{
 						GrpcService: &v1alpha1.GrpcService{
-							StaticClusterName: "test-cluster",
-							LogName:           "test-log",
+							BackendRef: &gwv1.BackendRef{
+								BackendObjectReference: gwv1.BackendObjectReference{
+									Name: "test-service",
+								},
+							},
+							LogName: "grpc-log",
 						},
 					},
 				},
@@ -280,11 +289,11 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 						ConfigType: &v33.AccessLog_TypedConfig{
 							TypedConfig: mustMessageToAny(t, &envoygrpc.HttpGrpcAccessLogConfig{
 								CommonConfig: &envoygrpc.CommonGrpcAccessLogConfig{
-									LogName: "test-log",
+									LogName: "grpc-log",
 									GrpcService: &envoycore.GrpcService{
 										TargetSpecifier: &envoycore.GrpcService_EnvoyGrpc_{
 											EnvoyGrpc: &envoycore.GrpcService_EnvoyGrpc{
-												ClusterName: "test-cluster",
+												ClusterName: "test-service",
 											},
 										},
 									},
@@ -305,7 +314,10 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 						},
 						Filter: &v1alpha1.AccessLogFilter{
 							FilterType: &v1alpha1.FilterType{
-								StatusCodeFilter: &v1alpha1.StatusCodeFilter{Value: 0},
+								StatusCodeFilter: &v1alpha1.StatusCodeFilter{
+									Op:    v1alpha1.EQ,
+									Value: 5,
+								},
 							},
 						},
 					},
@@ -345,8 +357,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 									Comparison: &v33.ComparisonFilter{
 										Op: v33.ComparisonFilter_EQ,
 										Value: &envoycore.RuntimeUInt32{
-											DefaultValue: 0,
-											RuntimeKey:   "test-key",
+											DefaultValue: 5,
 										},
 									},
 								},
@@ -356,7 +367,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "access log with header filter",
+				name: "AccessLogHeaderFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -403,7 +414,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "Duration Filter",
+				name: "DurationFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -413,7 +424,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 							FilterType: &v1alpha1.FilterType{
 								DurationFilter: &v1alpha1.DurationFilter{
 									Op:    v1alpha1.EQ,
-									Value: 0,
+									Value: 5,
 								},
 							},
 						},
@@ -433,8 +444,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 									Comparison: &v33.ComparisonFilter{
 										Op: v33.ComparisonFilter_EQ,
 										Value: &envoycore.RuntimeUInt32{
-											DefaultValue: 0,
-											RuntimeKey:   "test-key",
+											DefaultValue: 5,
 										},
 									},
 								},
@@ -444,7 +454,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "Not Health Check Filter",
+				name: "NotHealthCheckFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -474,7 +484,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "Traceable Filter",
+				name: "TraceableFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -504,7 +514,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "Runtime Filter",
+				name: "RuntimeFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -548,7 +558,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "Response Flag Filter",
+				name: "ResponseFlagFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -586,7 +596,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "Grpc Status Filter",
+				name: "GrpcStatusFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -620,7 +630,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "CEL Filter",
+				name: "CELFilter",
 				config: []v1alpha1.AccessLog{
 					{
 						FileSink: &v1alpha1.FileSink{
@@ -665,7 +675,20 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 			t.Cleanup(cancel)
 
 			t.Run(tc.name, func(t *testing.T) {
-				result, err := convertAccessLogConfig(ctx, tc.config)
+				result, err := convertAccessLogConfig(ctx, &httpListenerOptsPlugin{
+					spec: v1alpha1.HTTPListenerPolicySpec{
+						AccessLog: tc.config,
+					},
+					// Example grpcBackends map for upstreams
+					grpcBackends: map[string]*ir.Upstream{
+						"grpc-log": {
+							ObjectSource: ir.ObjectSource{
+								Name:      "test-service",
+								Namespace: "default",
+							},
+						},
+					},
+				})
 				require.NoError(t, err, "failed to convert access log config")
 				// Perform deep equality check
 				assert.Equal(t, len(tc.expected), len(result), "expected length mismatch")
