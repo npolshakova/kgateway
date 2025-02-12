@@ -1301,7 +1301,7 @@ func schema_kgateway_v2_api_v1alpha1_GrpcService(ref common.ReferenceCallback) c
 					},
 					"backendRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The static cluster defined in bootstrap config to route to",
+							Description: "The backend gRPC service. Can be any type of supported backed (Kubernetes Service, kgateway Upstream, etc..)",
 							Ref:         ref("sigs.k8s.io/gateway-api/apis/v1.BackendRef"),
 						},
 					},
