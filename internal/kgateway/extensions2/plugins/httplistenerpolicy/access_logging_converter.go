@@ -3,6 +3,7 @@ package httplistenerpolicy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	envoyaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v3"
@@ -16,7 +17,6 @@ import (
 	envoymatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-	"github.com/rotisserie/eris"
 	"github.com/solo-io/go-utils/contextutils"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -51,8 +51,7 @@ func convertAccessLogConfig(
 		if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
 			upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, parentSrc, log.GrpcService.BackendRef.BackendObjectReference)
 			if err != nil {
-				// TODO: report error on status
-				return nil, eris.Wrapf(err, "failed to get upstream from ref")
+				return nil, errors.New(fmt.Sprintf("failed to get upstream from ref: %s", err.Error()))
 			}
 			grpcBackends[getLogId(log.GrpcService.LogName, idx)] = upstream
 		}
@@ -84,7 +83,7 @@ func translateAccessLogs(logger *zap.Logger, configs []v1alpha1.AccessLog, grpcB
 func translateAccessLog(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream, accessLogId int) (*envoyaccesslog.AccessLog, error) {
 	// Validate mutual exclusivity of sink types
 	if logConfig.FileSink != nil && logConfig.GrpcService != nil {
-		return nil, eris.New("access log config cannot have both file sink and grpc service")
+		return nil, errors.New("access log config cannot have both file sink and grpc service")
 	}
 
 	var (
@@ -98,7 +97,7 @@ func translateAccessLog(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBa
 	case logConfig.GrpcService != nil:
 		accessLogCfg, err = createGrpcAccessLog(logger, logConfig.GrpcService, grpcBackends, accessLogId)
 	default:
-		return nil, eris.New("no access log sink specified")
+		return nil, errors.New("no access log sink specified")
 	}
 
 	if err != nil {
@@ -121,7 +120,7 @@ func createFileAccessLog(logger *zap.Logger, fileSink *v1alpha1.FileSink) (*envo
 
 	// Validate format configuration
 	if fileSink.StringFormat != "" && fileSink.JsonFormat != nil {
-		return nil, eris.New("access log config cannot have both string format and json format")
+		return nil, errors.New("access log config cannot have both string format and json format")
 	}
 
 	formatterExtensions, err := getFormatterExtensions()
@@ -425,16 +424,16 @@ func convertJsonFormat(jsonFormat *runtime.RawExtension) *structpb.Struct {
 
 func copyGrpcSettings(cfg *envoygrpc.HttpGrpcAccessLogConfig, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream, accessLogId int) error {
 	if grpcService == nil {
-		return eris.New("grpc service object cannot be nil")
+		return errors.New("grpc service object cannot be nil")
 	}
 
 	if grpcService.LogName == "" {
-		return eris.New("grpc service log name cannot be empty")
+		return errors.New("grpc service log name cannot be empty")
 	}
 
 	upstream := grpcBackends[getLogId(grpcService.LogName, accessLogId)]
 	if upstream == nil {
-		return eris.New("upstream backend ref not found")
+		return errors.New("upstream backend ref not found")
 	}
 
 	svc := &envoycore.GrpcService{
@@ -511,7 +510,7 @@ func toEnvoyComparisonOpType(op v1alpha1.Op) (envoyaccesslog.ComparisonFilter_Op
 	case v1alpha1.LE:
 		return envoyaccesslog.ComparisonFilter_EQ, nil
 	default:
-		return 0, eris.Errorf("Unknown OP (%s)", op)
+		return 0, errors.New(fmt.Sprintf("Unknown OP (%s)", op))
 	}
 }
 
@@ -524,7 +523,7 @@ func toEnvoyDenominatorType(denominatorType v1alpha1.DenominatorType) (envoytype
 	case v1alpha1.MILLION:
 		return envoytype.FractionalPercent_MILLION, nil
 	default:
-		return 0, eris.Errorf("Unknown DenominatorType (%s)", denominatorType)
+		return 0, errors.New(fmt.Sprintf("Unknown DenominatorType (%s)", denominatorType))
 	}
 }
 
@@ -565,6 +564,6 @@ func toEnvoyGRPCStatusType(grpcStatus v1alpha1.GrpcStatus) (envoyaccesslog.GrpcS
 	case v1alpha1.UNAUTHENTICATED:
 		return envoyaccesslog.GrpcStatusFilter_UNAUTHENTICATED, nil
 	default:
-		return 0, eris.Errorf("Unknown GRPCStatus (%s)", grpcStatus)
+		return 0, errors.New(fmt.Sprintf("Unknown GRPCStatus (%s)", grpcStatus))
 	}
 }

@@ -2,6 +2,8 @@ package httplistenerpolicy
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -9,7 +11,6 @@ import (
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
-	"github.com/rotisserie/eris"
 	"github.com/solo-io/go-utils/contextutils"
 	"google.golang.org/protobuf/proto"
 	"istio.io/istio/pkg/kube/krt"
@@ -143,7 +144,7 @@ func (p *httpListenerOptsPluginGwPass) ApplyHCM(
 	out *envoy_hcm.HttpConnectionManager) error {
 	policy, ok := pCtx.Policy.(*httpListenerOptsPlugin)
 	if !ok {
-		return eris.Errorf("internal error: expected httplistener policy, got %T", pCtx.Policy)
+		return errors.New(fmt.Sprintf("internal error: expected httplistener policy, got %T", pCtx.Policy))
 	}
 
 	// translate access logging configuration

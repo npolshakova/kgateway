@@ -461,7 +461,7 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AccessLogFilter represents the top-level filter structure.",
+				Description: "AccessLogFilter represents the top-level filter structure. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-accesslogfilter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"statusCodeFilter": {
@@ -476,14 +476,16 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 					},
 					"notHealthCheckFilter": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
+							Description: "Filters for requests that are not health check requests. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-nothealthcheckfilter",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"traceableFilter": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
+							Description: "Filters for requests that are traceable. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-traceablefilter",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"headerFilter": {
@@ -508,7 +510,8 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 					},
 					"andFilter": {
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "Performs a logical \"and\" operation on the result of each individual filter. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-andfilter",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -521,7 +524,8 @@ func schema_kgateway_v2_api_v1alpha1_AccessLogFilter(ref common.ReferenceCallbac
 					},
 					"orFilter": {
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "Performs a logical \"or\" operation on the result of each individual filter. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-orfilter",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -676,7 +680,7 @@ func schema_kgateway_v2_api_v1alpha1_CELFilter(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"match": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The CEL expressions to evaluate. AccessLogs are only emitted when the CEL expressions evaluates to true. see: https://www.envoyproxy.io/docs/envoy/latest/xds/type/v3/cel.proto.html#common-expression-language-cel-proto",
+							Description: "The CEL expressions to evaluate. AccessLogs are only emitted when the CEL expressions evaluates to true. see: https://www.envoyproxy.io/docs/envoy/v1.33.0/xds/type/v3/cel.proto.html#common-expression-language-cel-proto",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -693,7 +697,7 @@ func schema_kgateway_v2_api_v1alpha1_ComparisonFilter(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ComparisonFilter represents a filter based on a comparison.",
+				Description: "ComparisonFilter represents a filter based on a comparison. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-comparisonfilter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"op": {
@@ -897,7 +901,7 @@ func schema_kgateway_v2_api_v1alpha1_DurationFilter(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DurationFilter filters based on request duration.",
+				Description: "DurationFilter filters based on request duration. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-durationfilter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"op": {
@@ -1011,14 +1015,14 @@ func schema_kgateway_v2_api_v1alpha1_FileSink(ref common.ReferenceCallback) comm
 					},
 					"stringFormat": {
 						SchemaProps: spec.SchemaProps{
-							Description: "the format string by which envoy will format the log lines https://www.envoyproxy.io/docs/envoy/v1.14.1/configuration/observability/access_log#config-access-log-format-strings",
+							Description: "the format string by which envoy will format the log lines https://www.envoyproxy.io/docs/envoy/v1.33.0/configuration/observability/access_log/usage#format-strings",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"jsonFormat": {
 						SchemaProps: spec.SchemaProps{
-							Description: "the format object by which to envoy will emit the logs in a structured way. https://www.envoyproxy.io/docs/envoy/v1.14.1/configuration/observability/access_log#format-dictionaries",
+							Description: "the format object by which to envoy will emit the logs in a structured way. https://www.envoyproxy.io/docs/envoy/v1.33.0/configuration/observability/access_log/usage#format-dictionaries",
 							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
 						},
 					},
@@ -1035,7 +1039,7 @@ func schema_kgateway_v2_api_v1alpha1_FilterType(ref common.ReferenceCallback) co
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "FilterType represents the type of filter to apply (only one of these should be set).",
+				Description: "FilterType represents the type of filter to apply (only one of these should be set). Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#envoy-v3-api-msg-config-accesslog-v3-accesslogfilter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"statusCodeFilter": {
@@ -1050,14 +1054,16 @@ func schema_kgateway_v2_api_v1alpha1_FilterType(ref common.ReferenceCallback) co
 					},
 					"notHealthCheckFilter": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
+							Description: "Filters for requests that are not health check requests. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-nothealthcheckfilter",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"traceableFilter": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
+							Description: "Filters for requests that are traceable. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-traceablefilter",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"headerFilter": {
@@ -1326,7 +1332,7 @@ func schema_kgateway_v2_api_v1alpha1_GrpcStatusFilter(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "GrpcStatusFilter filters gRPC requests based on their response status.",
+				Description: "GrpcStatusFilter filters gRPC requests based on their response status. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#enum-config-accesslog-v3-grpcstatusfilter-status",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"statuses": {
@@ -1469,7 +1475,7 @@ func schema_kgateway_v2_api_v1alpha1_HTTPListenerPolicySpec(ref common.Reference
 					},
 					"accessLog": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AccessLoggingConfig contains various settings for Envoy's access logging service. See here for more information: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/accesslog/v3/accesslog.proto",
+							Description: "AccessLoggingConfig contains various settings for Envoy's access logging service. See here for more information: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1493,7 +1499,7 @@ func schema_kgateway_v2_api_v1alpha1_HeaderFilter(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "HeaderFilter filters requests based on headers.",
+				Description: "HeaderFilter filters requests based on headers. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-headerfilter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"header": {
@@ -2170,7 +2176,7 @@ func schema_kgateway_v2_api_v1alpha1_ResponseFlagFilter(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResponseFlagFilter filters based on response flags.",
+				Description: "ResponseFlagFilter filters based on response flags. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-responseflagfilter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"flags": {
@@ -2559,7 +2565,7 @@ func schema_kgateway_v2_api_v1alpha1_StatusCodeFilter(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "StatusCodeFilter filters based on HTTP status code.",
+				Description: "StatusCodeFilter filters based on HTTP status code. Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#envoy-v3-api-msg-config-accesslog-v3-statuscodefilter",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"op": {
