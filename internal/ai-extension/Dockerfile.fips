@@ -1,0 +1,46 @@
+ARG PYTHON_BASE_IMAGE=python-3.12-fips:latest
+FROM $PYTHON_BASE_IMAGE AS builder-image
+
+# avoid stuck build due to user prompt
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install --no-install-recommends -y build-essential libpq-dev && \
+	apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# create and activate virtual environment
+RUN python3 -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# install requirements
+COPY requirements.txt fips/patches/langchain_cache.patch .
+RUN python -m pip install --no-cache-dir wheel
+RUN python -m pip install --no-cache-dir -r requirements.txt
+
+RUN cd /opt/venv/lib/python3.12/site-packages/langchain_community/ && patch -p1 < /fips/langchain_cache.patch
+RUN rm -r /fips/*.patch
+
+ARG PYTHON_BASE_IMAGE=python-3.12-fips:latest
+FROM $PYTHON_BASE_IMAGE AS runner-image
+
+RUN apt-get update && apt-get install --no-install-recommends -y build-essential libpq-dev && \
+	apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home gloo
+COPY --from=builder-image /opt/venv /opt/venv
+
+USER gloo
+RUN mkdir -p /home/gloo
+WORKDIR /home/gloo
+COPY ai_extension/ .
+
+# make sure all messages always reach console
+ENV PYTHONUNBUFFERED=1
+# avoid creation of .pyc files
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# activate virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+CMD ["python3", "main.py"]
