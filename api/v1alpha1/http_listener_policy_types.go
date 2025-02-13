@@ -88,20 +88,24 @@ type GrpcService struct {
 
 // AccessLogFilter represents the top-level filter structure.
 // Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-accesslogfilter
+// +kubebuilder:validation:MaxProperties=1
+// +kubebuilder:validation:MinProperties=1
 type AccessLogFilter struct {
 	*FilterType `json:",inline"` // embedded to allow for validation
 	// Performs a logical "and" operation on the result of each individual filter.
 	// Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-andfilter
-	// +kube:validation:MinItems=2
+	// +kubebuilder:validation:MinItems=2
 	AndFilter []FilterType `json:"andFilter,omitempty"`
 	// Performs a logical "or" operation on the result of each individual filter.
 	// Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#config-accesslog-v3-orfilter
-	// +kube:validation:MinItems=2
+	// +kubebuilder:validation:MinItems=2
 	OrFilter []FilterType `json:"orFilter,omitempty"`
 }
 
 // FilterType represents the type of filter to apply (only one of these should be set).
 // Based on: https://www.envoyproxy.io/docs/envoy/v1.33.0/api-v3/config/accesslog/v3/accesslog.proto#envoy-v3-api-msg-config-accesslog-v3-accesslogfilter
+// +kubebuilder:validation:MaxProperties=1
+// +kubebuilder:validation:MinProperties=1
 type FilterType struct {
 	StatusCodeFilter *StatusCodeFilter `json:"statusCodeFilter,omitempty"`
 	DurationFilter   *DurationFilter   `json:"durationFilter,omitempty"`

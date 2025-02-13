@@ -15,7 +15,6 @@ import (
 	envoy_metadata_formatter "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/metadata/v3"
 	envoy_req_without_query "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/req_without_query/v3"
 	envoymatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
-	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/solo-io/go-utils/contextutils"
 	"go.uber.org/zap"
@@ -216,10 +215,6 @@ func translateOrFilters(logger *zap.Logger, filters []v1alpha1.FilterType) ([]*e
 }
 
 func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyaccesslog.AccessLogFilter, error) {
-	if err := validateFilter(filter); err != nil {
-		return nil, err
-	}
-
 	var alCfg *envoyaccesslog.AccessLogFilter
 	switch {
 	case filter.StatusCodeFilter != nil:
@@ -371,40 +366,6 @@ func createHeaderMatchSpecifier(logger *zap.Logger, header gwv1.HTTPHeaderMatch)
 	}
 }
 
-func validateFilter(filter *v1alpha1.FilterType) error {
-	count := 0
-	if filter.StatusCodeFilter != nil {
-		count++
-	}
-	if filter.DurationFilter != nil {
-		count++
-	}
-	if filter.NotHealthCheckFilter {
-		count++
-	}
-	if filter.TraceableFilter {
-		count++
-	}
-	if filter.HeaderFilter != nil {
-		count++
-	}
-	if filter.ResponseFlagFilter != nil {
-		count++
-	}
-	if filter.GrpcStatusFilter != nil {
-		count++
-	}
-	if filter.CELFilter != nil {
-		count++
-	}
-
-	if count != 1 {
-		return fmt.Errorf("exactly one AccessLogFilter type must be set")
-	}
-
-	return nil
-}
-
 func convertJsonFormat(jsonFormat *runtime.RawExtension) *structpb.Struct {
 	if jsonFormat == nil {
 		return nil
@@ -512,19 +473,6 @@ func toEnvoyComparisonOpType(op v1alpha1.Op) (envoyaccesslog.ComparisonFilter_Op
 		return envoyaccesslog.ComparisonFilter_EQ, nil
 	default:
 		return 0, fmt.Errorf("unknown OP (%s)", op)
-	}
-}
-
-func toEnvoyDenominatorType(denominatorType v1alpha1.DenominatorType) (envoytype.FractionalPercent_DenominatorType, error) {
-	switch denominatorType {
-	case v1alpha1.HUNDRED:
-		return envoytype.FractionalPercent_HUNDRED, nil
-	case v1alpha1.TEN_THOUSAND:
-		return envoytype.FractionalPercent_TEN_THOUSAND, nil
-	case v1alpha1.MILLION:
-		return envoytype.FractionalPercent_MILLION, nil
-	default:
-		return 0, fmt.Errorf("unknown DenominatorType (%s)", denominatorType)
 	}
 }
 

@@ -55,9 +55,16 @@ spec:
                         rule: (has(self.stringFormat) && !has(self.jsonFormat)) ||
                           (!has(self.stringFormat) && has(self.jsonFormat))
                     filter:
+                      allOf:
+                      - maxProperties: 1
+                        minProperties: 1
+                      - maxProperties: 1
+                        minProperties: 1
                       properties:
                         andFilter:
                           items:
+                            maxProperties: 1
+                            minProperties: 1
                             properties:
                               celFilter:
                                 properties:
@@ -167,6 +174,7 @@ spec:
                               traceableFilter:
                                 type: boolean
                             type: object
+                          minItems: 2
                           type: array
                         celFilter:
                           properties:
@@ -249,6 +257,8 @@ spec:
                           type: boolean
                         orFilter:
                           items:
+                            maxProperties: 1
+                            minProperties: 1
                             properties:
                               celFilter:
                                 properties:
@@ -358,6 +368,7 @@ spec:
                               traceableFilter:
                                 type: boolean
                             type: object
+                          minItems: 2
                           type: array
                         responseFlagFilter:
                           properties:
