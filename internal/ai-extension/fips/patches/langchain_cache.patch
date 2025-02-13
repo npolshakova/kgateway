@@ -1,0 +1,26 @@
+From e68c456e077481103b4be689db1eab4fb71066e9 Mon Sep 17 00:00:00 2001
+From: Shashank Ram <shashank.ram@solo.io>
+Date: Tue, 30 Jul 2024 13:35:26 -0700
+Subject: [PATCH] langchain/cache: use sha256 instead of md5 for FIPS
+
+Signed-off-by: Shashank Ram <shashank.ram@solo.io>
+---
+ cache.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cache.py b/cache.py
+index 82f8dfe..28eb8cc 100644
+--- a/cache.py
++++ b/cache.py
+@@ -95,7 +95,7 @@ if TYPE_CHECKING:
+
+ def _hash(_input: str) -> str:
+     """Use a deterministic hashing approach."""
+-    return hashlib.md5(_input.encode()).hexdigest()
++    return hashlib.sha256(_input.encode()).hexdigest()
+
+
+ def _dump_generations_to_json(generations: RETURN_VAL_TYPE) -> str:
+--
+2.34.1
+
