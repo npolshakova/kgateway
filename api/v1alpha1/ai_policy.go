@@ -1,7 +1,6 @@
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -262,7 +261,7 @@ type AIPromptGuard struct {
 // # Anthropic doesn't support a system chat type
 // defaults:
 //   - field: "system"
-//     value: "answer all questions in french"
+//     value: "answer all questions in French"
 //
 // ```
 //
@@ -270,16 +269,28 @@ type AIPromptGuard struct {
 // ```yaml
 // defaults:
 //   - field: "temperature"
-//     value: 0.5
+//     value: "0.5"
 //   - field: "max_tokens"
-//     value: 100
+//     value: "100"
+//
+// ```
+//
+// Example overriding custom list:
+// ```yaml
+// defaults:
+//   - field: "custom_list"
+//     value: "[a,b,c]"
 //
 // ```
 type FieldDefault struct {
 	// The name of the field.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
 	Field string `json:"field,omitempty"`
 	// The field default value, which can be any JSON Data Type.
-	Value runtime.RawExtension `json:"value,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Value string `json:"value,omitempty"`
 	// Whether to override the field's value if it already exists.
 	// Defaults to false.
 	// +kubebuilder:default=false

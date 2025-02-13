@@ -40,13 +40,17 @@ spec:
                     items:
                       properties:
                         field:
+                          minLength: 1
                           type: string
                         override:
                           default: false
                           type: boolean
                         value:
-                          type: object
-                          x-kubernetes-preserve-unknown-fields: true
+                          minLength: 1
+                          type: string
+                      required:
+                      - field
+                      - value
                       type: object
                     type: array
                   promptEnrichment:
