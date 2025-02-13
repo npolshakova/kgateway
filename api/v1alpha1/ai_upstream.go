@@ -166,7 +166,7 @@ type VertexAIConfig struct {
 
 	// The type of publisher model to use. Currently, only Google is supported.
 	// +kubebuilder:validation:Enum=GOOGLE
-	Publisher *Publisher `json:"publisher,omitempty"`
+	Publisher Publisher `json:"publisher,omitempty"`
 }
 
 // MistralConfig configures the settings for the [Mistral AIRoutePolicy](https://docs.mistral.ai/getting-started/quickstart/) LLM provider.
