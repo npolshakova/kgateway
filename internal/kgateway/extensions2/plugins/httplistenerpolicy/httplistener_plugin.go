@@ -2,7 +2,6 @@ package httplistenerpolicy
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -25,18 +24,18 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 )
 
-type httpListenerOptsPlugin struct {
+type httpListenerOptsPolicy struct {
 	ct        time.Time
 	spec      v1alpha1.HTTPListenerPolicySpec
 	accessLog []*envoyaccesslog.AccessLog
 }
 
-func (d *httpListenerOptsPlugin) CreationTime() time.Time {
+func (d *httpListenerOptsPolicy) CreationTime() time.Time {
 	return d.ct
 }
 
-func (d *httpListenerOptsPlugin) Equals(in any) bool {
-	d2, ok := in.(*httpListenerOptsPlugin)
+func (d *httpListenerOptsPolicy) Equals(in any) bool {
+	d2, ok := in.(*httpListenerOptsPolicy)
 	if !ok {
 		return false
 	}
@@ -65,10 +64,10 @@ func (d *httpListenerOptsPlugin) Equals(in any) bool {
 	return true
 }
 
-type httpListenerOptsPluginGwPass struct {
+type httpListenerOptsPolicyGwPass struct {
 }
 
-func (p *httpListenerOptsPluginGwPass) ApplyListenerPlugin(ctx context.Context, pCtx *ir.ListenerContext, out *envoy_config_listener_v3.Listener) {
+func (p *httpListenerOptsPolicyGwPass) ApplyListenerPlugin(ctx context.Context, pCtx *ir.ListenerContext, out *envoy_config_listener_v3.Listener) {
 	// no op
 }
 
@@ -100,7 +99,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 		var pol = &ir.PolicyWrapper{
 			ObjectSource: objSrc,
 			Policy:       i,
-			PolicyIR: &httpListenerOptsPlugin{
+			PolicyIR: &httpListenerOptsPolicy{
 				ct:        i.CreationTimestamp.Time,
 				spec:      i.Spec,
 				accessLog: accessLog,
@@ -132,19 +131,19 @@ func convert(targetRef v1alpha1.LocalPolicyTargetReference) []ir.PolicyTargetRef
 }
 
 func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx) ir.ProxyTranslationPass {
-	return &httpListenerOptsPluginGwPass{}
+	return &httpListenerOptsPolicyGwPass{}
 }
-func (p *httpListenerOptsPluginGwPass) Name() string {
+func (p *httpListenerOptsPolicyGwPass) Name() string {
 	return "httplistenerpolicies"
 }
 
-func (p *httpListenerOptsPluginGwPass) ApplyHCM(
+func (p *httpListenerOptsPolicyGwPass) ApplyHCM(
 	ctx context.Context,
 	pCtx *ir.HcmContext,
 	out *envoy_hcm.HttpConnectionManager) error {
-	policy, ok := pCtx.Policy.(*httpListenerOptsPlugin)
+	policy, ok := pCtx.Policy.(*httpListenerOptsPolicy)
 	if !ok {
-		return errors.New(fmt.Sprintf("internal error: expected httplistener policy, got %T", pCtx.Policy))
+		return fmt.Errorf("internal error: expected httplistener policy, got %T", pCtx.Policy)
 	}
 
 	// translate access logging configuration
@@ -156,15 +155,15 @@ func (p *httpListenerOptsPluginGwPass) ApplyHCM(
 	return nil
 }
 
-func (p *httpListenerOptsPluginGwPass) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {
+func (p *httpListenerOptsPolicyGwPass) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {
 }
 
 // called 0 or more times
-func (p *httpListenerOptsPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContext, outputRoute *envoy_config_route_v3.Route) error {
+func (p *httpListenerOptsPolicyGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContext, outputRoute *envoy_config_route_v3.Route) error {
 	return nil
 }
 
-func (p *httpListenerOptsPluginGwPass) ApplyForRouteBackend(
+func (p *httpListenerOptsPolicyGwPass) ApplyForRouteBackend(
 	ctx context.Context,
 	policy ir.PolicyIR,
 	pCtx *ir.RouteBackendContext,
@@ -175,19 +174,19 @@ func (p *httpListenerOptsPluginGwPass) ApplyForRouteBackend(
 // called 1 time per listener
 // if a plugin emits new filters, they must be with a plugin unique name.
 // any filter returned from listener config must be disabled, so it doesnt impact other listeners.
-func (p *httpListenerOptsPluginGwPass) HttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
+func (p *httpListenerOptsPolicyGwPass) HttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
 	return nil, nil
 }
 
-func (p *httpListenerOptsPluginGwPass) UpstreamHttpFilters(ctx context.Context) ([]plugins.StagedUpstreamHttpFilter, error) {
+func (p *httpListenerOptsPolicyGwPass) UpstreamHttpFilters(ctx context.Context) ([]plugins.StagedUpstreamHttpFilter, error) {
 	return nil, nil
 }
 
-func (p *httpListenerOptsPluginGwPass) NetworkFilters(ctx context.Context) ([]plugins.StagedNetworkFilter, error) {
+func (p *httpListenerOptsPolicyGwPass) NetworkFilters(ctx context.Context) ([]plugins.StagedNetworkFilter, error) {
 	return nil, nil
 }
 
 // called 1 time (per envoy proxy). replaces GeneratedResources
-func (p *httpListenerOptsPluginGwPass) ResourcesToAdd(ctx context.Context) ir.Resources {
+func (p *httpListenerOptsPolicyGwPass) ResourcesToAdd(ctx context.Context) ir.Resources {
 	return ir.Resources{}
 }

@@ -51,7 +51,7 @@ func convertAccessLogConfig(
 		if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
 			upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, parentSrc, log.GrpcService.BackendRef.BackendObjectReference)
 			if err != nil {
-				return nil, errors.New(fmt.Sprintf("failed to get upstream from ref: %s", err.Error()))
+				return nil, fmt.Errorf("failed to get upstream from ref: %s", err.Error())
 			}
 			grpcBackends[getLogId(log.GrpcService.LogName, idx)] = upstream
 		}
@@ -160,8 +160,9 @@ func createFileAccessLog(logger *zap.Logger, fileSink *v1alpha1.FileSink) (*envo
 func createGrpcAccessLog(logger *zap.Logger, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream, accessLogId int) (*envoyaccesslog.AccessLog, error) {
 	var cfg envoygrpc.HttpGrpcAccessLogConfig
 	if err := copyGrpcSettings(&cfg, grpcService, grpcBackends, accessLogId); err != nil {
-		logger.Error(fmt.Sprintf("error converting grpc access log config: %s", err.Error()))
-		return nil, err
+		wrappedErr := fmt.Errorf("error converting grpc access log config: %s", err.Error())
+		logger.Error(wrappedErr.Error())
+		return nil, wrappedErr
 	}
 
 	return newAccessLogWithConfig(wellknown.HTTPGRPCAccessLog, &cfg)
@@ -510,7 +511,7 @@ func toEnvoyComparisonOpType(op v1alpha1.Op) (envoyaccesslog.ComparisonFilter_Op
 	case v1alpha1.LE:
 		return envoyaccesslog.ComparisonFilter_EQ, nil
 	default:
-		return 0, errors.New(fmt.Sprintf("Unknown OP (%s)", op))
+		return 0, fmt.Errorf("unknown OP (%s)", op)
 	}
 }
 
@@ -523,7 +524,7 @@ func toEnvoyDenominatorType(denominatorType v1alpha1.DenominatorType) (envoytype
 	case v1alpha1.MILLION:
 		return envoytype.FractionalPercent_MILLION, nil
 	default:
-		return 0, errors.New(fmt.Sprintf("Unknown DenominatorType (%s)", denominatorType))
+		return 0, fmt.Errorf("unknown DenominatorType (%s)", denominatorType)
 	}
 }
 
@@ -564,6 +565,6 @@ func toEnvoyGRPCStatusType(grpcStatus v1alpha1.GrpcStatus) (envoyaccesslog.GrpcS
 	case v1alpha1.UNAUTHENTICATED:
 		return envoyaccesslog.GrpcStatusFilter_UNAUTHENTICATED, nil
 	default:
-		return 0, errors.New(fmt.Sprintf("Unknown GRPCStatus (%s)", grpcStatus))
+		return 0, fmt.Errorf("unknown GRPCStatus (%s)", grpcStatus)
 	}
 }
