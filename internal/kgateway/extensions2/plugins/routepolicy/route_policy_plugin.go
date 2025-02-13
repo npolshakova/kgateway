@@ -21,17 +21,17 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 )
 
-type routePolicyPlugin struct {
+type routePolicy struct {
 	ct   time.Time
 	spec v1alpha1.RoutePolicySpec
 }
 
-func (d *routePolicyPlugin) CreationTime() time.Time {
+func (d *routePolicy) CreationTime() time.Time {
 	return d.ct
 }
 
-func (d *routePolicyPlugin) Equals(in any) bool {
-	d2, ok := in.(*routePolicyPlugin)
+func (d *routePolicy) Equals(in any) bool {
+	d2, ok := in.(*routePolicy)
 	if !ok {
 		return false
 	}
@@ -63,7 +63,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 				Name:      policyCR.Name,
 			},
 			Policy:     policyCR,
-			PolicyIR:   &routePolicyPlugin{ct: policyCR.CreationTimestamp.Time, spec: policyCR.Spec},
+			PolicyIR:   &routePolicy{ct: policyCR.CreationTimestamp.Time, spec: policyCR.Spec},
 			TargetRefs: convert(policyCR.Spec.TargetRef),
 		}
 		return pol
@@ -91,7 +91,7 @@ func convert(targetRef v1alpha1.LocalPolicyTargetReference) []ir.PolicyTargetRef
 func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx) ir.ProxyTranslationPass {
 	return &routePolicyPluginGwPass{}
 }
-func (p *routePolicyPlugin) Name() string {
+func (p *routePolicy) Name() string {
 	return "routepolicies"
 }
 
@@ -104,7 +104,7 @@ func (p *routePolicyPluginGwPass) ApplyVhostPlugin(ctx context.Context, pCtx *ir
 
 // called 0 or more times
 func (p *routePolicyPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContext, outputRoute *envoy_config_route_v3.Route) error {
-	policy, ok := pCtx.Policy.(*routePolicyPlugin)
+	policy, ok := pCtx.Policy.(*routePolicy)
 	if !ok {
 		return nil
 	}

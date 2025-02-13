@@ -83,7 +83,7 @@ func (u *UpstreamIr) Equals(other any) bool {
 	})
 }
 
-type plugin2 struct {
+type upstreamPlugin struct {
 	needFilter map[string]bool
 }
 
@@ -222,33 +222,33 @@ func processEndpoints(up *v1alpha1.Upstream) *ir.EndpointsForUpstream {
 }
 
 func newPlug(ctx context.Context, tctx ir.GwTranslationCtx) ir.ProxyTranslationPass {
-	return &plugin2{}
+	return &upstreamPlugin{}
 }
 
-func (p *plugin2) Name() string {
+func (p *upstreamPlugin) Name() string {
 	return "upstream"
 }
 
 // called 1 time for each listener
-func (p *plugin2) ApplyListenerPlugin(ctx context.Context, pCtx *ir.ListenerContext, out *envoy_config_listener_v3.Listener) {
+func (p *upstreamPlugin) ApplyListenerPlugin(ctx context.Context, pCtx *ir.ListenerContext, out *envoy_config_listener_v3.Listener) {
 }
 
-func (p *plugin2) ApplyHCM(ctx context.Context,
+func (p *upstreamPlugin) ApplyHCM(ctx context.Context,
 	pCtx *ir.HcmContext,
 	out *envoy_hcm.HttpConnectionManager) error { //no-op
 	return nil
 }
 
-func (p *plugin2) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {
+func (p *upstreamPlugin) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {
 }
 
 // called 0 or more times
-func (p *plugin2) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContext, outputRoute *envoy_config_route_v3.Route) error {
+func (p *upstreamPlugin) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContext, outputRoute *envoy_config_route_v3.Route) error {
 
 	return nil
 }
 
-func (p *plugin2) ApplyForRouteBackend(
+func (p *upstreamPlugin) ApplyForRouteBackend(
 	ctx context.Context, policy ir.PolicyIR,
 	pCtx *ir.RouteBackendContext,
 ) error {
@@ -263,7 +263,7 @@ func (p *plugin2) ApplyForRouteBackend(
 // called 1 time per listener
 // if a plugin emits new filters, they must be with a plugin unique name.
 // any filter returned from route config must be disabled, so it doesnt impact other routes.
-func (p *plugin2) HttpFilters(ctx context.Context, fc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
+func (p *upstreamPlugin) HttpFilters(ctx context.Context, fc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
 	if !p.needFilter[fc.FilterChainName] {
 		return nil, nil
 	}
@@ -276,15 +276,15 @@ func (p *plugin2) HttpFilters(ctx context.Context, fc ir.FilterChainCommon) ([]p
 	}, nil
 }
 
-func (p *plugin2) UpstreamHttpFilters(ctx context.Context) ([]plugins.StagedUpstreamHttpFilter, error) {
+func (p *upstreamPlugin) UpstreamHttpFilters(ctx context.Context) ([]plugins.StagedUpstreamHttpFilter, error) {
 	return nil, nil
 }
 
-func (p *plugin2) NetworkFilters(ctx context.Context) ([]plugins.StagedNetworkFilter, error) {
+func (p *upstreamPlugin) NetworkFilters(ctx context.Context) ([]plugins.StagedNetworkFilter, error) {
 	return nil, nil
 }
 
 // called 1 time (per envoy proxy). replaces GeneratedResources
-func (p *plugin2) ResourcesToAdd(ctx context.Context) ir.Resources {
+func (p *upstreamPlugin) ResourcesToAdd(ctx context.Context) ir.Resources {
 	return ir.Resources{}
 }
