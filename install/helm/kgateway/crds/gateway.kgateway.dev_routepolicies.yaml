@@ -142,7 +142,7 @@ spec:
                                   - EMAIL
                                   type: string
                                 type: array
-                              regexMatch:
+                              matches:
                                 items:
                                   properties:
                                     name:
@@ -212,7 +212,7 @@ spec:
                                   - EMAIL
                                   type: string
                                 type: array
-                              regexMatch:
+                              matches:
                                 items:
                                   properties:
                                     name:

@@ -129,7 +129,7 @@ const (
 type Regex struct {
 	// A list of regex patterns to match against the request or response.
 	// Matches and built-ins are additive.
-	Matches []RegexMatch `json:"regexMatch,omitempty"`
+	Matches []RegexMatch `json:"matches,omitempty"`
 	// A list of built-in regex patterns to match against the request or response.
 	// Matches and built-ins are additive.
 	Builtins []BuiltIn `json:"builtins,omitempty"`

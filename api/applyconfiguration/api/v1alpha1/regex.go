@@ -9,7 +9,7 @@ import (
 // RegexApplyConfiguration represents a declarative configuration of the Regex type for use
 // with apply.
 type RegexApplyConfiguration struct {
-	Matches  []RegexMatchApplyConfiguration `json:"regexMatch,omitempty"`
+	Matches  []RegexMatchApplyConfiguration `json:"matches,omitempty"`
 	Builtins []apiv1alpha1.BuiltIn          `json:"builtins,omitempty"`
 	Action   *apiv1alpha1.Action            `json:"action,omitempty"`
 }
