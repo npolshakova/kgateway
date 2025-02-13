@@ -47,19 +47,14 @@ func convertAccessLogConfig(
 	}
 
 	grpcBackends := make(map[string]*ir.Upstream, len(policy.Spec.AccessLog))
-	for _, log := range configs {
+	for idx, log := range configs {
 		if log.GrpcService != nil && log.GrpcService.BackendRef != nil {
 			upstream, err := commoncol.Upstreams.GetUpstreamFromRef(krtctx, parentSrc, log.GrpcService.BackendRef.BackendObjectReference)
 			if err != nil {
 				// TODO: report error on status
 				return nil, eris.Wrapf(err, "failed to get upstream from ref")
 			}
-			if grpcBackends[log.GrpcService.LogName] != nil {
-				// TODO: report error on status
-				contextutils.LoggerFrom(ctx).Error(err, fmt.Sprintf("Duplicate grpc service log name %s. Using first grpc service config.", log.GrpcService.LogName))
-				continue
-			}
-			grpcBackends[log.GrpcService.LogName] = upstream
+			grpcBackends[getLogId(log.GrpcService.LogName, idx)] = upstream
 		}
 	}
 
@@ -67,11 +62,15 @@ func convertAccessLogConfig(
 	return translateAccessLogs(logger, configs, grpcBackends)
 }
 
+func getLogId(logName string, idx int) string {
+	return fmt.Sprintf("%s-%d", logName, idx)
+}
+
 func translateAccessLogs(logger *zap.Logger, configs []v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream) ([]*envoyaccesslog.AccessLog, error) {
 	var results []*envoyaccesslog.AccessLog
 
-	for _, logConfig := range configs {
-		accessLogCfg, err := translateAccessLog(logger, logConfig, grpcBackends)
+	for idx, logConfig := range configs {
+		accessLogCfg, err := translateAccessLog(logger, logConfig, grpcBackends, idx)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +81,7 @@ func translateAccessLogs(logger *zap.Logger, configs []v1alpha1.AccessLog, grpcB
 }
 
 // translateAccessLog creates an Envoy AccessLog configuration for a single log config
-func translateAccessLog(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream) (*envoyaccesslog.AccessLog, error) {
+func translateAccessLog(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBackends map[string]*ir.Upstream, accessLogId int) (*envoyaccesslog.AccessLog, error) {
 	// Validate mutual exclusivity of sink types
 	if logConfig.FileSink != nil && logConfig.GrpcService != nil {
 		return nil, eris.New("access log config cannot have both file sink and grpc service")
@@ -97,7 +96,7 @@ func translateAccessLog(logger *zap.Logger, logConfig v1alpha1.AccessLog, grpcBa
 	case logConfig.FileSink != nil:
 		accessLogCfg, err = createFileAccessLog(logger, logConfig.FileSink)
 	case logConfig.GrpcService != nil:
-		accessLogCfg, err = createGrpcAccessLog(logger, logConfig.GrpcService, grpcBackends)
+		accessLogCfg, err = createGrpcAccessLog(logger, logConfig.GrpcService, grpcBackends, accessLogId)
 	default:
 		return nil, eris.New("no access log sink specified")
 	}
@@ -159,9 +158,9 @@ func createFileAccessLog(logger *zap.Logger, fileSink *v1alpha1.FileSink) (*envo
 }
 
 // createGrpcAccessLog generates a gRPC-based access log configuration
-func createGrpcAccessLog(logger *zap.Logger, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream) (*envoyaccesslog.AccessLog, error) {
+func createGrpcAccessLog(logger *zap.Logger, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream, accessLogId int) (*envoyaccesslog.AccessLog, error) {
 	var cfg envoygrpc.HttpGrpcAccessLogConfig
-	if err := copyGrpcSettings(&cfg, grpcService, grpcBackends); err != nil {
+	if err := copyGrpcSettings(&cfg, grpcService, grpcBackends, accessLogId); err != nil {
 		logger.Error(fmt.Sprintf("error converting grpc access log config: %s", err.Error()))
 		return nil, err
 	}
@@ -272,24 +271,6 @@ func translateFilter(logger *zap.Logger, filter *v1alpha1.FilterType) (*envoyacc
 		alCfg = &envoyaccesslog.AccessLogFilter{
 			FilterSpecifier: &envoyaccesslog.AccessLogFilter_TraceableFilter{
 				TraceableFilter: &envoyaccesslog.TraceableFilter{},
-			},
-		}
-
-	case filter.RuntimeFilter != nil:
-		denominator, err := toEnvoyDenominatorType(filter.RuntimeFilter.PercentSampled.Denominator)
-		if err != nil {
-			return nil, err
-		}
-		alCfg = &envoyaccesslog.AccessLogFilter{
-			FilterSpecifier: &envoyaccesslog.AccessLogFilter_RuntimeFilter{
-				RuntimeFilter: &envoyaccesslog.RuntimeFilter{
-					RuntimeKey: filter.RuntimeFilter.RuntimeKey,
-					PercentSampled: &envoytype.FractionalPercent{
-						Numerator:   filter.RuntimeFilter.PercentSampled.Numerator,
-						Denominator: denominator,
-					},
-					UseIndependentRandomness: filter.RuntimeFilter.UseIndependentRandomness,
-				},
 			},
 		}
 
@@ -404,9 +385,6 @@ func validateFilter(filter *v1alpha1.FilterType) error {
 	if filter.TraceableFilter {
 		count++
 	}
-	if filter.RuntimeFilter != nil {
-		count++
-	}
 	if filter.HeaderFilter != nil {
 		count++
 	}
@@ -445,7 +423,7 @@ func convertJsonFormat(jsonFormat *runtime.RawExtension) *structpb.Struct {
 	return structVal
 }
 
-func copyGrpcSettings(cfg *envoygrpc.HttpGrpcAccessLogConfig, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream) error {
+func copyGrpcSettings(cfg *envoygrpc.HttpGrpcAccessLogConfig, grpcService *v1alpha1.GrpcService, grpcBackends map[string]*ir.Upstream, accessLogId int) error {
 	if grpcService == nil {
 		return eris.New("grpc service object cannot be nil")
 	}
@@ -454,7 +432,7 @@ func copyGrpcSettings(cfg *envoygrpc.HttpGrpcAccessLogConfig, grpcService *v1alp
 		return eris.New("grpc service log name cannot be empty")
 	}
 
-	upstream := grpcBackends[grpcService.LogName]
+	upstream := grpcBackends[getLogId(grpcService.LogName, accessLogId)]
 	if upstream == nil {
 		return eris.New("upstream backend ref not found")
 	}

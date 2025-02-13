@@ -68,9 +68,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: responseFlagFilter
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ResponseFlagFilter
-    - name: runtimeFilter
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RuntimeFilter
     - name: statusCodeFilter
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.StatusCodeFilter
@@ -262,24 +259,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: responseFlagFilter
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ResponseFlagFilter
-    - name: runtimeFilter
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RuntimeFilter
     - name: statusCodeFilter
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.StatusCodeFilter
     - name: traceableFilter
       type:
         scalar: boolean
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.FractionalPercent
-  map:
-    fields:
-    - name: denominator
-      type:
-        scalar: string
-    - name: numerator
-      type:
-        scalar: numeric
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.GatewayParameters
   map:
     fields:
@@ -689,19 +674,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: timeout
       type:
         scalar: numeric
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RuntimeFilter
-  map:
-    fields:
-    - name: percentSampled
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.FractionalPercent
-      default: {}
-    - name: runtimeKey
-      type:
-        scalar: string
-    - name: useIndependentRandomness
-      type:
-        scalar: boolean
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SdsBootstrap
   map:
     fields:

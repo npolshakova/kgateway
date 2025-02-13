@@ -9,7 +9,6 @@ type FilterTypeApplyConfiguration struct {
 	DurationFilter       *DurationFilterApplyConfiguration     `json:"durationFilter,omitempty"`
 	NotHealthCheckFilter *bool                                 `json:"notHealthCheckFilter,omitempty"`
 	TraceableFilter      *bool                                 `json:"traceableFilter,omitempty"`
-	RuntimeFilter        *RuntimeFilterApplyConfiguration      `json:"runtimeFilter,omitempty"`
 	HeaderFilter         *HeaderFilterApplyConfiguration       `json:"headerFilter,omitempty"`
 	ResponseFlagFilter   *ResponseFlagFilterApplyConfiguration `json:"responseFlagFilter,omitempty"`
 	GrpcStatusFilter     *GrpcStatusFilterApplyConfiguration   `json:"grpcStatusFilter,omitempty"`
@@ -51,14 +50,6 @@ func (b *FilterTypeApplyConfiguration) WithNotHealthCheckFilter(value bool) *Fil
 // If called multiple times, the TraceableFilter field is set to the value of the last call.
 func (b *FilterTypeApplyConfiguration) WithTraceableFilter(value bool) *FilterTypeApplyConfiguration {
 	b.TraceableFilter = &value
-	return b
-}
-
-// WithRuntimeFilter sets the RuntimeFilter field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RuntimeFilter field is set to the value of the last call.
-func (b *FilterTypeApplyConfiguration) WithRuntimeFilter(value *RuntimeFilterApplyConfiguration) *FilterTypeApplyConfiguration {
-	b.RuntimeFilter = value
 	return b
 }
 

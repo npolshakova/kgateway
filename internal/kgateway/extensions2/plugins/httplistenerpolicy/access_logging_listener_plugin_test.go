@@ -13,7 +13,6 @@ import (
 	envoy_metadata_formatter "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/metadata/v3"
 	envoy_req_without_query "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/req_without_query/v3"
 	envoymatcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
-	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/solo-io/go-utils/contextutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,12 +102,6 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				name: "GRPCAdditionalHeaders",
 				config: []v1alpha1.AccessLog{
 					{
-						FileSink: &v1alpha1.FileSink{
-							Path:         "/var/log/file-access.log",
-							StringFormat: "[%START_TIME%] %RESPONSE_CODE%",
-						},
-					},
-					{
 						GrpcService: &v1alpha1.GrpcService{
 							BackendRef: &gwv1.BackendRef{
 								BackendObjectReference: gwv1.BackendObjectReference{
@@ -121,8 +114,35 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 							AdditionalResponseTrailersToLog: []string{"x-trailer"},
 						},
 					},
+					{
+						FileSink: &v1alpha1.FileSink{
+							Path:         "/var/log/file-access.log",
+							StringFormat: "[%START_TIME%] %RESPONSE_CODE%",
+						},
+					},
 				},
 				expected: []*v33.AccessLog{
+					{
+						Name: "envoy.access_loggers.http_grpc",
+						ConfigType: &v33.AccessLog_TypedConfig{
+							TypedConfig: mustMessageToAny(t, &envoygrpc.HttpGrpcAccessLogConfig{
+								AdditionalRequestHeadersToLog:   []string{"x-request-id"},
+								AdditionalResponseHeadersToLog:  []string{"x-response-id"},
+								AdditionalResponseTrailersToLog: []string{"x-trailer"},
+								CommonConfig: &envoygrpc.CommonGrpcAccessLogConfig{
+									TransportApiVersion: envoycore.ApiVersion_V3,
+									LogName:             "grpc-log",
+									GrpcService: &envoycore.GrpcService{
+										TargetSpecifier: &envoycore.GrpcService_EnvoyGrpc_{
+											EnvoyGrpc: &envoycore.GrpcService_EnvoyGrpc{
+												ClusterName: "test-service",
+											},
+										},
+									},
+								},
+							}),
+						},
+					},
 					{
 						Name: "envoy.access_loggers.file",
 						ConfigType: &v33.AccessLog_TypedConfig{
@@ -145,27 +165,6 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 												Specifier: &envoycore.DataSource_InlineString{
 													InlineString: "[%START_TIME%] %RESPONSE_CODE%",
 												},
-											},
-										},
-									},
-								},
-							}),
-						},
-					},
-					{
-						Name: "envoy.access_loggers.http_grpc",
-						ConfigType: &v33.AccessLog_TypedConfig{
-							TypedConfig: mustMessageToAny(t, &envoygrpc.HttpGrpcAccessLogConfig{
-								AdditionalRequestHeadersToLog:   []string{"x-request-id"},
-								AdditionalResponseHeadersToLog:  []string{"x-response-id"},
-								AdditionalResponseTrailersToLog: []string{"x-trailer"},
-								CommonConfig: &envoygrpc.CommonGrpcAccessLogConfig{
-									TransportApiVersion: envoycore.ApiVersion_V3,
-									LogName:             "grpc-log",
-									GrpcService: &envoycore.GrpcService{
-										TargetSpecifier: &envoycore.GrpcService_EnvoyGrpc_{
-											EnvoyGrpc: &envoycore.GrpcService_EnvoyGrpc{
-												ClusterName: "test-service",
 											},
 										},
 									},
@@ -515,50 +514,6 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				},
 			},
 			{
-				name: "RuntimeFilter",
-				config: []v1alpha1.AccessLog{
-					{
-						FileSink: &v1alpha1.FileSink{
-							Path: "/var/log/access.log",
-						},
-						Filter: &v1alpha1.AccessLogFilter{
-							FilterType: &v1alpha1.FilterType{
-								RuntimeFilter: &v1alpha1.RuntimeFilter{
-									RuntimeKey: "test-key",
-									PercentSampled: v1alpha1.FractionalPercent{
-										Numerator:   1,
-										Denominator: v1alpha1.HUNDRED,
-									},
-									UseIndependentRandomness: false,
-								},
-							},
-						},
-					},
-				},
-				expected: []*v33.AccessLog{
-					{
-						Name: "envoy.access_loggers.file",
-						ConfigType: &v33.AccessLog_TypedConfig{
-							TypedConfig: mustMessageToAny(t, &envoyalfile.FileAccessLog{
-								Path: "/var/log/access.log",
-							}),
-						},
-						Filter: &v33.AccessLogFilter{
-							FilterSpecifier: &v33.AccessLogFilter_RuntimeFilter{
-								RuntimeFilter: &v33.RuntimeFilter{
-									RuntimeKey: "test-key",
-									PercentSampled: &envoytype.FractionalPercent{
-										Numerator:   1,
-										Denominator: envoytype.FractionalPercent_HUNDRED,
-									},
-									UseIndependentRandomness: false,
-								},
-							},
-						},
-					},
-				},
-			},
-			{
 				name: "ResponseFlagFilter",
 				config: []v1alpha1.AccessLog{
 					{
@@ -679,7 +634,7 @@ func TestConvertJsonFormat_EdgeCases(t *testing.T) {
 				result, err := translateAccessLogs(logger, tc.config,
 					// Example grpcBackends map for upstreams
 					map[string]*ir.Upstream{
-						"grpc-log": {
+						"grpc-log-0": {
 							ObjectSource: ir.ObjectSource{
 								Name:      "test-service",
 								Namespace: "default",

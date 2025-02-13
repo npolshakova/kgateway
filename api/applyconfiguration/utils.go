@@ -45,8 +45,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.FileSinkApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FilterType"):
 		return &apiv1alpha1.FilterTypeApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("FractionalPercent"):
-		return &apiv1alpha1.FractionalPercentApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("GatewayParameters"):
 		return &apiv1alpha1.GatewayParametersApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("GatewayParametersSpec"):
@@ -93,8 +91,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.RoutePolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RoutePolicySpec"):
 		return &apiv1alpha1.RoutePolicySpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeFilter"):
-		return &apiv1alpha1.RuntimeFilterApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SdsBootstrap"):
 		return &apiv1alpha1.SdsBootstrapApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SdsContainer"):

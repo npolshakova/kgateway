@@ -89,10 +89,11 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 			Name:      i.Name,
 		}
 
+		errors := []error{}
 		accessLog, err := convertAccessLogConfig(ctx, i, commoncol, krtctx, objSrc)
 		if err != nil {
-			// TODO: report error on status
 			contextutils.LoggerFrom(ctx).Error(err)
+			errors = append(errors, err)
 		}
 
 		var pol = &ir.PolicyWrapper{
@@ -104,6 +105,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 				accessLog: accessLog,
 			},
 			TargetRefs: convert(i.Spec.TargetRef),
+			Errors:     errors,
 		}
 
 		return pol

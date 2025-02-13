@@ -49,6 +49,11 @@ spec:
                       required:
                       - path
                       type: object
+                      x-kubernetes-validations:
+                      - message: only one of 'StringFormat' or 'JsonFormat' may be
+                          set
+                        rule: (has(self.stringFormat) && !has(self.jsonFormat)) ||
+                          (!has(self.stringFormat) && has(self.jsonFormat))
                     filter:
                       properties:
                         andFilter:
@@ -142,22 +147,6 @@ spec:
                                     type: array
                                 required:
                                 - flags
-                                type: object
-                              runtimeFilter:
-                                properties:
-                                  percentSampled:
-                                    properties:
-                                      denominator:
-                                        type: string
-                                      numerator:
-                                        format: int32
-                                        type: integer
-                                    type: object
-                                  runtimeKey:
-                                    minLength: 1
-                                    type: string
-                                  useIndependentRandomness:
-                                    type: boolean
                                 type: object
                               statusCodeFilter:
                                 properties:
@@ -350,22 +339,6 @@ spec:
                                 required:
                                 - flags
                                 type: object
-                              runtimeFilter:
-                                properties:
-                                  percentSampled:
-                                    properties:
-                                      denominator:
-                                        type: string
-                                      numerator:
-                                        format: int32
-                                        type: integer
-                                    type: object
-                                  runtimeKey:
-                                    minLength: 1
-                                    type: string
-                                  useIndependentRandomness:
-                                    type: boolean
-                                type: object
                               statusCodeFilter:
                                 properties:
                                   op:
@@ -395,22 +368,6 @@ spec:
                               type: array
                           required:
                           - flags
-                          type: object
-                        runtimeFilter:
-                          properties:
-                            percentSampled:
-                              properties:
-                                denominator:
-                                  type: string
-                                numerator:
-                                  format: int32
-                                  type: integer
-                              type: object
-                            runtimeKey:
-                              minLength: 1
-                              type: string
-                            useIndependentRandomness:
-                              type: boolean
                           type: object
                         statusCodeFilter:
                           properties:

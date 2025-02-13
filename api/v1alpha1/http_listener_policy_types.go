@@ -53,6 +53,7 @@ type AccessLog struct {
 }
 
 // FileSink represents the file sink configuration for access logs.
+// +kubebuilder:validation:XValidation:message="only one of 'StringFormat' or 'JsonFormat' may be set",rule="(has(self.stringFormat) && !has(self.jsonFormat)) || (!has(self.stringFormat) && has(self.jsonFormat))"
 type FileSink struct {
 	// the file path to which the file access logging service will sink
 	// +kubebuilder:validation:Required
@@ -100,7 +101,6 @@ type FilterType struct {
 	DurationFilter       *DurationFilter     `json:"durationFilter,omitempty"`
 	NotHealthCheckFilter bool                `json:"notHealthCheckFilter,omitempty"`
 	TraceableFilter      bool                `json:"traceableFilter,omitempty"`
-	RuntimeFilter        *RuntimeFilter      `json:"runtimeFilter,omitempty"`
 	HeaderFilter         *HeaderFilter       `json:"headerFilter,omitempty"`
 	ResponseFlagFilter   *ResponseFlagFilter `json:"responseFlagFilter,omitempty"`
 	GrpcStatusFilter     *GrpcStatusFilter   `json:"grpcStatusFilter,omitempty"`
@@ -133,20 +133,6 @@ type StatusCodeFilter ComparisonFilter
 
 // DurationFilter filters based on request duration.
 type DurationFilter ComparisonFilter
-
-// RuntimeFilter filters random sampling of requests.
-type RuntimeFilter struct {
-	// +kubebuilder:validation:MinLength=1
-	RuntimeKey               string            `json:"runtimeKey,omitempty"`
-	PercentSampled           FractionalPercent `json:"percentSampled,omitempty"`
-	UseIndependentRandomness bool              `json:"useIndependentRandomness,omitempty"`
-}
-
-// FractionalPercent represents a fractional percentage.
-type FractionalPercent struct {
-	Numerator   uint32          `json:"numerator,omitempty"`
-	Denominator DenominatorType `json:"denominator,omitempty"`
-}
 
 // DenominatorType defines the fraction percentages support several fixed denominator values.
 // +kubebuilder:validation:enum=HUNDRED,TEN_THOUSAND,MILLION
