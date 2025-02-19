@@ -99,8 +99,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.LocalPolicyTargetReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Message"):
 		return &apiv1alpha1.MessageApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("MistralConfig"):
-		return &apiv1alpha1.MistralConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Moderation"):
 		return &apiv1alpha1.ModerationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MultiPoolConfig"):

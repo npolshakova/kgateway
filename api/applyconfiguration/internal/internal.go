@@ -637,9 +637,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: gemini
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.GeminiConfig
-    - name: mistral
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.MistralConfig
     - name: openai
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.OpenAIConfig
@@ -703,19 +700,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.MistralConfig
-  map:
-    fields:
-    - name: authToken
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
-      default: {}
-    - name: customHost
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
-    - name: model
-      type:
-        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Moderation
   map:
     fields:
