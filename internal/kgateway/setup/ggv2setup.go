@@ -24,18 +24,18 @@ import (
 	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/version"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/namespaces"
-	"github.com/kgateway-dev/kgateway/v2/pkg/version"
 )
 
 const (
-	glooComponentName = "gloo"
+	componentName = "kgateway"
 )
 
 func Main(customCtx context.Context) error {
-	SetupLogging(customCtx, glooComponentName)
+	SetupLogging(customCtx, componentName)
 	return startSetupLoop(customCtx)
 }
 
@@ -56,7 +56,6 @@ func createKubeClient(restConfig *rest.Config) (istiokube.Client, error) {
 func StartGGv2(ctx context.Context,
 	extraPlugins []extensionsplug.Plugin,
 	extraGwClasses []string, // TODO: we can remove this and replace with something that watches all GW classes with our controller name
-
 ) error {
 	restConfig := ctrl.GetConfigOrDie()
 

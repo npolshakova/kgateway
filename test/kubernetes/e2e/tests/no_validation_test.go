@@ -11,21 +11,20 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	. "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/tests"
-	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/testutils/kgateway"
+	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/testutils/install"
 	"github.com/kgateway-dev/kgateway/v2/test/testutils"
 )
 
-// TestK8sGatewayMinimalDefaultGatewayParameters is the function which executes a series of tests against a given installation
-// which is expected to have all user-facing options set to null in helm values
-func TestK8sGatewayMinimalDefaultGatewayParameters(t *testing.T) {
+// TestKgatewayNoValidation executes tests against a K8s Gateway gloo install with validation disabled
+func TestKgatewayNoValidation(t *testing.T) {
 	ctx := context.Background()
-	installNs, nsEnvPredefined := envutils.LookupOrDefault(testutils.InstallNamespace, "k8s-gateway-minimal-default-gatewayparameters-test")
+	installNs, nsEnvPredefined := envutils.LookupOrDefault(testutils.InstallNamespace, "test-no-validation")
 	testInstallation := e2e.CreateTestInstallation(
 		t,
-		&kgateway.Context{
+		&install.Context{
 			InstallNamespace:          installNs,
-			ProfileValuesManifestFile: e2e.KubernetesGatewayProfilePath,
-			ValuesManifestFile:        e2e.ManifestPath("k8s-gateway-minimal-default-gatewayparameters-test-helm.yaml"),
+			ProfileValuesManifestFile: e2e.CommonRecommendationManifest,
+			ValuesManifestFile:        e2e.ManifestPath("no-webhook-validation-test-helm.yaml"),
 		},
 	)
 
@@ -52,5 +51,5 @@ func TestK8sGatewayMinimalDefaultGatewayParameters(t *testing.T) {
 	// Install Gloo Gateway
 	testInstallation.InstallGlooGatewayWithTestHelper(ctx, testHelper, 5*time.Minute)
 
-	KubeGatewayMinimalDefaultGatewayParametersSuiteRunner().Run(ctx, t, testInstallation)
+	KubeGatewayNoValidationSuiteRunner().Run(ctx, t, testInstallation)
 }

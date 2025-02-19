@@ -14,10 +14,11 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 )
 
-var _ e2e.NewSuiteFunc = NewIstioAutoMtlsSuite
+var _ e2e.NewSuiteFunc = NewTestingSuite
 
-// istioMtlsTestingSuite is the entire Suite of tests for the "Istio" integration cases where auto mTLS is enabled
-type istioAutoMtlsTestingSuite struct {
+// istioTestingSuite is the entire Suite of tests for the "Istio" integration cases where auto mtls is disabled
+// and Upstreams do not have sslConfig values set
+type istioTestingSuite struct {
 	suite.Suite
 
 	ctx context.Context
@@ -30,14 +31,7 @@ type istioAutoMtlsTestingSuite struct {
 	manifests map[string][]string
 }
 
-func NewIstioAutoMtlsSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.TestingSuite {
-	return &istioAutoMtlsTestingSuite{
-		ctx:              ctx,
-		testInstallation: testInst,
-	}
-}
-
-func (s *istioAutoMtlsTestingSuite) BeforeTest(suiteName, testName string) {
+func (s *istioTestingSuite) BeforeTest(suiteName, testName string) {
 	manifests, ok := s.manifests[testName]
 	if !ok {
 		s.FailNow("no manifests found for %s, manifest map contents: %v", testName, s.manifests)
@@ -49,12 +43,12 @@ func (s *istioAutoMtlsTestingSuite) BeforeTest(suiteName, testName string) {
 	}
 
 	s.testInstallation.Assertions.EventuallyObjectsExist(s.ctx, proxyService, proxyDeployment)
-	// Check that test resources are running
+	// Check that test resources are running. This can take a little longer for Istio tests due to the istio-proxy and sds sidecars
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, proxyDeployment.ObjectMeta.GetNamespace(),
-		metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=gloo-proxy-gw"}, time.Minute*2)
+		metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=gw"}, time.Minute*2)
 }
 
-func (s *istioAutoMtlsTestingSuite) AfterTest(suiteName, testName string) {
+func (s *istioTestingSuite) AfterTest(suiteName, testName string) {
 	manifests, ok := s.manifests[testName]
 	if !ok {
 		s.FailNow("no manifests found for " + testName)
@@ -68,29 +62,37 @@ func (s *istioAutoMtlsTestingSuite) AfterTest(suiteName, testName string) {
 	s.testInstallation.Assertions.EventuallyObjectsNotExist(s.ctx, proxyService, proxyDeployment)
 }
 
-func (s *istioAutoMtlsTestingSuite) SetupSuite() {
+func NewTestingSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.TestingSuite {
+	return &istioTestingSuite{
+		ctx:              ctx,
+		testInstallation: testInst,
+	}
+}
+
+func (s *istioTestingSuite) SetupSuite() {
 	err := s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, setupManifest)
 	s.NoError(err, "can apply setup manifest")
 	// Check that istio injection is successful and httpbin is running
 	s.testInstallation.Assertions.EventuallyObjectsExist(s.ctx, httpbinDeployment)
+	// httpbin can take a while to start up with Istio sidecar
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, httpbinDeployment.ObjectMeta.GetNamespace(),
 		metav1.ListOptions{LabelSelector: "app=httpbin"}, time.Minute*2)
 
 	// We include tests with manual setup here because the cleanup is still automated via AfterTest
 	s.manifests = map[string][]string{
-		"TestMtlsStrictPeerAuth":     {strictPeerAuthManifest, k8sRoutingSvcManifest},
-		"TestMtlsPermissivePeerAuth": {permissivePeerAuthManifest, k8sRoutingSvcManifest},
-		"TestMtlsDisablePeerAuth":    {disablePeerAuthManifest, k8sRoutingUpstreamManifest},
+		"TestStrictPeerAuth":     {strictPeerAuthManifest, k8sRoutingSvcManifest},
+		"TestPermissivePeerAuth": {permissivePeerAuthManifest, k8sRoutingSvcManifest},
 	}
 }
 
-func (s *istioAutoMtlsTestingSuite) TearDownSuite() {
+func (s *istioTestingSuite) TearDownSuite() {
 	err := s.testInstallation.Actions.Kubectl().DeleteFileSafe(s.ctx, setupManifest)
 	s.NoError(err, "can delete setup manifest")
 	s.testInstallation.Assertions.EventuallyObjectsNotExist(s.ctx, httpbinDeployment)
 }
 
-func (s *istioAutoMtlsTestingSuite) TestMtlsStrictPeerAuth() {
+func (s *istioTestingSuite) TestStrictPeerAuth() {
+	// With auto mtls disabled in the mesh, the request should fail when the strict peer auth policy is applied
 	s.testInstallation.Assertions.AssertEventualCurlResponse(
 		s.ctx,
 		curlPodExecOpt,
@@ -99,23 +101,11 @@ func (s *istioAutoMtlsTestingSuite) TestMtlsStrictPeerAuth() {
 			curl.WithHostHeader("httpbin"),
 			curl.WithPath("headers"),
 		},
-		expectedMtlsResponse, time.Minute)
+		expectedServiceUnavailableResponse, time.Minute)
 }
 
-func (s *istioAutoMtlsTestingSuite) TestMtlsPermissivePeerAuth() {
-	// With auto mtls enabled in the mesh, the response should contain the X-Forwarded-Client-Cert header even with permissive mode
-	s.testInstallation.Assertions.AssertEventualCurlResponse(
-		s.ctx,
-		curlPodExecOpt,
-		[]curl.Option{
-			curl.WithHost(kubeutils.ServiceFQDN(proxyService.ObjectMeta)),
-			curl.WithHostHeader("httpbin"),
-			curl.WithPath("headers"),
-		},
-		expectedMtlsResponse, time.Minute)
-}
-
-func (s *istioAutoMtlsTestingSuite) TestMtlsDisablePeerAuth() {
+func (s *istioTestingSuite) TestPermissivePeerAuth() {
+	// With auto mtls disabled in the mesh, the response should not contain the X-Forwarded-Client-Cert header
 	s.testInstallation.Assertions.AssertEventualCurlResponse(
 		s.ctx,
 		curlPodExecOpt,
