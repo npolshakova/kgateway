@@ -115,16 +115,6 @@ spec:
                                     required:
                                     - kind
                                     type: object
-                                    x-kubernetes-validations:
-                                    - message: There must one and only one SingleAuthToken
-                                        type set
-                                      rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
-                                        ? 0 : 1)'
-                                    - message: Inline token must be set when kind
-                                        is Inline or SecretRef must be set when kind
-                                        is SecretRef
-                                      rule: (self.kind == 'Inline' && has(self.inline))
-                                        || (self.kind == 'SecretRef' && has(self.secretRef))
                                   model:
                                     default: omni-moderation-latest
                                     type: string

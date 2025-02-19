@@ -32,8 +32,12 @@ spec:
           metadata:
             type: object
           spec:
+            maxProperties: 1
+            minProperties: 1
             properties:
               ai:
+                maxProperties: 1
+                minProperties: 1
                 properties:
                   customHost:
                     properties:
@@ -51,6 +55,8 @@ spec:
                     - port
                     type: object
                   llm:
+                    maxProperties: 1
+                    minProperties: 1
                     properties:
                       anthropic:
                         properties:
@@ -76,15 +82,6 @@ spec:
                             required:
                             - kind
                             type: object
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
-                                ? 0 : 1)'
-                            - message: Inline token must be set when kind is Inline
-                                or SecretRef must be set when kind is SecretRef
-                              rule: (self.kind == 'Inline' && has(self.inline)) ||
-                                (self.kind == 'SecretRef' && has(self.secretRef))
                           customHost:
                             properties:
                               host:
@@ -130,15 +127,6 @@ spec:
                             required:
                             - kind
                             type: object
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
-                                ? 0 : 1)'
-                            - message: Inline token must be set when kind is Inline
-                                or SecretRef must be set when kind is SecretRef
-                              rule: (self.kind == 'Inline' && has(self.inline)) ||
-                                (self.kind == 'SecretRef' && has(self.secretRef))
                           deploymentName:
                             minLength: 1
                             type: string
@@ -175,15 +163,6 @@ spec:
                             required:
                             - kind
                             type: object
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
-                                ? 0 : 1)'
-                            - message: Inline token must be set when kind is Inline
-                                or SecretRef must be set when kind is SecretRef
-                              rule: (self.kind == 'Inline' && has(self.inline)) ||
-                                (self.kind == 'SecretRef' && has(self.secretRef))
                           model:
                             type: string
                         required:
@@ -213,15 +192,6 @@ spec:
                             required:
                             - kind
                             type: object
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
-                                ? 0 : 1)'
-                            - message: Inline token must be set when kind is Inline
-                                or SecretRef must be set when kind is SecretRef
-                              rule: (self.kind == 'Inline' && has(self.inline)) ||
-                                (self.kind == 'SecretRef' && has(self.secretRef))
                           customHost:
                             properties:
                               host:
@@ -264,15 +234,6 @@ spec:
                             required:
                             - kind
                             type: object
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
-                                ? 0 : 1)'
-                            - message: Inline token must be set when kind is Inline
-                                or SecretRef must be set when kind is SecretRef
-                              rule: (self.kind == 'Inline' && has(self.inline)) ||
-                                (self.kind == 'SecretRef' && has(self.secretRef))
                           customHost:
                             properties:
                               host:
@@ -318,15 +279,6 @@ spec:
                             required:
                             - kind
                             type: object
-                            x-kubernetes-validations:
-                            - message: There must one and only one SingleAuthToken
-                                type set
-                              rule: '1 == (!has(self.inline) ? 0 : 1) + (!has(self.secretRef)
-                                ? 0 : 1)'
-                            - message: Inline token must be set when kind is Inline
-                                or SecretRef must be set when kind is SecretRef
-                              rule: (self.kind == 'Inline' && has(self.inline)) ||
-                                (self.kind == 'SecretRef' && has(self.secretRef))
                           location:
                             minLength: 1
                             type: string
@@ -350,12 +302,6 @@ spec:
                         - projectId
                         type: object
                     type: object
-                    x-kubernetes-validations:
-                    - message: There must one and only one LLMProviders type set
-                      rule: 1 == (self.openai != null?1:0) + (self.azureopenai !=
-                        null?1:0) + (self.anthropic != null?1:0) + (self.gemini !=
-                        null?1:0) + (self.vertexai != null?1:0) + (self.mistral !=
-                        null?1:0)
                   multipool:
                     properties:
                       priorities:
@@ -363,6 +309,8 @@ spec:
                           properties:
                             pool:
                               items:
+                                maxProperties: 1
+                                minProperties: 1
                                 properties:
                                   anthropic:
                                     properties:
@@ -388,16 +336,6 @@ spec:
                                         required:
                                         - kind
                                         type: object
-                                        x-kubernetes-validations:
-                                        - message: There must one and only one SingleAuthToken
-                                            type set
-                                          rule: '1 == (!has(self.inline) ? 0 : 1)
-                                            + (!has(self.secretRef) ? 0 : 1)'
-                                        - message: Inline token must be set when kind
-                                            is Inline or SecretRef must be set when
-                                            kind is SecretRef
-                                          rule: (self.kind == 'Inline' && has(self.inline))
-                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       customHost:
                                         properties:
                                           host:
@@ -443,16 +381,6 @@ spec:
                                         required:
                                         - kind
                                         type: object
-                                        x-kubernetes-validations:
-                                        - message: There must one and only one SingleAuthToken
-                                            type set
-                                          rule: '1 == (!has(self.inline) ? 0 : 1)
-                                            + (!has(self.secretRef) ? 0 : 1)'
-                                        - message: Inline token must be set when kind
-                                            is Inline or SecretRef must be set when
-                                            kind is SecretRef
-                                          rule: (self.kind == 'Inline' && has(self.inline))
-                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       deploymentName:
                                         minLength: 1
                                         type: string
@@ -489,16 +417,6 @@ spec:
                                         required:
                                         - kind
                                         type: object
-                                        x-kubernetes-validations:
-                                        - message: There must one and only one SingleAuthToken
-                                            type set
-                                          rule: '1 == (!has(self.inline) ? 0 : 1)
-                                            + (!has(self.secretRef) ? 0 : 1)'
-                                        - message: Inline token must be set when kind
-                                            is Inline or SecretRef must be set when
-                                            kind is SecretRef
-                                          rule: (self.kind == 'Inline' && has(self.inline))
-                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       model:
                                         type: string
                                     required:
@@ -528,16 +446,6 @@ spec:
                                         required:
                                         - kind
                                         type: object
-                                        x-kubernetes-validations:
-                                        - message: There must one and only one SingleAuthToken
-                                            type set
-                                          rule: '1 == (!has(self.inline) ? 0 : 1)
-                                            + (!has(self.secretRef) ? 0 : 1)'
-                                        - message: Inline token must be set when kind
-                                            is Inline or SecretRef must be set when
-                                            kind is SecretRef
-                                          rule: (self.kind == 'Inline' && has(self.inline))
-                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       customHost:
                                         properties:
                                           host:
@@ -580,16 +488,6 @@ spec:
                                         required:
                                         - kind
                                         type: object
-                                        x-kubernetes-validations:
-                                        - message: There must one and only one SingleAuthToken
-                                            type set
-                                          rule: '1 == (!has(self.inline) ? 0 : 1)
-                                            + (!has(self.secretRef) ? 0 : 1)'
-                                        - message: Inline token must be set when kind
-                                            is Inline or SecretRef must be set when
-                                            kind is SecretRef
-                                          rule: (self.kind == 'Inline' && has(self.inline))
-                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       customHost:
                                         properties:
                                           host:
@@ -635,16 +533,6 @@ spec:
                                         required:
                                         - kind
                                         type: object
-                                        x-kubernetes-validations:
-                                        - message: There must one and only one SingleAuthToken
-                                            type set
-                                          rule: '1 == (!has(self.inline) ? 0 : 1)
-                                            + (!has(self.secretRef) ? 0 : 1)'
-                                        - message: Inline token must be set when kind
-                                            is Inline or SecretRef must be set when
-                                            kind is SecretRef
-                                          rule: (self.kind == 'Inline' && has(self.inline))
-                                            || (self.kind == 'SecretRef' && has(self.secretRef))
                                       location:
                                         minLength: 1
                                         type: string
@@ -668,13 +556,6 @@ spec:
                                     - projectId
                                     type: object
                                 type: object
-                                x-kubernetes-validations:
-                                - message: There must one and only one LLMProviders
-                                    type set
-                                  rule: 1 == (self.openai != null?1:0) + (self.azureopenai
-                                    != null?1:0) + (self.anthropic != null?1:0) +
-                                    (self.gemini != null?1:0) + (self.vertexai !=
-                                    null?1:0) + (self.mistral != null?1:0)
                               maxItems: 20
                               minItems: 1
                               type: array
@@ -688,7 +569,8 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: There must one and only one LLM or MultiPool can be set
-                  rule: 1 == (self.llm != null?1:0) + (self.multipool != null?1:0)
+                  rule: (has(self.llm) && !has(self.multipool)) || (!has(self.llm)
+                    && has(self.multipool))
               aws:
                 properties:
                   region:
@@ -724,8 +606,9 @@ spec:
             type: object
             x-kubernetes-validations:
             - message: There must one and only one upstream type set
-              rule: 1 == (self.aws != null?1:0) + (self.static != null?1:0) + (self.ai
-                != null?1:0)
+              rule: (has(self.aws) && !has(self.static) && !has(self.ai)) || (!has(self.aws)
+                && has(self.static) && !has(self.ai)) || (!has(self.aws) && !has(self.static)
+                && has(self.ai))
           status:
             properties:
               conditions:

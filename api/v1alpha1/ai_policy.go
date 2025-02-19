@@ -26,7 +26,7 @@ type AIRoutePolicy struct {
 	// The type of route to the LLM provider API. Currently, `CHAT` and `CHAT_STREAMING` are supported.
 	// +kubebuilder:validation:Enum=CHAT;CHAT_STREAMING
 	// +kube:default=CHAT
-	RouteType RouteType `json:"routeType,omitempty"`
+	RouteType *RouteType `json:"routeType,omitempty"`
 }
 
 // AIPromptEnrichment defines the config to enrich requests sent to the LLM provider by appending and prepending system prompts.
@@ -83,9 +83,9 @@ const (
 type Message struct {
 	// Role of the message. The available roles depend on the backend
 	// LLM provider model, such as `SYSTEM` or `USER` in the OpenAI API.
-	Role string `json:"role,omitempty"`
+	Role *string `json:"role,omitempty"`
 	// String content of the message.
-	Content string `json:"content,omitempty"`
+	Content *string `json:"content,omitempty"`
 }
 
 // BuiltIn regex patterns for specific types of strings in prompts.
@@ -108,9 +108,9 @@ const (
 // RegexMatch configures the regular expression (regex) matching for prompt guards and data masking.
 type RegexMatch struct {
 	// The regex pattern to match against the request or response.
-	Pattern string `json:"pattern,omitempty"`
+	Pattern *string `json:"pattern,omitempty"`
 	// An optional name for this match, which can be used for debugging purposes.
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 }
 
 // Action to take if a regex pattern is matched in a request or response.
@@ -136,14 +136,14 @@ type Regex struct {
 	// This setting applies only to request matches. PromptguardResponse matches are always masked by default.
 	// Defaults to `MASK`.
 	// +kubebuilder:default=MASK
-	Action Action `json:"action,omitempty"`
+	Action *Action `json:"action,omitempty"`
 }
 
 // Webhook configures a webhook to forward requests or responses to for prompt guarding.
 type Webhook struct {
 	// Host to send the traffic to.
 	// +kubebuilder:validation:Required
-	Host *Host `json:"host"`
+	Host Host `json:"host"`
 
 	// ForwardHeaders define headers to forward with the request to the webhook.
 	ForwardHeaders []gwv1.HTTPHeaderMatch `json:"forwardHeaders,omitempty"`
@@ -155,13 +155,13 @@ type CustomResponse struct {
 	// A custom response message to return to the client. If not specified, defaults to
 	// "The request was rejected due to inappropriate content".
 	// +kubebuilder:default="The request was rejected due to inappropriate content"
-	Message string `json:"message,omitempty"`
+	Message *string `json:"message,omitempty"`
 
 	// The status code to return to the client. Defaults to 403.
 	// +kubebuilder:default=403
 	// +kubebuilder:validation:Minimum=200
 	// +kubebuilder:validation:Maximum=599
-	StatusCode uint32 `json:"statusCode,omitempty"`
+	StatusCode *uint32 `json:"statusCode,omitempty"`
 }
 
 // OpenAIModeration configure an OpenAI moderation endpoint.
@@ -169,7 +169,7 @@ type OpenAIModeration struct {
 	// The name of the OpenAI moderation model to use. Defaults to
 	// [`omni-moderation-latest`](https://platform.openai.com/docs/guides/moderation).
 	// +kubebuilder:default="omni-moderation-latest"
-	Model string `json:"model,omitempty"`
+	Model *string `json:"model,omitempty"`
 
 	// The authorization token that the AIRoutePolicy gateway uses
 	// to access the OpenAI moderation model.
@@ -286,13 +286,13 @@ type FieldDefault struct {
 	// The name of the field.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
-	Field string `json:"field,omitempty"`
+	Field *string `json:"field,omitempty"`
 	// The field default value, which can be any JSON Data Type.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
-	Value string `json:"value,omitempty"`
+	Value *string `json:"value,omitempty"`
 	// Whether to override the field's value if it already exists.
 	// Defaults to false.
 	// +kubebuilder:default=false
-	Override bool `json:"override,omitempty"`
+	Override *bool `json:"override,omitempty"`
 }

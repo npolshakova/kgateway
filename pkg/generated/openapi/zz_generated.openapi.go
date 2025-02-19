@@ -829,6 +829,7 @@ func schema_kgateway_v2_api_v1alpha1_AnthropicConfig(ref common.ReferenceCallbac
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Anthropic API. This token is automatically sent in the `x-api-key` header of the request.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
@@ -897,6 +898,7 @@ func schema_kgateway_v2_api_v1alpha1_AzureOpenAIConfig(ref common.ReferenceCallb
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Azure OpenAI API. This token is automatically sent in the `api-key` header of the request.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
@@ -1560,6 +1562,7 @@ func schema_kgateway_v2_api_v1alpha1_GeminiConfig(ref common.ReferenceCallback) 
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Gemini API. This token is automatically sent in the `key` query parameter of the request.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
@@ -2366,6 +2369,7 @@ func schema_kgateway_v2_api_v1alpha1_MistralConfig(ref common.ReferenceCallback)
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API. This token is automatically sent in the `Authorization` header of the request and prefixed with `Bearer`.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
@@ -2452,6 +2456,7 @@ func schema_kgateway_v2_api_v1alpha1_OpenAIConfig(ref common.ReferenceCallback) 
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API. This token is automatically sent in the `Authorization` header of the request and prefixed with `Bearer`.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
@@ -2469,6 +2474,7 @@ func schema_kgateway_v2_api_v1alpha1_OpenAIConfig(ref common.ReferenceCallback) 
 						},
 					},
 				},
+				Required: []string{"authToken"},
 			},
 		},
 		Dependencies: []string{
@@ -3551,6 +3557,7 @@ func schema_kgateway_v2_api_v1alpha1_VertexAIConfig(ref common.ReferenceCallback
 					"authToken": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The authorization token that the AIRoutePolicy gateway uses to access the Vertex AIRoutePolicy API. This token is automatically sent in the `key` header of the request.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
@@ -3619,6 +3626,7 @@ func schema_kgateway_v2_api_v1alpha1_Webhook(ref common.ReferenceCallback) commo
 					"host": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Host to send the traffic to.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host"),
 						},
 					},

@@ -176,6 +176,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
+      default: {}
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
@@ -202,6 +203,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
+      default: {}
     - name: deploymentName
       type:
         scalar: string
@@ -425,6 +427,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
+      default: {}
     - name: model
       type:
         scalar: string
@@ -702,6 +705,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
+      default: {}
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
@@ -729,6 +733,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
+      default: {}
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
@@ -1102,6 +1107,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authToken
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
+      default: {}
     - name: location
       type:
         scalar: string
@@ -1132,6 +1138,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: host
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
+      default: {}
 - name: io.k8s.api.core.v1.Affinity
   map:
     fields:
