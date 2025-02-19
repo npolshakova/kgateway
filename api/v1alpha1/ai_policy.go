@@ -83,9 +83,9 @@ const (
 type Message struct {
 	// Role of the message. The available roles depend on the backend
 	// LLM provider model, such as `SYSTEM` or `USER` in the OpenAI API.
-	Role *string `json:"role,omitempty"`
+	Role string `json:"role"`
 	// String content of the message.
-	Content *string `json:"content,omitempty"`
+	Content string `json:"content"`
 }
 
 // BuiltIn regex patterns for specific types of strings in prompts.
@@ -286,11 +286,11 @@ type FieldDefault struct {
 	// The name of the field.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
-	Field *string `json:"field,omitempty"`
+	Field string `json:"field"`
 	// The field default value, which can be any JSON Data Type.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
-	Value *string `json:"value,omitempty"`
+	Value string `json:"value"`
 	// Whether to override the field's value if it already exists.
 	// Defaults to false.
 	// +kubebuilder:default=false

@@ -300,6 +300,7 @@ spec:
                         - location
                         - model
                         - projectId
+                        - publisher
                         type: object
                     type: object
                   multipool:
@@ -554,6 +555,7 @@ spec:
                                     - location
                                     - model
                                     - projectId
+                                    - publisher
                                     type: object
                                 type: object
                               maxItems: 20

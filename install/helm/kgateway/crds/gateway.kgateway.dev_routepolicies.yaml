@@ -62,6 +62,9 @@ spec:
                               type: string
                             role:
                               type: string
+                          required:
+                          - content
+                          - role
                           type: object
                         type: array
                       prepend:
@@ -71,6 +74,9 @@ spec:
                               type: string
                             role:
                               type: string
+                          required:
+                          - content
+                          - role
                           type: object
                         type: array
                     type: object

@@ -329,12 +329,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: field
       type:
         scalar: string
+      default: ""
     - name: override
       type:
         scalar: boolean
     - name: value
       type:
         scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.FileSink
   map:
     fields:
@@ -696,9 +698,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: content
       type:
         scalar: string
+      default: ""
     - name: role
       type:
         scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.MistralConfig
   map:
     fields:
@@ -1126,6 +1130,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: publisher
       type:
         scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Webhook
   map:
     fields:

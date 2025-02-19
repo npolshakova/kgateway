@@ -1299,6 +1299,7 @@ func schema_kgateway_v2_api_v1alpha1_FieldDefault(ref common.ReferenceCallback) 
 					"field": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The name of the field.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1306,6 +1307,7 @@ func schema_kgateway_v2_api_v1alpha1_FieldDefault(ref common.ReferenceCallback) 
 					"value": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The field default value, which can be any JSON Data Type.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1318,6 +1320,7 @@ func schema_kgateway_v2_api_v1alpha1_FieldDefault(ref common.ReferenceCallback) 
 						},
 					},
 				},
+				Required: []string{"field", "value"},
 			},
 		},
 	}
@@ -2342,6 +2345,7 @@ func schema_kgateway_v2_api_v1alpha1_Message(ref common.ReferenceCallback) commo
 					"role": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Role of the message. The available roles depend on the backend LLM provider model, such as `SYSTEM` or `USER` in the OpenAI API.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -2349,11 +2353,13 @@ func schema_kgateway_v2_api_v1alpha1_Message(ref common.ReferenceCallback) commo
 					"content": {
 						SchemaProps: spec.SchemaProps{
 							Description: "String content of the message.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
+				Required: []string{"role", "content"},
 			},
 		},
 	}
@@ -3603,12 +3609,13 @@ func schema_kgateway_v2_api_v1alpha1_VertexAIConfig(ref common.ReferenceCallback
 					"publisher": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The type of publisher model to use. Currently, only Google is supported.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"authToken", "model", "apiVersion", "projectId", "location"},
+				Required: []string{"authToken", "model", "apiVersion", "projectId", "location", "publisher"},
 			},
 		},
 		Dependencies: []string{
