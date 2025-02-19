@@ -126,7 +126,7 @@ gateway:
   aiExtension:
     enabled: false
     image:
-      repository: gloo-ai-extension
+      repository: kgateway-ai-extension
       registry: quay.io/solo-io
       pullPolicy: IfNotPresent
     env: []

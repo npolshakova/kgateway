@@ -1076,7 +1076,7 @@ var _ = Describe("Deployer", func() {
 				case "gloo-gateway":
 					gwContainer = container
 					foundGw = true
-				case "gloo-ai-extension":
+				case "kgateway-ai-extension":
 					aiContainer = container
 					foundAIExtension = true
 				default:
