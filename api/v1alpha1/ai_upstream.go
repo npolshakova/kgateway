@@ -25,7 +25,6 @@ type LLMProviders struct {
 	Anthropic   *AnthropicConfig   `json:"anthropic,omitempty"`
 	Gemini      *GeminiConfig      `json:"gemini,omitempty"`
 	VertexAI    *VertexAIConfig    `json:"vertexai,omitempty"`
-	Mistral     *MistralConfig     `json:"mistral,omitempty"`
 }
 
 type SingleAuthTokenKind string
