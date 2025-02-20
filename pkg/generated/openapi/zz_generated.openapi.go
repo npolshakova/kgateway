@@ -64,7 +64,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ListenerPolicySpec":         schema_kgateway_v2_api_v1alpha1_ListenerPolicySpec(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReference": schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetReference(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Message":                    schema_kgateway_v2_api_v1alpha1_Message(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MistralConfig":              schema_kgateway_v2_api_v1alpha1_MistralConfig(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Moderation":                 schema_kgateway_v2_api_v1alpha1_Moderation(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MultiPoolConfig":            schema_kgateway_v2_api_v1alpha1_MultiPoolConfig(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.OpenAIConfig":               schema_kgateway_v2_api_v1alpha1_OpenAIConfig(ref),
@@ -2357,42 +2356,6 @@ func schema_kgateway_v2_api_v1alpha1_Message(ref common.ReferenceCallback) commo
 				Required: []string{"role", "content"},
 			},
 		},
-	}
-}
-
-func schema_kgateway_v2_api_v1alpha1_MistralConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "MistralConfig configures the settings for the [Mistral AIRoutePolicy](https://docs.mistral.ai/getting-started/quickstart/) LLM provider.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"authToken": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API. This token is automatically sent in the `Authorization` header of the request and prefixed with `Bearer`.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
-						},
-					},
-					"customHost": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host"),
-						},
-					},
-					"model": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Override the model name. If unset, the model name is taken from the request. This setting can be useful when testing model failover scenarios.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"authToken"},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"},
 	}
 }
 

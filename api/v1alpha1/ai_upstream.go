@@ -169,22 +169,6 @@ type VertexAIConfig struct {
 	Publisher Publisher `json:"publisher"`
 }
 
-// MistralConfig configures the settings for the [Mistral AIRoutePolicy](https://docs.mistral.ai/getting-started/quickstart/) LLM provider.
-type MistralConfig struct {
-	// The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API.
-	// This token is automatically sent in the `Authorization` header of the
-	// request and prefixed with `Bearer`.
-	// +kubebuilder:validation:Required
-	AuthToken SingleAuthToken `json:"authToken"`
-	// Optional: Send requests to a custom host and port, such as to proxy the request,
-	// or to use a different backend that is API-compliant with the upstream version.
-	CustomHost *Host `json:"customHost,omitempty"`
-	// Optional: Override the model name.
-	// If unset, the model name is taken from the request.
-	// This setting can be useful when testing model failover scenarios.
-	Model *string `json:"model,omitempty"`
-}
-
 // AnthropicConfig settings for the [Anthropic](https://docs.anthropic.com/en/release-notes/api) LLM provider.
 type AnthropicConfig struct {
 	// The authorization token that the AIRoutePolicy gateway uses to access the Anthropic API.
