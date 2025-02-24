@@ -8,7 +8,7 @@ import corev1 "k8s.io/api/core/v1"
 type AIUpstream struct {
 	// Send requests to a custom host and port, such as to proxy the request,
 	// or to use a different backend that is API-compliant with the upstream version.
-	CustomHost *Host `json:"customHost,omitempty"`
+	HostOverride *Host `json:"hostOverride,omitempty"`
 
 	// The LLM configures the AI gateway to use a single LLM provider backend.
 	LLM *LLMProviders `json:"llm,omitempty"`
@@ -72,9 +72,6 @@ type OpenAIConfig struct {
 	// request and prefixed with `Bearer`.
 	// +kubebuilder:validation:Required
 	AuthToken SingleAuthToken `json:"authToken"`
-	// Optional: Send requests to a custom host and port, such as to proxy the request,
-	// or to use a different backend that is API-compliant with the upstream version.
-	CustomHost *Host `json:"customHost,omitempty"`
 	// Optional: Override the model name, such as `gpt-4o-mini`.
 	// If unset, the model name is taken from the request.
 	// This setting can be useful when setting up model failover within the same LLM provider.
@@ -175,9 +172,6 @@ type AnthropicConfig struct {
 	// This token is automatically sent in the `x-api-key` header of the request.
 	// +kubebuilder:validation:Required
 	AuthToken SingleAuthToken `json:"authToken"`
-	// Optional: Send requests to a custom host and port, such as to proxy the request,
-	// or to use a different backend that is API-compliant with the upstream version.
-	CustomHost *Host `json:"customHost,omitempty"`
 	// Optional: A version header to pass to the Anthropic API.
 	// For more information, see the [Anthropic API versioning docs](https://docs.anthropic.com/en/api/versioning).
 	Version string `json:"apiVersion,omitempty"`

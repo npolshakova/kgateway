@@ -5,9 +5,8 @@ package v1alpha1
 // OpenAIConfigApplyConfiguration represents a declarative configuration of the OpenAIConfig type for use
 // with apply.
 type OpenAIConfigApplyConfiguration struct {
-	AuthToken  *SingleAuthTokenApplyConfiguration `json:"authToken,omitempty"`
-	CustomHost *HostApplyConfiguration            `json:"customHost,omitempty"`
-	Model      *string                            `json:"model,omitempty"`
+	AuthToken *SingleAuthTokenApplyConfiguration `json:"authToken,omitempty"`
+	Model     *string                            `json:"model,omitempty"`
 }
 
 // OpenAIConfigApplyConfiguration constructs a declarative configuration of the OpenAIConfig type for use with
@@ -21,14 +20,6 @@ func OpenAIConfig() *OpenAIConfigApplyConfiguration {
 // If called multiple times, the AuthToken field is set to the value of the last call.
 func (b *OpenAIConfigApplyConfiguration) WithAuthToken(value *SingleAuthTokenApplyConfiguration) *OpenAIConfigApplyConfiguration {
 	b.AuthToken = value
-	return b
-}
-
-// WithCustomHost sets the CustomHost field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the CustomHost field is set to the value of the last call.
-func (b *OpenAIConfigApplyConfiguration) WithCustomHost(value *HostApplyConfiguration) *OpenAIConfigApplyConfiguration {
-	b.CustomHost = value
 	return b
 }
 

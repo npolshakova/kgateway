@@ -68,7 +68,7 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AIUpstream
   map:
     fields:
-    - name: customHost
+    - name: hostOverride
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
     - name: llm
@@ -177,9 +177,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
       default: {}
-    - name: customHost
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
     - name: model
       type:
         scalar: string
@@ -722,9 +719,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
       default: {}
-    - name: customHost
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
     - name: model
       type:
         scalar: string

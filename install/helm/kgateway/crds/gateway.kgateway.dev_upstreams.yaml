@@ -39,7 +39,7 @@ spec:
                 maxProperties: 1
                 minProperties: 1
                 properties:
-                  customHost:
+                  hostOverride:
                     properties:
                       host:
                         maxLength: 253
@@ -81,21 +81,6 @@ spec:
                                 x-kubernetes-map-type: atomic
                             required:
                             - kind
-                            type: object
-                          customHost:
-                            properties:
-                              host:
-                                maxLength: 253
-                                minLength: 1
-                                type: string
-                              port:
-                                format: int32
-                                maximum: 65535
-                                minimum: 1
-                                type: integer
-                            required:
-                            - host
-                            - port
                             type: object
                           model:
                             type: string
@@ -192,21 +177,6 @@ spec:
                             required:
                             - kind
                             type: object
-                          customHost:
-                            properties:
-                              host:
-                                maxLength: 253
-                                minLength: 1
-                                type: string
-                              port:
-                                format: int32
-                                maximum: 65535
-                                minimum: 1
-                                type: integer
-                            required:
-                            - host
-                            - port
-                            type: object
                           model:
                             type: string
                         required:
@@ -294,21 +264,6 @@ spec:
                                             x-kubernetes-map-type: atomic
                                         required:
                                         - kind
-                                        type: object
-                                      customHost:
-                                        properties:
-                                          host:
-                                            maxLength: 253
-                                            minLength: 1
-                                            type: string
-                                          port:
-                                            format: int32
-                                            maximum: 65535
-                                            minimum: 1
-                                            type: integer
-                                        required:
-                                        - host
-                                        - port
                                         type: object
                                       model:
                                         type: string
@@ -404,21 +359,6 @@ spec:
                                             x-kubernetes-map-type: atomic
                                         required:
                                         - kind
-                                        type: object
-                                      customHost:
-                                        properties:
-                                          host:
-                                            maxLength: 253
-                                            minLength: 1
-                                            type: string
-                                          port:
-                                            format: int32
-                                            maximum: 65535
-                                            minimum: 1
-                                            type: integer
-                                        required:
-                                        - host
-                                        - port
                                         type: object
                                       model:
                                         type: string

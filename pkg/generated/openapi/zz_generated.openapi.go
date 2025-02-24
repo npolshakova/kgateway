@@ -570,7 +570,7 @@ func schema_kgateway_v2_api_v1alpha1_AIUpstream(ref common.ReferenceCallback) co
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"customHost": {
+					"hostOverride": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host"),
@@ -831,12 +831,6 @@ func schema_kgateway_v2_api_v1alpha1_AnthropicConfig(ref common.ReferenceCallbac
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
-					"customHost": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host"),
-						},
-					},
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: A version header to pass to the Anthropic API. For more information, see the [Anthropic API versioning docs](https://docs.anthropic.com/en/api/versioning).",
@@ -856,7 +850,7 @@ func schema_kgateway_v2_api_v1alpha1_AnthropicConfig(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"},
 	}
 }
 
@@ -1291,7 +1285,7 @@ func schema_kgateway_v2_api_v1alpha1_FieldDefault(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "FieldDefault provides defaults to merge with user input fields. Defaults do _not_ override the user input fields, unless you explicitly set `override` to `true`.\n\nExample overriding the system field for Anthropic: ```yaml # Anthropic doesn't support a system chat type defaults:\n  - field: \"system\"\n    value: \"answer all questions in French\"\n\n```\n\nExample setting the temperature and overriding `max_tokens`: ```yaml defaults:\n  - field: \"temperature\"\n    value: \"0.5\"\n  - field: \"max_tokens\"\n    value: \"100\"\n\n```\n\nExample overriding custom list: ```yaml defaults:\n  - field: \"custom_list\"\n    value: \"[a,b,c]\"\n\n```",
+				Description: "FieldDefault provides default values for specific fields in the JSON request body sent to the LLM provider. These defaults are merged with the user-provided request to ensure missing fields are populated.\n\nUser input fields here refer to the fields in the JSON request body that a client sends when making a request to the LLM provider. Defaults set here do _not_ override those user-provided values unless you explicitly set `override` to `true`.\n\nExample: Setting a default system field for Anthropic, which does not support system role messages: ```yaml defaults:\n  - field: \"system\"\n    value: \"answer all questions in French\"\n\n```\n\nExample: Setting a default temperature and overriding `max_tokens`: ```yaml defaults:\n  - field: \"temperature\"\n    value: \"0.5\"\n  - field: \"max_tokens\"\n    value: \"100\"\n    override: true\n\n```\n\nExample: Overriding a custom list field: ```yaml defaults:\n  - field: \"custom_list\"\n    value: \"[a,b,c]\"\n\n```\n\nNote: The `field` values correspond to keys in the JSON request body, not fields in this CRD.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"field": {
@@ -2423,12 +2417,6 @@ func schema_kgateway_v2_api_v1alpha1_OpenAIConfig(ref common.ReferenceCallback) 
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"),
 						},
 					},
-					"customHost": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Send requests to a custom host and port, such as to proxy the request, or to use a different backend that is API-compliant with the upstream version.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host"),
-						},
-					},
 					"model": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Override the model name, such as `gpt-4o-mini`. If unset, the model name is taken from the request. This setting can be useful when setting up model failover within the same LLM provider.",
@@ -2441,7 +2429,7 @@ func schema_kgateway_v2_api_v1alpha1_OpenAIConfig(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SingleAuthToken"},
 	}
 }
 

@@ -241,35 +241,40 @@ type AIPromptGuard struct {
 	Response *PromptguardResponse `json:"response,omitempty"`
 }
 
-// FieldDefault provides defaults to merge with user input fields.
-// Defaults do _not_ override the user input fields, unless you explicitly set `override` to `true`.
+// FieldDefault provides default values for specific fields in the JSON request body sent to the LLM provider.
+// These defaults are merged with the user-provided request to ensure missing fields are populated.
 //
-// Example overriding the system field for Anthropic:
+// User input fields here refer to the fields in the JSON request body that a client sends when making a request to the LLM provider.
+// Defaults set here do _not_ override those user-provided values unless you explicitly set `override` to `true`.
+//
+// Example: Setting a default system field for Anthropic, which does not support system role messages:
 // ```yaml
-// # Anthropic doesn't support a system chat type
 // defaults:
 //   - field: "system"
 //     value: "answer all questions in French"
 //
 // ```
 //
-// Example setting the temperature and overriding `max_tokens`:
+// Example: Setting a default temperature and overriding `max_tokens`:
 // ```yaml
 // defaults:
 //   - field: "temperature"
 //     value: "0.5"
 //   - field: "max_tokens"
 //     value: "100"
+//     override: true
 //
 // ```
 //
-// Example overriding custom list:
+// Example: Overriding a custom list field:
 // ```yaml
 // defaults:
 //   - field: "custom_list"
 //     value: "[a,b,c]"
 //
 // ```
+//
+// Note: The `field` values correspond to keys in the JSON request body, not fields in this CRD.
 type FieldDefault struct {
 	// The name of the field.
 	// +kubebuilder:validation:Required
