@@ -13,11 +13,11 @@ type AIUpstream struct {
 }
 
 type LLMProviders struct {
-	SupportedLLMProviders `json:",inline"`
+	// The LLM provider type to configure.
+	Provider SupportedLLMProviders `json:"provider"`
 
 	// Send requests to a custom host and port, such as to proxy the request,
 	// or to use a different backend that is API-compliant with the upstream version.
-	// +kubebuilder:validation:Optional
 	HostOverride *Host `json:"hostOverride,omitempty"`
 }
 

@@ -2125,29 +2125,11 @@ func schema_kgateway_v2_api_v1alpha1_LLMProviders(ref common.ReferenceCallback) 
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"openai": {
+					"provider": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.OpenAIConfig"),
-						},
-					},
-					"azureopenai": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AzureOpenAIConfig"),
-						},
-					},
-					"anthropic": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AnthropicConfig"),
-						},
-					},
-					"gemini": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GeminiConfig"),
-						},
-					},
-					"vertexai": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.VertexAIConfig"),
+							Description: "The LLM provider type to configure.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProviders"),
 						},
 					},
 					"hostOverride": {
@@ -2157,10 +2139,11 @@ func schema_kgateway_v2_api_v1alpha1_LLMProviders(ref common.ReferenceCallback) 
 						},
 					},
 				},
+				Required: []string{"provider"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AnthropicConfig", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AzureOpenAIConfig", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GeminiConfig", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.OpenAIConfig", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.VertexAIConfig"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProviders"},
 	}
 }
 
