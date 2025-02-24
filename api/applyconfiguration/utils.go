@@ -145,6 +145,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.StatsConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("StatusCodeFilter"):
 		return &apiv1alpha1.StatusCodeFilterApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SupportedLLMProviders"):
+		return &apiv1alpha1.SupportedLLMProvidersApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Upstream"):
 		return &apiv1alpha1.UpstreamApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("UpstreamSpec"):

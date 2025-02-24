@@ -68,9 +68,6 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AIUpstream
   map:
     fields:
-    - name: hostOverride
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
     - name: llm
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LLMProviders
@@ -634,6 +631,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: gemini
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.GeminiConfig
+    - name: hostOverride
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
     - name: openai
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.OpenAIConfig

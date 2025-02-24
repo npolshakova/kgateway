@@ -5,23 +5,14 @@ package v1alpha1
 // AIUpstreamApplyConfiguration represents a declarative configuration of the AIUpstream type for use
 // with apply.
 type AIUpstreamApplyConfiguration struct {
-	HostOverride *HostApplyConfiguration            `json:"hostOverride,omitempty"`
-	LLM          *LLMProvidersApplyConfiguration    `json:"llm,omitempty"`
-	MultiPool    *MultiPoolConfigApplyConfiguration `json:"multipool,omitempty"`
+	LLM       *LLMProvidersApplyConfiguration    `json:"llm,omitempty"`
+	MultiPool *MultiPoolConfigApplyConfiguration `json:"multipool,omitempty"`
 }
 
 // AIUpstreamApplyConfiguration constructs a declarative configuration of the AIUpstream type for use with
 // apply.
 func AIUpstream() *AIUpstreamApplyConfiguration {
 	return &AIUpstreamApplyConfiguration{}
-}
-
-// WithHostOverride sets the HostOverride field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the HostOverride field is set to the value of the last call.
-func (b *AIUpstreamApplyConfiguration) WithHostOverride(value *HostApplyConfiguration) *AIUpstreamApplyConfiguration {
-	b.HostOverride = value
-	return b
 }
 
 // WithLLM sets the LLM field in the declarative configuration to the given value

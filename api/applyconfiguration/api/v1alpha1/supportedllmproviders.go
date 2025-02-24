@@ -2,23 +2,26 @@
 
 package v1alpha1
 
-// LLMProvidersApplyConfiguration represents a declarative configuration of the LLMProviders type for use
+// SupportedLLMProvidersApplyConfiguration represents a declarative configuration of the SupportedLLMProviders type for use
 // with apply.
-type LLMProvidersApplyConfiguration struct {
-	SupportedLLMProvidersApplyConfiguration `json:",inline"`
-	HostOverride                            *HostApplyConfiguration `json:"hostOverride,omitempty"`
+type SupportedLLMProvidersApplyConfiguration struct {
+	OpenAI      *OpenAIConfigApplyConfiguration      `json:"openai,omitempty"`
+	AzureOpenAI *AzureOpenAIConfigApplyConfiguration `json:"azureopenai,omitempty"`
+	Anthropic   *AnthropicConfigApplyConfiguration   `json:"anthropic,omitempty"`
+	Gemini      *GeminiConfigApplyConfiguration      `json:"gemini,omitempty"`
+	VertexAI    *VertexAIConfigApplyConfiguration    `json:"vertexai,omitempty"`
 }
 
-// LLMProvidersApplyConfiguration constructs a declarative configuration of the LLMProviders type for use with
+// SupportedLLMProvidersApplyConfiguration constructs a declarative configuration of the SupportedLLMProviders type for use with
 // apply.
-func LLMProviders() *LLMProvidersApplyConfiguration {
-	return &LLMProvidersApplyConfiguration{}
+func SupportedLLMProviders() *SupportedLLMProvidersApplyConfiguration {
+	return &SupportedLLMProvidersApplyConfiguration{}
 }
 
 // WithOpenAI sets the OpenAI field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the OpenAI field is set to the value of the last call.
-func (b *LLMProvidersApplyConfiguration) WithOpenAI(value *OpenAIConfigApplyConfiguration) *LLMProvidersApplyConfiguration {
+func (b *SupportedLLMProvidersApplyConfiguration) WithOpenAI(value *OpenAIConfigApplyConfiguration) *SupportedLLMProvidersApplyConfiguration {
 	b.OpenAI = value
 	return b
 }
@@ -26,7 +29,7 @@ func (b *LLMProvidersApplyConfiguration) WithOpenAI(value *OpenAIConfigApplyConf
 // WithAzureOpenAI sets the AzureOpenAI field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AzureOpenAI field is set to the value of the last call.
-func (b *LLMProvidersApplyConfiguration) WithAzureOpenAI(value *AzureOpenAIConfigApplyConfiguration) *LLMProvidersApplyConfiguration {
+func (b *SupportedLLMProvidersApplyConfiguration) WithAzureOpenAI(value *AzureOpenAIConfigApplyConfiguration) *SupportedLLMProvidersApplyConfiguration {
 	b.AzureOpenAI = value
 	return b
 }
@@ -34,7 +37,7 @@ func (b *LLMProvidersApplyConfiguration) WithAzureOpenAI(value *AzureOpenAIConfi
 // WithAnthropic sets the Anthropic field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Anthropic field is set to the value of the last call.
-func (b *LLMProvidersApplyConfiguration) WithAnthropic(value *AnthropicConfigApplyConfiguration) *LLMProvidersApplyConfiguration {
+func (b *SupportedLLMProvidersApplyConfiguration) WithAnthropic(value *AnthropicConfigApplyConfiguration) *SupportedLLMProvidersApplyConfiguration {
 	b.Anthropic = value
 	return b
 }
@@ -42,7 +45,7 @@ func (b *LLMProvidersApplyConfiguration) WithAnthropic(value *AnthropicConfigApp
 // WithGemini sets the Gemini field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Gemini field is set to the value of the last call.
-func (b *LLMProvidersApplyConfiguration) WithGemini(value *GeminiConfigApplyConfiguration) *LLMProvidersApplyConfiguration {
+func (b *SupportedLLMProvidersApplyConfiguration) WithGemini(value *GeminiConfigApplyConfiguration) *SupportedLLMProvidersApplyConfiguration {
 	b.Gemini = value
 	return b
 }
@@ -50,15 +53,7 @@ func (b *LLMProvidersApplyConfiguration) WithGemini(value *GeminiConfigApplyConf
 // WithVertexAI sets the VertexAI field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the VertexAI field is set to the value of the last call.
-func (b *LLMProvidersApplyConfiguration) WithVertexAI(value *VertexAIConfigApplyConfiguration) *LLMProvidersApplyConfiguration {
+func (b *SupportedLLMProvidersApplyConfiguration) WithVertexAI(value *VertexAIConfigApplyConfiguration) *SupportedLLMProvidersApplyConfiguration {
 	b.VertexAI = value
-	return b
-}
-
-// WithHostOverride sets the HostOverride field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the HostOverride field is set to the value of the last call.
-func (b *LLMProvidersApplyConfiguration) WithHostOverride(value *HostApplyConfiguration) *LLMProvidersApplyConfiguration {
-	b.HostOverride = value
 	return b
 }

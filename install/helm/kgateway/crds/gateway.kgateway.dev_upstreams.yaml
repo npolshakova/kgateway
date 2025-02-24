@@ -39,21 +39,6 @@ spec:
                 maxProperties: 1
                 minProperties: 1
                 properties:
-                  hostOverride:
-                    properties:
-                      host:
-                        maxLength: 253
-                        minLength: 1
-                        type: string
-                      port:
-                        format: int32
-                        maximum: 65535
-                        minimum: 1
-                        type: integer
-                    required:
-                    - host
-                    - port
-                    type: object
                   llm:
                     maxProperties: 1
                     minProperties: 1
@@ -154,6 +139,21 @@ spec:
                         - apiVersion
                         - authToken
                         - model
+                        type: object
+                      hostOverride:
+                        properties:
+                          host:
+                            maxLength: 253
+                            minLength: 1
+                            type: string
+                          port:
+                            format: int32
+                            maximum: 65535
+                            minimum: 1
+                            type: integer
+                        required:
+                        - host
+                        - port
                         type: object
                       openai:
                         properties:
@@ -337,6 +337,21 @@ spec:
                                     - apiVersion
                                     - authToken
                                     - model
+                                    type: object
+                                  hostOverride:
+                                    properties:
+                                      host:
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      port:
+                                        format: int32
+                                        maximum: 65535
+                                        minimum: 1
+                                        type: integer
+                                    required:
+                                    - host
+                                    - port
                                     type: object
                                   openai:
                                     properties:
