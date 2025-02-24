@@ -10,13 +10,13 @@ type AIUpstream struct {
 	// or to use a different backend that is API-compliant with the upstream version.
 	CustomHost *Host `json:"customHost,omitempty"`
 
-	// The LLM configures the AIRoutePolicy gateway to use a single LLM provider backend.
+	// The LLM configures the AI gateway to use a single LLM provider backend.
 	LLM *LLMProviders `json:"llm,omitempty"`
 	// The MultiPool configures the backends for multiple hosts or models from the same provider in one Upstream resource.
 	MultiPool *MultiPoolConfig `json:"multipool,omitempty"`
 }
 
-// LLMProviders configures the AIRoutePolicy gateway to use a single LLM provider backend.
+// LLMProviders configures the AI gateway to use a single LLM provider backend.
 // +kubebuilder:validation:MaxProperties=1
 // +kubebuilder:validation:MinProperties=1
 type LLMProviders struct {
@@ -45,7 +45,7 @@ const (
 	Passthrough SingleAuthTokenKind = "Passthrough"
 )
 
-// SingleAuthToken configures the authorization token that the AIRoutePolicy gateway uses to access the LLM provider API.
+// SingleAuthToken configures the authorization token that the AI gateway uses to access the LLM provider API.
 // This token is automatically sent in a request header, depending on the LLM provider.
 type SingleAuthToken struct {
 	// Kind specifies which type of authorization token is being used.
@@ -54,7 +54,7 @@ type SingleAuthToken struct {
 	Kind SingleAuthTokenKind `json:"kind"`
 
 	// Provide the token directly in the configuration for the Upstream.
-	// This option is the least secure. Only use this option for quick tests such as trying out AIRoutePolicy Gateway.
+	// This option is the least secure. Only use this option for quick tests such as trying out AI Gateway.
 	Inline *string `json:"inline,omitempty"`
 
 	// Store the API key in a Kubernetes secret in the same namespace as the Upstream.
@@ -67,7 +67,7 @@ type SingleAuthToken struct {
 
 // OpenAIConfig settings for the [OpenAI](https://platform.openai.com/docs/api-reference/streaming) LLM provider.
 type OpenAIConfig struct {
-	// The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API.
+	// The authorization token that the AI gateway uses to access the OpenAI API.
 	// This token is automatically sent in the `Authorization` header of the
 	// request and prefixed with `Bearer`.
 	// +kubebuilder:validation:Required
@@ -83,7 +83,7 @@ type OpenAIConfig struct {
 
 // AzureOpenAIConfig settings for the [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/) LLM provider.
 type AzureOpenAIConfig struct {
-	// The authorization token that the AIRoutePolicy gateway uses to access the Azure OpenAI API.
+	// The authorization token that the AI gateway uses to access the Azure OpenAI API.
 	// This token is automatically sent in the `api-key` header of the request.
 	// +kubebuilder:validation:Required
 	AuthToken SingleAuthToken `json:"authToken"`
@@ -109,7 +109,7 @@ type AzureOpenAIConfig struct {
 
 // GeminiConfig settings for the [Gemini](https://ai.google.dev/gemini-api/docs) LLM provider.
 type GeminiConfig struct {
-	// The authorization token that the AIRoutePolicy gateway uses to access the Gemini API.
+	// The authorization token that the AI gateway uses to access the Gemini API.
 	// This token is automatically sent in the `key` query parameter of the request.
 	// +kubebuilder:validation:Required
 	AuthToken SingleAuthToken `json:"authToken"`
@@ -130,33 +130,33 @@ type Publisher string
 
 const GOOGLE Publisher = "GOOGLE"
 
-// VertexAIConfig settings for the [Vertex AIRoutePolicy](https://cloud.google.com/vertex-ai/docs) LLM provider.
+// VertexAIConfig settings for the [Vertex AI](https://cloud.google.com/vertex-ai/docs) LLM provider.
 // To find the values for the project ID, project location, and publisher, you can check the fields of an API request, such as
 // `https://{LOCATION}-aiplatform.googleapis.com/{VERSION}/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/{PROVIDER}/<model-path>`.
 type VertexAIConfig struct {
-	// The authorization token that the AIRoutePolicy gateway uses to access the Vertex AIRoutePolicy API.
+	// The authorization token that the AI gateway uses to access the Vertex AI API.
 	// This token is automatically sent in the `key` header of the request.
 	// +kubebuilder:validation:Required
 	AuthToken SingleAuthToken `json:"authToken"`
 
-	// The Vertex AIRoutePolicy model to use.
-	// For more information, see the [Vertex AIRoutePolicy model docs](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models).
+	// The Vertex AI model to use.
+	// For more information, see the [Vertex AI model docs](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models).
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	Model string `json:"model"`
 
-	// The version of the Vertex AIRoutePolicy API to use.
-	// For more information, see the [Vertex AIRoutePolicy API reference](https://cloud.google.com/vertex-ai/docs/reference#versions).
+	// The version of the Vertex AI API to use.
+	// For more information, see the [Vertex AI API reference](https://cloud.google.com/vertex-ai/docs/reference#versions).
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	ApiVersion string `json:"apiVersion"`
 
-	// The ID of the Google Cloud Project that you use for the Vertex AIRoutePolicy.
+	// The ID of the Google Cloud Project that you use for the Vertex AI.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	ProjectId string `json:"projectId"`
 
-	// The location of the Google Cloud Project that you use for the Vertex AIRoutePolicy.
+	// The location of the Google Cloud Project that you use for the Vertex AI.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	Location string `json:"location"`
@@ -169,25 +169,9 @@ type VertexAIConfig struct {
 	Publisher Publisher `json:"publisher"`
 }
 
-// MistralConfig configures the settings for the [Mistral AIRoutePolicy](https://docs.mistral.ai/getting-started/quickstart/) LLM provider.
-type MistralConfig struct {
-	// The authorization token that the AIRoutePolicy gateway uses to access the OpenAI API.
-	// This token is automatically sent in the `Authorization` header of the
-	// request and prefixed with `Bearer`.
-	// +kubebuilder:validation:Required
-	AuthToken SingleAuthToken `json:"authToken"`
-	// Optional: Send requests to a custom host and port, such as to proxy the request,
-	// or to use a different backend that is API-compliant with the upstream version.
-	CustomHost *Host `json:"customHost,omitempty"`
-	// Optional: Override the model name.
-	// If unset, the model name is taken from the request.
-	// This setting can be useful when testing model failover scenarios.
-	Model *string `json:"model,omitempty"`
-}
-
 // AnthropicConfig settings for the [Anthropic](https://docs.anthropic.com/en/release-notes/api) LLM provider.
 type AnthropicConfig struct {
-	// The authorization token that the AIRoutePolicy gateway uses to access the Anthropic API.
+	// The authorization token that the AI gateway uses to access the Anthropic API.
 	// This token is automatically sent in the `x-api-key` header of the request.
 	// +kubebuilder:validation:Required
 	AuthToken SingleAuthToken `json:"authToken"`

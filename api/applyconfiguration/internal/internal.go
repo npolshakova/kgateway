@@ -705,7 +705,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: openAIModeration
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.OpenAIModeration
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.OpenAIConfig
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.MultiPoolConfig
   map:
     fields:
@@ -725,15 +725,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: customHost
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
-    - name: model
-      type:
-        scalar: string
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.OpenAIModeration
-  map:
-    fields:
-    - name: authToken
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SingleAuthToken
     - name: model
       type:
         scalar: string

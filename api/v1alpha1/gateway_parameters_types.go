@@ -101,7 +101,7 @@ type KubernetesProxyConfig struct {
 	// +kubebuilder:validation:Optional
 	Stats *StatsConfig `json:"stats,omitempty"`
 
-	// Configuration for the AIRoutePolicy extension.
+	// Configuration for the AI extension.
 	//
 	// +kubebuilder:validation:Optional
 	AiExtension *AiExtension `json:"aiExtension,omitempty"`
@@ -554,7 +554,7 @@ func (in *StatsConfig) GetStatsRoutePrefixRewrite() *string {
 	return in.StatsRoutePrefixRewrite
 }
 
-// Configuration for the AIRoutePolicy extension.
+// Configuration for the AI extension.
 type AiExtension struct {
 	// Whether to enable the extension.
 	//
@@ -589,12 +589,12 @@ type AiExtension struct {
 	// +kubebuilder:validation:Optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// The extensions's container ports.
+	// The extension's container ports.
 	//
 	// +kubebuilder:validation:Optional
 	Ports []corev1.ContainerPort `json:"ports,omitempty"`
 
-	// Additional stats config for AIRoutePolicy Extension.
+	// Additional stats config for AI Extension.
 	// This config can be useful for adding custom labels to the request metrics.
 	// +optional
 	//
@@ -663,7 +663,7 @@ func (in *AiExtension) GetStats() *AiExtensionStats {
 
 type AiExtensionStats struct {
 	// Set of custom labels to be added to the request metrics.
-	// These will be added on each request which goes through the AIRoutePolicy Extension.
+	// These will be added on each request which goes through the AI Extension.
 	// +optional
 	CustomLabels []*CustomLabel `json:"customLabels,omitempty"`
 }

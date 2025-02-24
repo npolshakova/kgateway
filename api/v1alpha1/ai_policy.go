@@ -11,7 +11,7 @@ import (
 type AIRoutePolicy struct {
 
 	// Enrich requests sent to the LLM provider by appending and prepending system prompts.
-	// This can be configured only for LLM providers that use the `CHAT` API route type.
+	// This can be configured only for LLM providers that use the `CHAT` or `CHAT_STREAMING` API route type.
 	PromptEnrichment *AIPromptEnrichment `json:"promptEnrichment,omitempty"`
 
 	// Set up prompt guards to block unwanted requests to the LLM provider and mask sensitive data.
@@ -30,7 +30,7 @@ type AIRoutePolicy struct {
 }
 
 // AIPromptEnrichment defines the config to enrich requests sent to the LLM provider by appending and prepending system prompts.
-// This can be configured only for LLM providers that use the CHAT API type.
+// This can be configured only for LLM providers that use the `CHAT` or `CHAT_STREAMING` API type.
 //
 // Prompt enrichment allows you to add additional context to the prompt before sending it to the model.
 // Unlike RAG or other dynamic context methods, prompt enrichment is static and is applied to every request.
@@ -164,23 +164,11 @@ type CustomResponse struct {
 	StatusCode *uint32 `json:"statusCode,omitempty"`
 }
 
-// OpenAIModeration configure an OpenAI moderation endpoint.
-type OpenAIModeration struct {
-	// The name of the OpenAI moderation model to use. Defaults to
-	// [`omni-moderation-latest`](https://platform.openai.com/docs/guides/moderation).
-	// +kubebuilder:default="omni-moderation-latest"
-	Model *string `json:"model,omitempty"`
-
-	// The authorization token that the AIRoutePolicy gateway uses
-	// to access the OpenAI moderation model.
-	AuthToken *SingleAuthToken `json:"authToken,omitempty"`
-}
-
 // Moderation configures an external moderation model endpoint. This endpoint evaluates
 // request prompt data against predefined content rules to determine if the content
 // adheres to those rules.
 //
-// Any requests routed through the AIRoutePolicy Gateway are processed by the specified
+// Any requests routed through the AI Gateway are processed by the specified
 // moderation model. If the model identifies the content as harmful based on its rules,
 // the request is automatically rejected.
 //
@@ -190,7 +178,7 @@ type Moderation struct {
 	// Pass prompt data through an external moderation model endpoint,
 	// which compares the request prompt input to predefined content rules.
 	// Configure an OpenAI moderation endpoint.
-	OpenAIModeration *OpenAIModeration `json:"openAIModeration"`
+	OpenAIModeration *OpenAIConfig `json:"openAIModeration"`
 
 	// TODO: support other moderation models
 }

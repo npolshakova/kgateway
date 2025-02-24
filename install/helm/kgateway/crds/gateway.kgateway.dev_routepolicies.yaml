@@ -121,9 +121,25 @@ spec:
                                     required:
                                     - kind
                                     type: object
+                                  customHost:
+                                    properties:
+                                      host:
+                                        maxLength: 253
+                                        minLength: 1
+                                        type: string
+                                      port:
+                                        format: int32
+                                        maximum: 65535
+                                        minimum: 1
+                                        type: integer
+                                    required:
+                                    - host
+                                    - port
+                                    type: object
                                   model:
-                                    default: omni-moderation-latest
                                     type: string
+                                required:
+                                - authToken
                                 type: object
                             required:
                             - openAIModeration
