@@ -25,7 +25,6 @@ from guardrails.regex import RegexRejection
 
 from openai import AsyncOpenAI as OpenAIClient
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
-from google.protobuf.json_format import Parse
 from google.protobuf import struct_pb2 as struct_pb2
 from prometheus_client import Counter, Histogram, start_http_server
 
