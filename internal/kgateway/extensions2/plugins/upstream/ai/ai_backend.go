@@ -22,10 +22,16 @@ func ApplyAIBackend(ctx context.Context, aiUpstream *v1alpha1.AIUpstream, pCtx *
 	// This is used to add headers to the ext-proc request.
 	// These headers are used to configure the AI server on a per-request basis.
 	// This was the best available way to pass per-route configuration to the AI server.
-	extProcRouteSettings := &envoy_ext_proc_v3.ExtProcPerRoute{
-		Override: &envoy_ext_proc_v3.ExtProcPerRoute_Overrides{
-			Overrides: &envoy_ext_proc_v3.ExtProcOverrides{},
-		},
+	extProcRouteSettingsProto := pCtx.GetConfig(wellknown.AIExtProcFilterName)
+	var extProcRouteSettings *envoy_ext_proc_v3.ExtProcPerRoute
+	if extProcRouteSettingsProto == nil {
+		extProcRouteSettings = &envoy_ext_proc_v3.ExtProcPerRoute{
+			Override: &envoy_ext_proc_v3.ExtProcPerRoute_Overrides{
+				Overrides: &envoy_ext_proc_v3.ExtProcOverrides{},
+			},
+		}
+	} else {
+		extProcRouteSettings = extProcRouteSettingsProto.(*envoy_ext_proc_v3.ExtProcPerRoute)
 	}
 
 	var llmModel string
@@ -84,7 +90,7 @@ func ApplyAIBackend(ctx context.Context, aiUpstream *v1alpha1.AIUpstream, pCtx *
 	transformations := &envoytransformation.RouteTransformations{
 		Transformations: []*envoytransformation.RouteTransformations_RouteTransformation{routeTransformation},
 	}
-	pCtx.AddTypedConfig(wellknown.TransformationFilterName, transformations)
+	pCtx.AddTypedConfig(wellknown.AIUpstreamTransformationFilterName, transformations)
 
 	extProcRouteSettings.GetOverrides().GrpcInitialMetadata = append(extProcRouteSettings.GetOverrides().GetGrpcInitialMetadata(),
 		&envoy_config_core_v3.HeaderValue{

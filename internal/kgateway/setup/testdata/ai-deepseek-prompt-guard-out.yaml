@@ -1,4 +1,15 @@
 clusters:
+- http2ProtocolOptions: {}
+  loadAssignment:
+    clusterName: ai_ext_proc_uds_cluster
+    endpoints:
+    - lbEndpoints:
+      - endpoint:
+          address:
+            pipe:
+              path: '@kgateway-ai-sock'
+  name: ai_ext_proc_uds_cluster
+  type: STATIC
 - connectTimeout: 5s
   edsClusterConfig:
     edsConfig:
@@ -153,7 +164,10 @@ listeners:
             - name: io.kgateway.wait
               typedConfig:
                 '@type': type.googleapis.com/envoy.config.filter.http.upstream_wait.v2.UpstreamWaitFilterConfig
-            - name: ai.transformation.kgateway.io
+            - name: ai.policy.transformation.kgateway.io
+              typedConfig:
+                '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
+            - name: ai.upstream.transformation.kgateway.io
               typedConfig:
                 '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
             - name: envoy.filters.http.upstream_codec
@@ -203,7 +217,20 @@ routes:
               value: '{"regex":{"builtins":["PHONE_NUMBER","EMAIL","SSN","CREDIT_CARD"],"action":"MASK"}}'
             - key: x-resp-guardrails-config-hash
               value: "15744476576820868899"
-        ai.transformation.kgateway.io:
+        ai.policy.transformation.kgateway.io:
+          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations.RouteTransformation
+          requestMatch:
+            requestTransformation:
+              logRequestResponseInfo: false
+              transformationTemplate:
+                mergeJsonKeys:
+                  jsonKeys:
+                    messages:
+                      tmpl:
+                        text: '[{"content":"respond to all questions in French","role":"system"},{"content":"Say
+                          hello before each response","role":"system"},{{ join(messages,
+                          ", ") }}]'
+        ai.upstream.transformation.kgateway.io:
           '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations
           transformations:
           - requestMatch:
@@ -223,14 +250,3 @@ routes:
                         tmpl:
                           text: '{% if host_metadata("model") != "" %}"{{host_metadata("model")}}"{%
                             else %}"{{model}}"{% endif %}'
-          - requestMatch:
-              requestTransformation:
-                logRequestResponseInfo: false
-                transformationTemplate:
-                  mergeJsonKeys:
-                    jsonKeys:
-                      messages:
-                        tmpl:
-                          text: '[{"content":"respond to all questions in French","role":"system"},{"content":"Say
-                            hello before each response","role":"system"},{{ join(messages,
-                            ", ") }}]'

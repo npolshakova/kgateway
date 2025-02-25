@@ -11,7 +11,6 @@ import (
 	envoy_ext_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
 	http_set_filter_state_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/set_filter_state/v3"
 	envoyhttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
-	envoytransformation "github.com/solo-io/envoy-gloo/go/config/filter/http/transformation/v2"
 	"github.com/solo-io/go-utils/contextutils"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"istio.io/istio/pkg/kube/krt"
@@ -156,18 +155,12 @@ func (p *routePolicyPluginGwPass) ApplyForRouteBackend(
 		return nil
 	}
 
-	transformationProto := pCtx.GetConfig(wellknown.TransformationFilterName)
-	if transformationProto == nil {
-		return nil
-	}
-	transformations, ok := transformationProto.(*envoytransformation.RouteTransformations)
-
 	rtPolicy, ok := policy.(*routePolicy)
 	if !ok {
 		return nil
 	}
 
-	err := p.processAIRoutePolicy(ctx, rtPolicy.spec.AI, pCtx, extprocSettings, transformations, rtPolicy.AISecret)
+	err := p.processAIRoutePolicy(ctx, rtPolicy.spec.AI, pCtx, extprocSettings, rtPolicy.AISecret)
 	if err != nil {
 		// TODO: report error on status
 		return err

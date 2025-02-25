@@ -46,7 +46,19 @@ func AddUpstreamHttpFilters() ([]plugins.StagedUpstreamHttpFilter, error) {
 		},
 		{
 			Filter: &envoy_hcm.HttpFilter{
-				Name: wellknown.TransformationFilterName,
+				Name: wellknown.AIUpstreamTransformationFilterName,
+				ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
+					TypedConfig: transformationMsg,
+				},
+			},
+			Stage: plugins.UpstreamHTTPFilterStage{
+				RelativeTo: plugins.TransformationStage,
+				Weight:     0,
+			},
+		},
+		{
+			Filter: &envoy_hcm.HttpFilter{
+				Name: wellknown.AIPolicyTransformationFilterName,
 				ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
 					TypedConfig: transformationMsg,
 				},

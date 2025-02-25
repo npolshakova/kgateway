@@ -33,7 +33,6 @@ func (p *routePolicyPluginGwPass) processAIRoutePolicy(
 	aiConfig *v1alpha1.AIRoutePolicy,
 	pCtx *ir.RouteBackendContext,
 	extprocSettings *envoy_ext_proc_v3.ExtProcPerRoute,
-	transformations *envoytransformation.RouteTransformations,
 	aiSecret *ir.Secret,
 ) error {
 	// If the route options specify this as a chat streaming route, add a header to the ext-proc request
@@ -53,7 +52,6 @@ func (p *routePolicyPluginGwPass) processAIRoutePolicy(
 		return err
 	}
 
-	pCtx.AddTypedConfig(wellknown.AIExtProcFilterName, extprocSettings)
 	transformation := &envoytransformation.RouteTransformations_RouteTransformation{
 		Match: &envoytransformation.RouteTransformations_RouteTransformation_RequestMatch_{
 			RequestMatch: &envoytransformation.RouteTransformations_RouteTransformation_RequestMatch{
@@ -67,9 +65,8 @@ func (p *routePolicyPluginGwPass) processAIRoutePolicy(
 			},
 		},
 	}
-	// add the disjoint route transformations to the list
-	transformations.Transformations = append(transformations.GetTransformations(), transformation)
-	pCtx.AddTypedConfig(wellknown.TransformationFilterName, transformations)
+	pCtx.AddTypedConfig(wellknown.AIPolicyTransformationFilterName, transformation)
+	pCtx.AddTypedConfig(wellknown.AIExtProcFilterName, extprocSettings)
 
 	return nil
 }
