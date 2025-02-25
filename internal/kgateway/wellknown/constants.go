@@ -28,6 +28,7 @@ const (
 )
 
 const (
+	// TODO: create a policy and upstream
 	TransformationFilterName = "ai.transformation.kgateway.io"
 	AIExtProcFilterName      = "ai.extproc.kgateway.io"
 	SetMetadataFilterName    = "envoy.filters.http.set_filter_state"

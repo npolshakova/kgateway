@@ -80,7 +80,7 @@ func ApplyAIBackend(ctx context.Context, aiUpstream *v1alpha1.AIUpstream, pCtx *
 			},
 		},
 	}
-	// Sets the transformation for the Upstream. Will be updated in a route policy is attached.
+	// Sets the transformation for the Upstream. Can be updated in a route policy is attached.
 	transformations := &envoytransformation.RouteTransformations{
 		Transformations: []*envoytransformation.RouteTransformations_RouteTransformation{routeTransformation},
 	}
