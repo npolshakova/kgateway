@@ -2678,7 +2678,7 @@ func schema_kgateway_v2_api_v1alpha1_PromptguardRequest(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PromptguardRequest defines the prompt guards to apply to requests sent by the client.",
+				Description: "PromptguardRequest defines the prompt guards to apply to requests sent by the client. Multiple prompt guard configurations can be set, and they will be executed in the following order: webhook → regex → moderation for requests, where each step can reject the request and stop further processing.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"customResponse": {
@@ -2717,7 +2717,7 @@ func schema_kgateway_v2_api_v1alpha1_PromptguardResponse(ref common.ReferenceCal
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PromptguardResponse configures the response that the prompt guard applies to responses returned by the LLM provider.",
+				Description: "PromptguardResponse configures the response that the prompt guard applies to responses returned by the LLM provider. Both webhook and regex can be set, they will be executed in the following order: webhook → regex, where each step can reject the request and stop further processing.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"regex": {
