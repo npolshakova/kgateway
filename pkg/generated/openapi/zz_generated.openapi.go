@@ -58,7 +58,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.IstioContainer":             schema_kgateway_v2_api_v1alpha1_IstioContainer(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.IstioIntegration":           schema_kgateway_v2_api_v1alpha1_IstioIntegration(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.KubernetesProxyConfig":      schema_kgateway_v2_api_v1alpha1_KubernetesProxyConfig(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProviders":               schema_kgateway_v2_api_v1alpha1_LLMProviders(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProvider":                schema_kgateway_v2_api_v1alpha1_LLMProvider(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ListenerPolicy":             schema_kgateway_v2_api_v1alpha1_ListenerPolicy(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ListenerPolicyList":         schema_kgateway_v2_api_v1alpha1_ListenerPolicyList(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ListenerPolicySpec":         schema_kgateway_v2_api_v1alpha1_ListenerPolicySpec(ref),
@@ -89,7 +89,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StaticUpstream":             schema_kgateway_v2_api_v1alpha1_StaticUpstream(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatsConfig":                schema_kgateway_v2_api_v1alpha1_StatsConfig(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StatusCodeFilter":           schema_kgateway_v2_api_v1alpha1_StatusCodeFilter(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProviders":      schema_kgateway_v2_api_v1alpha1_SupportedLLMProviders(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProvider":       schema_kgateway_v2_api_v1alpha1_SupportedLLMProvider(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Upstream":                   schema_kgateway_v2_api_v1alpha1_Upstream(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.UpstreamList":               schema_kgateway_v2_api_v1alpha1_UpstreamList(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.UpstreamSpec":               schema_kgateway_v2_api_v1alpha1_UpstreamSpec(ref),
@@ -575,7 +575,7 @@ func schema_kgateway_v2_api_v1alpha1_AIUpstream(ref common.ReferenceCallback) co
 					"llm": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The LLM configures the AI gateway to use a single LLM provider backend.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProviders"),
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProvider"),
 						},
 					},
 					"multipool": {
@@ -588,7 +588,7 @@ func schema_kgateway_v2_api_v1alpha1_AIUpstream(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProviders", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MultiPoolConfig"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProvider", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MultiPoolConfig"},
 	}
 }
 
@@ -2120,7 +2120,7 @@ func schema_kgateway_v2_api_v1alpha1_KubernetesProxyConfig(ref common.ReferenceC
 	}
 }
 
-func schema_kgateway_v2_api_v1alpha1_LLMProviders(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_kgateway_v2_api_v1alpha1_LLMProvider(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2130,7 +2130,7 @@ func schema_kgateway_v2_api_v1alpha1_LLMProviders(ref common.ReferenceCallback) 
 						SchemaProps: spec.SchemaProps{
 							Description: "The LLM provider type to configure.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProviders"),
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProvider"),
 						},
 					},
 					"hostOverride": {
@@ -2144,7 +2144,7 @@ func schema_kgateway_v2_api_v1alpha1_LLMProviders(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProviders"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SupportedLLMProvider"},
 	}
 }
 
@@ -2350,7 +2350,6 @@ func schema_kgateway_v2_api_v1alpha1_Moderation(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"openAIModeration"},
 			},
 		},
 		Dependencies: []string{
@@ -2661,7 +2660,7 @@ func schema_kgateway_v2_api_v1alpha1_Priority(ref common.ReferenceCallback) comm
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProviders"),
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProvider"),
 									},
 								},
 							},
@@ -2671,7 +2670,7 @@ func schema_kgateway_v2_api_v1alpha1_Priority(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProviders"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProvider"},
 	}
 }
 
@@ -3296,11 +3295,11 @@ func schema_kgateway_v2_api_v1alpha1_StatusCodeFilter(ref common.ReferenceCallba
 	}
 }
 
-func schema_kgateway_v2_api_v1alpha1_SupportedLLMProviders(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_kgateway_v2_api_v1alpha1_SupportedLLMProvider(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "SupportedLLMProviders configures the AI gateway to use a single LLM provider backend.",
+				Description: "SupportedLLMProvider configures the AI gateway to use a single LLM provider backend.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"openai": {

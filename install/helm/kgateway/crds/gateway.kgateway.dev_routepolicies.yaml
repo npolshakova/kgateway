@@ -126,8 +126,6 @@ spec:
                                 required:
                                 - authToken
                                 type: object
-                            required:
-                            - openAIModeration
                             type: object
                           regex:
                             properties:
