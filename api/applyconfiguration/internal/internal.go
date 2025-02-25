@@ -70,7 +70,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: llm
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LLMProviders
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LLMProvider
     - name: multipool
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.MultiPoolConfig
@@ -619,7 +619,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: stats
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.StatsConfig
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LLMProviders
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LLMProvider
   map:
     fields:
     - name: hostOverride
@@ -627,7 +627,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Host
     - name: provider
       type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SupportedLLMProviders
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SupportedLLMProvider
       default: {}
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ListenerPolicy
   map:
@@ -802,7 +802,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LLMProviders
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LLMProvider
           elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.PromptguardRequest
   map:
@@ -1015,7 +1015,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: value
       type:
         scalar: numeric
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SupportedLLMProviders
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SupportedLLMProvider
   map:
     fields:
     - name: anthropic

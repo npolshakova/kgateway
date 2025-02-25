@@ -178,7 +178,7 @@ type Moderation struct {
 	// Pass prompt data through an external moderation model endpoint,
 	// which compares the request prompt input to predefined content rules.
 	// Configure an OpenAI moderation endpoint.
-	OpenAIModeration *OpenAIConfig `json:"openAIModeration"`
+	OpenAIModeration *OpenAIConfig `json:"openAIModeration,omitempty"`
 
 	// TODO: support other moderation models
 }

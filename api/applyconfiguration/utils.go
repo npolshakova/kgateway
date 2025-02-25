@@ -93,8 +93,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ListenerPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ListenerPolicySpec"):
 		return &apiv1alpha1.ListenerPolicySpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("LLMProviders"):
-		return &apiv1alpha1.LLMProvidersApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LLMProvider"):
+		return &apiv1alpha1.LLMProviderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LocalPolicyTargetReference"):
 		return &apiv1alpha1.LocalPolicyTargetReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Message"):
@@ -145,8 +145,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.StatsConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("StatusCodeFilter"):
 		return &apiv1alpha1.StatusCodeFilterApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("SupportedLLMProviders"):
-		return &apiv1alpha1.SupportedLLMProvidersApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SupportedLLMProvider"):
+		return &apiv1alpha1.SupportedLLMProviderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Upstream"):
 		return &apiv1alpha1.UpstreamApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("UpstreamSpec"):

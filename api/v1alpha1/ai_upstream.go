@@ -7,24 +7,24 @@ import corev1 "k8s.io/api/core/v1"
 // +kubebuilder:validation:MinProperties=1
 type AIUpstream struct {
 	// The LLM configures the AI gateway to use a single LLM provider backend.
-	LLM *LLMProviders `json:"llm,omitempty"`
+	LLM *LLMProvider `json:"llm,omitempty"`
 	// The MultiPool configures the backends for multiple hosts or models from the same provider in one Upstream resource.
 	MultiPool *MultiPoolConfig `json:"multipool,omitempty"`
 }
 
-type LLMProviders struct {
+type LLMProvider struct {
 	// The LLM provider type to configure.
-	Provider SupportedLLMProviders `json:"provider"`
+	Provider SupportedLLMProvider `json:"provider"`
 
 	// Send requests to a custom host and port, such as to proxy the request,
 	// or to use a different backend that is API-compliant with the upstream version.
 	HostOverride *Host `json:"hostOverride,omitempty"`
 }
 
-// SupportedLLMProviders configures the AI gateway to use a single LLM provider backend.
+// SupportedLLMProvider configures the AI gateway to use a single LLM provider backend.
 // +kubebuilder:validation:MaxProperties=1
 // +kubebuilder:validation:MinProperties=1
-type SupportedLLMProviders struct {
+type SupportedLLMProvider struct {
 	OpenAI      *OpenAIConfig      `json:"openai,omitempty"`
 	AzureOpenAI *AzureOpenAIConfig `json:"azureopenai,omitempty"`
 	Anthropic   *AnthropicConfig   `json:"anthropic,omitempty"`
@@ -191,7 +191,7 @@ type Priority struct {
 	// A list of LLM provider backends within a single endpoint pool entry.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=20
-	Pool []LLMProviders `json:"pool,omitempty"`
+	Pool []LLMProvider `json:"pool,omitempty"`
 }
 
 // MultiPoolConfig configures the backends for multiple hosts or models from the same provider in one Upstream resource.

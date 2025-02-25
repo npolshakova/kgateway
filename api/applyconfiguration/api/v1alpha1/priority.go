@@ -5,7 +5,7 @@ package v1alpha1
 // PriorityApplyConfiguration represents a declarative configuration of the Priority type for use
 // with apply.
 type PriorityApplyConfiguration struct {
-	Pool []LLMProvidersApplyConfiguration `json:"pool,omitempty"`
+	Pool []LLMProviderApplyConfiguration `json:"pool,omitempty"`
 }
 
 // PriorityApplyConfiguration constructs a declarative configuration of the Priority type for use with
@@ -17,7 +17,7 @@ func Priority() *PriorityApplyConfiguration {
 // WithPool adds the given value to the Pool field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Pool field.
-func (b *PriorityApplyConfiguration) WithPool(values ...*LLMProvidersApplyConfiguration) *PriorityApplyConfiguration {
+func (b *PriorityApplyConfiguration) WithPool(values ...*LLMProviderApplyConfiguration) *PriorityApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithPool")
