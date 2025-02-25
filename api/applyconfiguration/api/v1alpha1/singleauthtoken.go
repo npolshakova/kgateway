@@ -5,15 +5,15 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 
-	v1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	apiv1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 )
 
 // SingleAuthTokenApplyConfiguration represents a declarative configuration of the SingleAuthToken type for use
 // with apply.
 type SingleAuthTokenApplyConfiguration struct {
-	Kind      *v1alpha1.SingleAuthTokenKind `json:"kind,omitempty"`
-	Inline    *string                       `json:"inline,omitempty"`
-	SecretRef *v1.LocalObjectReference      `json:"secretRef,omitempty"`
+	Kind      *apiv1alpha1.SingleAuthTokenKind `json:"kind,omitempty"`
+	Inline    *string                          `json:"inline,omitempty"`
+	SecretRef *v1.LocalObjectReference         `json:"secretRef,omitempty"`
 }
 
 // SingleAuthTokenApplyConfiguration constructs a declarative configuration of the SingleAuthToken type for use with
@@ -25,7 +25,7 @@ func SingleAuthToken() *SingleAuthTokenApplyConfiguration {
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
-func (b *SingleAuthTokenApplyConfiguration) WithKind(value v1alpha1.SingleAuthTokenKind) *SingleAuthTokenApplyConfiguration {
+func (b *SingleAuthTokenApplyConfiguration) WithKind(value apiv1alpha1.SingleAuthTokenKind) *SingleAuthTokenApplyConfiguration {
 	b.Kind = &value
 	return b
 }
