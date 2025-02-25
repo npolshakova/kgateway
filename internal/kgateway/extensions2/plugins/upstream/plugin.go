@@ -7,34 +7,31 @@ import (
 	"maps"
 	"time"
 
+	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_ext_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
+	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
+	awspb "github.com/solo-io/envoy-gloo/go/config/filter/http/aws_lambda/v2"
 	"github.com/solo-io/go-utils/contextutils"
+	skubeclient "istio.io/istio/pkg/config/schema/kubeclient"
+	"istio.io/istio/pkg/kube/kclient"
+	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
-
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/upstream/ai"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
-	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
-	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
-	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
-	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
-	awspb "github.com/solo-io/envoy-gloo/go/config/filter/http/aws_lambda/v2"
-	skubeclient "istio.io/istio/pkg/config/schema/kubeclient"
-	"istio.io/istio/pkg/kube/kclient"
-	"istio.io/istio/pkg/kube/krt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/upstream/ai"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/plugins"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 )
 
@@ -213,7 +210,6 @@ func buildTranslateFunc(ctx context.Context, secrets *krtcollections.SecretIndex
 					}
 				}
 			}
-
 		}
 		return &upstreamIr
 	}
@@ -355,7 +351,6 @@ func (p *upstreamPlugin) ApplyForRouteBackend(
 	// TODO: AI config for ApplyToRouteBackend
 
 	return p.processBackendAws(ctx, pCtx, pol)
-
 }
 
 // called 1 time per listener
@@ -372,7 +367,6 @@ func (p *upstreamPlugin) HttpFilters(ctx context.Context, fc ir.FilterChainCommo
 		result = append(result, aiFilters...)
 	}
 	if p.needFilter[fc.FilterChainName] {
-
 		filterConfig := &awspb.AWSLambdaConfig{}
 		pluginStage := plugins.DuringStage(plugins.OutAuthStage)
 		f, _ := plugins.NewStagedFilter(FilterName, filterConfig, pluginStage)
