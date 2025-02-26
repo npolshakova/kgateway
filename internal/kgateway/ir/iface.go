@@ -35,7 +35,7 @@ func (r *RouteBackendContext) AddTypedConfig(key string, v proto.Message) {
 	(*r.TypedFilterConfig)[key] = v
 }
 
-func (r *RouteBackendContext) GetConfig(key string) proto.Message {
+func (r *RouteBackendContext) GetTypedConfig(key string) proto.Message {
 	if *r.TypedFilterConfig == nil {
 		return nil
 	}

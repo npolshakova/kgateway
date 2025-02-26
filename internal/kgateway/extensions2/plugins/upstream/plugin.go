@@ -328,7 +328,7 @@ func (p *upstreamPlugin) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContex
 func (p *upstreamPlugin) ApplyForBackend(ctx context.Context, pCtx *ir.RouteBackendContext, in ir.HttpBackend, out *envoy_config_route_v3.Route) error {
 	upstream := pCtx.Upstream.Obj.(*v1alpha1.Upstream)
 	if upstream.Spec.AI != nil {
-		err := ai.ApplyAIBackend(ctx, upstream.Spec.AI, pCtx, in, out)
+		err := ai.ApplyAIBackend(ctx, upstream.Spec.AI, pCtx, out)
 		if err != nil {
 			return err
 		}

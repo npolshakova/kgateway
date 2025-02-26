@@ -145,7 +145,7 @@ func (p *routePolicyPluginGwPass) ApplyForRouteBackend(
 	policy ir.PolicyIR,
 	pCtx *ir.RouteBackendContext,
 ) error {
-	extprocSettingsProto := pCtx.GetConfig(wellknown.AIExtProcFilterName)
+	extprocSettingsProto := pCtx.GetTypedConfig(wellknown.AIExtProcFilterName)
 	if extprocSettingsProto == nil {
 		return nil
 	}

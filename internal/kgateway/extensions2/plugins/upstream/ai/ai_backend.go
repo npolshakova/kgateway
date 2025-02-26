@@ -16,13 +16,13 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
-func ApplyAIBackend(ctx context.Context, aiUpstream *v1alpha1.AIUpstream, pCtx *ir.RouteBackendContext, in ir.HttpBackend, out *envoy_config_route_v3.Route) error {
+func ApplyAIBackend(ctx context.Context, aiUpstream *v1alpha1.AIUpstream, pCtx *ir.RouteBackendContext, out *envoy_config_route_v3.Route) error {
 	// Setup ext-proc route filter config, we will conditionally modify it based on certain route options.
 	// A heavily used part of this config is the `GrpcInitialMetadata`.
 	// This is used to add headers to the ext-proc request.
 	// These headers are used to configure the AI server on a per-request basis.
 	// This was the best available way to pass per-route configuration to the AI server.
-	extProcRouteSettingsProto := pCtx.GetConfig(wellknown.AIExtProcFilterName)
+	extProcRouteSettingsProto := pCtx.GetTypedConfig(wellknown.AIExtProcFilterName)
 	var extProcRouteSettings *envoy_ext_proc_v3.ExtProcPerRoute
 	if extProcRouteSettingsProto == nil {
 		extProcRouteSettings = &envoy_ext_proc_v3.ExtProcPerRoute{
@@ -57,9 +57,6 @@ func ApplyAIBackend(ctx context.Context, aiUpstream *v1alpha1.AIUpstream, pCtx *
 	}
 
 	// Add things which require basic AI upstream.
-	if out == nil {
-		panic("!!")
-	}
 	if out.GetRoute() == nil {
 		// initialize route action if not set
 		out.Action = &envoy_config_route_v3.Route_Route{
@@ -99,6 +96,7 @@ func ApplyAIBackend(ctx context.Context, aiUpstream *v1alpha1.AIUpstream, pCtx *
 		},
 	)
 	// If the Upstream specifies a model, add a header to the ext-proc request
+	// TODO: add support for multi pool setting different models for different pools
 	if llmModel != "" {
 		extProcRouteSettings.GetOverrides().GrpcInitialMetadata = append(extProcRouteSettings.GetOverrides().GetGrpcInitialMetadata(),
 			&envoy_config_core_v3.HeaderValue{
