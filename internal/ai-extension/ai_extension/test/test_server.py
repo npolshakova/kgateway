@@ -1,4 +1,3 @@
-import threading
 import asyncio
 import json
 import logging
@@ -53,7 +52,7 @@ ai_prompt_tokens = Counter("ai_prompt_tokens", "Description", registry=test_regi
 
 stats_config = StatsConfig(customLabels=[])
 tracing_config = TracingConfig()
-extproc_server = ExtProcServer(dict(), threading.RLock(), stats_config, tracing_config)
+extproc_server = ExtProcServer(stats_config, tracing_config)
 
 
 @pytest.mark.parametrize(
