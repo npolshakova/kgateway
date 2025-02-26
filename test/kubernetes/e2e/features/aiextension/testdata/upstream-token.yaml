@@ -1,0 +1,100 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Upstream
+metadata:
+  labels:
+    app: kgateway
+  name: mistralai
+  namespace: ai-test
+spec:
+  ai:
+    mistral:
+      authToken:
+        secretRef:
+          name: mistralai-secret
+          namespace: ai-test
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Upstream
+metadata:
+  labels:
+    app: kgateway
+  name: openai
+  namespace: ai-test
+spec:
+  ai:
+    openai:
+      authToken:
+        secretRef:
+          name: openai-secret
+          namespace: ai-test
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Upstream
+metadata:
+  labels:
+    app: kgateway
+  name: anthropic
+  namespace: ai-test
+spec:
+  ai:
+    anthropic:
+      authToken:
+        secretRef:
+          name: anthropic-secret
+          namespace: ai-test
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Upstream
+metadata:
+  labels:
+    app: kgateway
+  name: azure-openai
+  namespace: ai-test
+spec:
+  ai:
+    azureOpenai:
+      endpoint: ai-gateway.openai.azure.com
+      deploymentName: gpt-4o-mini
+      apiVersion: 2024-02-15-preview
+      authToken:
+        secretRef:
+          name: azure-secret
+          namespace: ai-test
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Upstream
+metadata:
+  labels:
+    app: kgateway
+  name: gemini
+  namespace: ai-test
+spec:
+  ai:
+    gemini:
+      model: gemini-1.5-flash-001
+      apiVersion: v1beta
+      authToken:
+        secretRef:
+          name: gemini-secret
+          namespace: ai-test
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Upstream
+metadata:
+  labels:
+    app: kgateway
+  name: vertex-ai
+  namespace: ai-test
+spec:
+  ai:
+    vertexAi:
+      model: gemini-1.5-flash-001
+      apiVersion: v1
+      location: us-central1
+      projectId: gloo-ee
+      publisher: GOOGLE
+      authToken:
+        secretRef:
+          name: vertex-ai-secret
+          namespace: ai-test
+---
