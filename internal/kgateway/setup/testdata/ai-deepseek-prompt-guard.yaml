@@ -13,6 +13,26 @@ spec:
         namespaces:
           from: All
 ---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Upstream
+metadata:
+  labels:
+    app: kgateway
+  name: deepseek
+  namespace: gwtest
+spec:
+  ai:
+    llm:
+      hostOverride:
+        host: ollama-deepseek-r1.ollama.svc.cluster.local
+        port: 11434
+      provider:
+        openai:
+          authToken:
+            kind: "SecretRef"
+            secretRef:
+              name: deepseek-secret
+---
 apiVersion: v1
 kind: Secret
 metadata:
@@ -77,22 +97,3 @@ spec:
             - SSN
             - CREDIT_CARD
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
-metadata:
-  labels:
-    app: kgateway
-  name: deepseek
-  namespace: gwtest
-spec:
-  ai:
-    llm:
-      hostOverride:
-        host: ollama-deepseek-r1.ollama.svc.cluster.local
-        port: 11434
-      provider:
-        openai:
-          authToken:
-            kind: "SecretRef"
-            secretRef:
-              name: deepseek-secret

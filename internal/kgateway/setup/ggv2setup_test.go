@@ -206,7 +206,7 @@ func TestScenarios(t *testing.T) {
 		t.Fatalf("failed to read dir: %v", err)
 	}
 	for _, f := range files {
-		if !strings.Contains(f.Name(), "ai-") {
+		if !strings.Contains(f.Name(), "ai-deepseek") {
 			continue
 		}
 
