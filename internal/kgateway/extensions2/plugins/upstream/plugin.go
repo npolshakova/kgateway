@@ -71,11 +71,11 @@ type UpstreamIr struct {
 	AIMultiSecret map[string]*ir.Secret
 }
 
-func (u *UpstreamIr) data() map[string][]byte {
-	if u.AwsSecret == nil {
+func data(s *ir.Secret) map[string][]byte {
+	if s == nil {
 		return nil
 	}
-	return u.AwsSecret.Data
+	return s.Data
 }
 
 func (u *UpstreamIr) Equals(other any) bool {
@@ -83,9 +83,25 @@ func (u *UpstreamIr) Equals(other any) bool {
 	if !ok {
 		return false
 	}
-	return maps.EqualFunc(u.data(), otherUpstream.data(), func(a, b []byte) bool {
+	if !maps.EqualFunc(data(u.AwsSecret), data(otherUpstream.AwsSecret), func(a, b []byte) bool {
 		return bytes.Equal(a, b)
-	})
+	}) {
+		return false
+	}
+	if !maps.EqualFunc(data(u.AISecret), data(otherUpstream.AISecret), func(a, b []byte) bool {
+		return bytes.Equal(a, b)
+	}) {
+		return false
+	}
+	if !maps.EqualFunc(u.AIMultiSecret, otherUpstream.AIMultiSecret, func(a, b *ir.Secret) bool {
+		return maps.EqualFunc(data(a), data(b), func(a, b []byte) bool {
+			return bytes.Equal(a, b)
+		})
+	}) {
+		return false
+	}
+
+	return true
 }
 
 type upstreamPlugin struct {
