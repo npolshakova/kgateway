@@ -13,7 +13,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 python3 -m ensurepip --upgrade
-python3 -m pip install -r projects/ai-extension/requirements-dev.txt
+python3 -m pip install -r internal/ai-extension/requirements-dev.txt
 
 # set the PYTHON environment variable, required by the tests
 export PYTHON=$(which python)
@@ -23,7 +23,7 @@ export PYTHON=$(which python)
 
 Switch to the `projects/ai-extension/ai_extension` directory:
 ```bash
-cd projects/ai-extension/ai_extension
+cd internal/ai-extension/ai_extension
 ```
 
 You can run the test through the command line from the `projects/ai-extension/ai_extension` directory:
