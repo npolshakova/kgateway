@@ -277,6 +277,7 @@ class ExtProcServer(external_processor_pb2_grpc.ExternalProcessorServicer):
         metadict: dict,
         headers: external_processor_pb2.HttpHeaders,
     ):
+        logger.debug("parsing handler config %s", metadict)
         if (guardrails := metadict.get("x-req-guardrails-config", "")) != "":
             prompt_guard_obj = prompt_guard.from_json(guardrails)
             guardrails_obj = prompt_guard_obj.request
