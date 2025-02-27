@@ -60,7 +60,7 @@ func TestProcessAIRoutePolicy(t *testing.T) {
 		assert.True(t, found, "streaming header not found")
 
 		// Verify transformation and extproc were added to context
-		transformation, ok := pCtx.GetTypedConfig(wellknown.AIPolicyTransformationFilterName).(*envoytransformation.RouteTransformations_RouteTransformation)
+		transformation, ok := pCtx.GetTypedConfig(wellknown.AIPolicyTransformationFilterName).(*envoytransformation.RouteTransformations)
 		assert.True(t, ok)
 		assert.NotNil(t, transformation)
 
@@ -93,9 +93,10 @@ func TestProcessAIRoutePolicy(t *testing.T) {
 
 		// Verify
 		require.NoError(t, err)
-		transformation, ok := pCtx.GetTypedConfig(wellknown.AIPolicyTransformationFilterName).(*envoytransformation.RouteTransformations_RouteTransformation)
+		transformation, ok := pCtx.GetTypedConfig(wellknown.AIPolicyTransformationFilterName).(*envoytransformation.RouteTransformations)
 		assert.True(t, ok)
-		assert.True(t, transformation.GetRequestMatch().GetRequestTransformation().GetLogRequestResponseInfo().GetValue())
+		assert.True(t, len(transformation.Transformations) == 1)
+		assert.True(t, transformation.Transformations[0].GetRequestMatch().GetRequestTransformation().GetLogRequestResponseInfo().GetValue())
 	})
 
 	t.Run("applies defaults and prompt enrichment", func(t *testing.T) {
@@ -132,8 +133,10 @@ func TestProcessAIRoutePolicy(t *testing.T) {
 
 		// Verify
 		require.NoError(t, err)
-		transformation, ok := pCtx.GetTypedConfig(wellknown.AIPolicyTransformationFilterName).(*envoytransformation.RouteTransformations_RouteTransformation)
+		routeTransformations, ok := pCtx.GetTypedConfig(wellknown.AIPolicyTransformationFilterName).(*envoytransformation.RouteTransformations)
 		assert.True(t, ok)
+		assert.True(t, len(routeTransformations.Transformations) == 1)
+		transformation := routeTransformations.Transformations[0]
 
 		// Check the model field was set in the transformation
 		modelTemplate := transformation.GetRequestMatch().GetRequestTransformation().GetTransformationTemplate().GetMergeJsonKeys().GetJsonKeys()["model"]
