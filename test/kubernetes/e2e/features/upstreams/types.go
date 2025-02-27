@@ -42,7 +42,7 @@ var (
 		Body:       gomega.ContainSubstring("sunt aut facere repellat provident occaecati excepturi optio reprehenderit"),
 	}
 
-	// Upstream resource to be created
+	// Backend resource to be created
 	upstreamMeta = metav1.ObjectMeta{
 		Name:      "json-upstream",
 		Namespace: "default",

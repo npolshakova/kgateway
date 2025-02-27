@@ -169,7 +169,7 @@ var _ = Describe("Happy path", func() {
 			// This will hit the virtual host with the above virtual cluster config
 			response, err := http.Get(fmt.Sprintf("http://%s:%d/", "localhost", envoyInstance.HttpPort))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response.Header).NotTo(HaveKey("X-Envoy-Upstream-Service-Time"))
+			Expect(response.Header).NotTo(HaveKey("X-Envoy-Backend-Service-Time"))
 
 			cfg, err := envoyInstance.ConfigDump()
 			Expect(err).NotTo(HaveOccurred())
@@ -194,7 +194,7 @@ var _ = Describe("Happy path", func() {
 			// This will hit the virtual host with the above virtual cluster config
 			response, err := http.Get(fmt.Sprintf("http://%s:%d/", "localhost", envoyInstance.HttpPort))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response.Header).To(HaveKey("X-Envoy-Upstream-Service-Time"))
+			Expect(response.Header).To(HaveKey("X-Envoy-Backend-Service-Time"))
 
 			cfg, err := envoyInstance.ConfigDump()
 			Expect(err).NotTo(HaveOccurred())

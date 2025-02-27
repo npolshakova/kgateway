@@ -122,8 +122,8 @@ func (s *testingSuite) BeforeTest(string, string) {
 	// Technical Debt!!
 	// https://github.com/kgateway-dev/kgateway/issues/10293
 	// There is a bug in the Control Plane that results in an Error reported on the status
-	// when the Upstream of the Tracing Collector is not found. This results in the VirtualService
-	// that references that Upstream being rejected. What should occur is a Warning is reported,
+	// when the Backend of the Tracing Collector is not found. This results in the VirtualService
+	// that references that Backend being rejected. What should occur is a Warning is reported,
 	// and the resource is accepted since validation.allowWarnings=true is set.
 	// We have plans to fix this in the code itself. But for a short-term solution, to reduce the
 	// noise in CI/CD of this test flaking, we perform some simple retry logic here.

@@ -56,7 +56,7 @@ var _ = Describe("Example E2E Test For Developers", Label(), func() {
 
 	Context("Using default resources", func() {
 		// The TestContext creates the minimum resources necessary for e2e tests to run by default
-		// Without creating any additional configuration, we have a Gateway, Virtual Service, and Upstream.
+		// Without creating any additional configuration, we have a Gateway, Virtual Service, and Backend.
 		// This means that a Proxy object is dynamically generated, and from there an xDS snapshot is computed
 		// and sent to Envoy to handle traffic
 
