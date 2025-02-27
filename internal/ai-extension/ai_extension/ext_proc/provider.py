@@ -150,11 +150,20 @@ class Provider(ABC):
         pass
 
     @abstractmethod
+    def has_choice_index(
+        self, json_data: Dict[str, Any] | None, choice_index: int
+    ) -> bool:
+        """
+        check if the choices inside the json_data has the specified choice_index
+        """
+        pass
+
+    @abstractmethod
     def update_stream_resp_contents(
         self, json_data: Dict[str, Any] | None, choice_index: int, content: bytes
     ):
         """
-        update the content texts in the stream response json_data
+        update the content texts in the stream response json_data.
         """
         pass
 
@@ -451,10 +460,17 @@ class OpenAI(Provider):
 
         contents: List[bytes] = []
         for choice in json_data["choices"]:
+            # For OpenAI streaming response with multi-choices, the choices array always has a single choice
+            # the index is the indicator of which choice the content belongs to
             if "content" in choice["delta"]:
-                contents.append(choice["delta"]["content"].encode("utf-8"))
+                index = choice.get("index", 0)
+                # The generic interface of this function can still work with providers that send multiple
+                # choices in a single array (currently, no provider does that. In fact, only OpenAI supports multi-choice at all)
+                # So, need to make sure we pad out the contents list to put the content in the correct slot base on the index
+                contents.extend([b""] * (index + 1 - len(contents)))
+                contents[index] = choice["delta"]["content"].encode("utf-8")
                 logger.debug(
-                    f"content from json: {choice['delta']['content']} [{len(choice['delta']['content'])}] content after encoding: {contents[-1]} [{len(contents[-1])}]"
+                    f"content from json: {choice['delta']['content']} [{len(choice['delta']['content'])}] content after encoding: {contents[index]} [{len(contents[index])}]"
                 )
 
         if len(contents) == 0:
@@ -463,18 +479,50 @@ class OpenAI(Provider):
         logger.debug(f"contents: {contents}")
         return contents
 
-    def update_stream_resp_contents(self, json_data, choice_index: int, content: bytes):
+    def has_choice_index(
+        self, json_data: Dict[str, Any] | None, choice_index: int
+    ) -> bool:
         if json_data is None:
             logger.warning(
-                f"update_stream_resp_contents() called by no json_data. choice_index: {choice_index} content: {content}"
+                f"has_choice_index() called by no json_data. choice_index: {choice_index}"
+            )
+            return False
+
+        if len(json_data.get("choices", [])) == 0:
+            logger.error(
+                "has_choice_index() called by no choices in json_data. choice_index: {}",
+                choice_index,
+            )
+            return False
+
+        choice = json_data["choices"][0]
+        if len(json_data["choices"]) > 1:
+            for c in json_data["choices"]:
+                if c.get("index", 0) == choice_index:
+                    choice = c
+
+        if choice.get("index", 0) == choice_index:
+            return True
+
+        return False
+
+    def update_stream_resp_contents(self, json_data, choice_index: int, content: bytes):
+        if json_data is None or not self.has_choice_index(json_data, choice_index):
+            logger.warning(
+                f"update_stream_resp_contents() called but does not have choice_index: {choice_index} content: {content}"
             )
             return None
 
-        if len(json_data["choices"]) <= choice_index:
-            logger.error("trying to update content out of bound")
-            return None
-
-        choice = json_data["choices"][choice_index]
+        # The 0 index looks odd here but it's because OpenAI only put a single choice in the choices array
+        # and uses the index field to indicate the choice_index instead of the array's index.
+        choice = json_data["choices"][0]
+        if len(json_data["choices"]) > 1:
+            # This is just in case that OpenAI starts doing what that says in their API doc,
+            # So, we walk the choices and check the index field to see which entry matches the choice_index
+            # and update our selection.
+            for c in json_data["choices"]:
+                if c["index"] == choice_index:
+                    choice = c
 
         if "delta" not in choice or "content" not in choice["delta"]:
             return None
@@ -506,23 +554,29 @@ class OpenAI(Provider):
         try:
             has_content = False
             has_audio = False
-            choice0 = json_data["choices"][0]
-            if "delta" in choice0:
-                if "content" in choice0["delta"]:
-                    has_content = True
-                if "audio" in choice0["delta"]:
-                    has_audio = True
+            if len(json_data["choices"]) > 0:
+                choice0 = json_data["choices"][0]
+                if "delta" in choice0:
+                    if "content" in choice0["delta"]:
+                        has_content = True
+                    if "audio" in choice0["delta"]:
+                        has_audio = True
 
-            if "finish_reason" in choice0 and choice0["finish_reason"] is not None:
-                if has_content:
-                    return StreamChunkDataType.FINISH
+                if "finish_reason" in choice0 and choice0["finish_reason"] is not None:
+                    if has_content:
+                        return StreamChunkDataType.FINISH
+                    else:
+                        return StreamChunkDataType.FINISH_NO_CONTENT
                 else:
-                    return StreamChunkDataType.FINISH_NO_CONTENT
+                    if has_audio:
+                        return StreamChunkDataType.NORMAL_BINARY
+                    else:
+                        return StreamChunkDataType.NORMAL_TEXT
+            elif json_data.get("usage", None) is not None:
+                return StreamChunkDataType.LAST_USAGE
             else:
-                if has_audio:
-                    return StreamChunkDataType.NORMAL_BINARY
-                else:
-                    return StreamChunkDataType.NORMAL_TEXT
+                return StreamChunkDataType.UNKNOWN
+
         except Exception as e:
             logger.warning(f"invalid chunk: exception: {e} json_data: {json_data}")
             logger.debug(traceback.format_exc())
@@ -650,6 +704,12 @@ class Anthropic(OpenAI):
 
         return None
 
+    def has_choice_index(
+        self, json_data: Dict[str, Any] | None, choice_index: int
+    ) -> bool:
+        # Anthropic does not support choices in response, so return false if choice_index is not 0
+        return choice_index == 0
+
     def update_stream_resp_contents(self, json_data, choice_index: int, content: bytes):
         # Anthropic does not support choices in response, so choice_index is not used here
         if json_data is None:
@@ -761,7 +821,7 @@ class Gemini(Provider):
             messages = []
             for content in body["contents"]:
                 for part in content["parts"]:
-                    messages.append(part["text"])
+                    messages.append(part.get("text", ""))
             tokens = num_tokens_from_messages(messages)
         return tokens
 
@@ -982,18 +1042,43 @@ class Gemini(Provider):
         logger.debug(f"contents: {contents}")
         return contents
 
-    def update_stream_resp_contents(self, json_data, choice_index: int, content: bytes):
+    def has_choice_index(
+        self, json_data: Dict[str, Any] | None, choice_index: int
+    ) -> bool:
         if json_data is None:
             logger.warning(
-                f"update_stream_resp_contents() called by no json_data. choice_index: {choice_index} content: {content}"
+                f"has_choice_index() called by no json_data. choice_index: {choice_index}"
+            )
+            return False
+
+        if len(json_data["candidates"]) == 0:
+            logger.warning(
+                f"has_choice_index() called by no candidates in json_data. choice_index: {choice_index}"
+            )
+            return False
+
+        for candidate in json_data["candidates"]:
+            if candidate.get("index", 0) == choice_index:
+                return True
+
+        return False
+
+    def update_stream_resp_contents(self, json_data, choice_index: int, content: bytes):
+        # Confirmed that gemini does not support multi-choices response in v1beta, it will return 400
+        # if generationConfig -> candidateCount is greater than 1
+        if choice_index > 1:
+            logger.warning(
+                "update_stream_res_contents(): gemini API does not support multi choices response"
             )
             return None
 
-        if len(json_data["candidates"]) <= choice_index:
-            logger.error("trying to update content out of bound")
+        if json_data is None or not self.has_choice_index(json_data, choice_index):
+            logger.warning(
+                f"update_stream_resp_contents() called but does not have choice_index: {choice_index} content: {content}"
+            )
             return None
 
-        # candidates[]->content->parts[]->text
+        # content is in candidates[]->content->parts[]->text
         candidate = json_data["candidates"][choice_index]
         if "content" not in candidate:
             return None

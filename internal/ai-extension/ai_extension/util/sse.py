@@ -126,7 +126,7 @@ def parse_sse_messages(
 
                 except json.JSONDecodeError as e:
                     logger.error(
-                        f"JSON decoding error occured while parsing SSE message: {e} data:\n{line[len(SSE_DATA_FIELD_NAME) :]}"
+                        f"JSON decoding error occurred while parsing SSE message: {e} data:\n{line[len(SSE_DATA_FIELD_NAME) :]}"
                     )
                     type = StreamChunkDataType.INVALID
                     break  # Fall down to add the invalid chunk and then continue to parse the rest of the data
