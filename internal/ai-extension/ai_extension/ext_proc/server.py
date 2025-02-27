@@ -277,31 +277,30 @@ class ExtProcServer(external_processor_pb2_grpc.ExternalProcessorServicer):
         metadict: dict,
         headers: external_processor_pb2.HttpHeaders,
     ):
-        logger.debug("parsing handler config %s", metadict)
+        logger.error("parsing handler config %s", metadict)
         if (guardrails := metadict.get("x-req-guardrails-config", "")) != "":
-            prompt_guard_obj = prompt_guard.from_json(guardrails)
-            guardrails_obj = prompt_guard_obj.request
+            guardrails_obj = prompt_guard.req_from_json(guardrails)
+            logger.error(f"guardrails_obj: {guardrails_obj}")
             config_hash = metadict.get("x-req-guardrails-config-hash", "")
-            if guardrails_obj.HasField("custom_response"):
+            if guardrails_obj.custom_response:
                 handler.req_custom_response = guardrails_obj.custom_response
-            if guardrails_obj.HasField("moderation"):
-                match guardrails_obj.moderation.WhichOneof("moderation"):
-                    case "openai":
-                        handler.req_moderation = (
-                            OpenAIClient(
-                                api_key=get_auth_token(
-                                    guardrails_obj.moderation.openai.auth_token,
-                                    headers.headers,
-                                    open_ai_token_env,
-                                )
-                            ).moderations,
-                            guardrails_obj.moderation.openai.model,
-                        )
-                    case _:
-                        raise ValueError("Unknown moderation type")
-            if guardrails_obj.HasField("webhook"):
+            if guardrails_obj.moderation:
+                if guardrails_obj.moderation.openai:
+                    handler.req_moderation = (
+                        OpenAIClient(
+                            api_key=get_auth_token(
+                                guardrails_obj.moderation.openai.auth_token,
+                                headers.headers,
+                                open_ai_token_env,
+                            )
+                        ).moderations,
+                        guardrails_obj.moderation.openai.model,
+                    )
+                else:
+                    raise ValueError("Unknown moderation type")
+            if guardrails_obj.webhook:
                 handler.req_webhook = guardrails_obj.webhook
-            if guardrails_obj.HasField("regex"):
+            if guardrails_obj.regex:
                 handler.req_regex_action = guardrails_obj.regex.action
                 if config_hash in self._req_guard:
                     handler.req_regex = self._req_guard.get(config_hash)
@@ -312,12 +311,11 @@ class ExtProcServer(external_processor_pb2_grpc.ExternalProcessorServicer):
                     self._req_guard[config_hash] = handler.req_regex
 
         if (guardrails := metadict.get("x-resp-guardrails-config", "")) != "":
-            prompt_guard_obj = prompt_guard.from_json(guardrails)
-            guardrails_obj = prompt_guard_obj.response
+            guardrails_obj = prompt_guard.resp_from_json(guardrails)
             config_hash = metadict.get("x-resp-guardrails-config-hash", "")
-            if guardrails_obj.HasField("webhook"):
+            if guardrails_obj.webhook:
                 handler.resp_webhook = guardrails_obj.webhook
-            if guardrails_obj.HasField("regex"):
+            if guardrails_obj.regex:
                 if config_hash in self._resp_guard:
                     handler.resp_regex = self._resp_guard.get(config_hash)
                     logger.debug("reusing cached response regex")
