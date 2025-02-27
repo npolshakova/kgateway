@@ -301,11 +301,13 @@ class ExtProcServer(external_processor_pb2_grpc.ExternalProcessorServicer):
             if guardrails_obj.webhook:
                 handler.req_webhook = guardrails_obj.webhook
             if guardrails_obj.regex:
+                logging.error("!!! has regex prompt guard")
                 handler.req_regex_action = guardrails_obj.regex.action
                 if config_hash in self._req_guard:
                     handler.req_regex = self._req_guard.get(config_hash)
                     logger.debug("reusing cached request regex")
                 else:
+                    logging.error("!!! init presidio")
                     recognizers = init_presidio_config(guardrails_obj.regex)
                     handler.req_regex = recognizers
                     self._req_guard[config_hash] = handler.req_regex
