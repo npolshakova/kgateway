@@ -762,7 +762,7 @@ class StreamChunks:
         self,
         llm_provider: Provider,
         resp_headers: dict[str, str],
-        webhook: prompt_guard.AIPromptGuard.Webhook | None,
+        webhook: prompt_guard.Webhook | None,
         regex: list[EntityRecognizer] | None,
         anonymizer_engine: AnonymizerEngine,
         parent_span: trace.Span,
@@ -906,7 +906,7 @@ class StreamChunks:
     async def buffer(
         self,
         llm_provider: Provider,
-        resp_webhook: prompt_guard.AIPromptGuard.Webhook | None,
+        resp_webhook: prompt_guard.Webhook | None,
         resp_regex: list[EntityRecognizer] | None,
         anonymizer_engine: AnonymizerEngine,
         resp_headers: dict[str, str],

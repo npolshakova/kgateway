@@ -1,4 +1,4 @@
-import json
+import logging
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional
@@ -6,8 +6,8 @@ from typing import Optional
 
 class SingleAuthTokenKind(Enum):
     INLINE = "Inline"
-    SECRET_REF = "SecretRef"
     PASSTHROUGH = "Passthrough"
+    UNKNOWN = "Unknown"
 
 
 @dataclass
@@ -21,26 +21,24 @@ class LocalObjectReference:
 
 @dataclass
 class SingleAuthToken:
-    def __init__(
-        self,
-        kind: SingleAuthTokenKind,
-        inline: Optional[str] = None,
-        secret_ref: Optional[LocalObjectReference] = None,
-    ):
-        self.kind = kind
-        self.inline = inline
-        self.secret_ref = secret_ref
+    kind: SingleAuthTokenKind
+    inline: Optional[str] = None
 
     def __repr__(self):
-        return f"SingleAuthToken(kind={self.kind}, inline={self.inline}, secret_ref={self.secret_ref})"
+        return f"SingleAuthToken(kind={self.kind}, inline={self.inline})"
 
 
-def from_json(data: str) -> SingleAuthToken:
-    json_data = json.loads(data)
-    return SingleAuthToken(
-        kind=SingleAuthTokenKind(json_data["kind"]),
-        inline=json_data.get("inline"),
-        secret_ref=LocalObjectReference(**json_data.get("secret_ref", {}))
-        if json_data.get("secret_ref")
-        else None,
-    )
+def auth_token_from_json(json_data: dict) -> SingleAuthToken:
+    logging.error(f"json data: {json_data}")
+    if json_data.get("kind") == "Inline":
+        return SingleAuthToken(
+            kind=SingleAuthTokenKind.INLINE,
+            inline=json_data.get("inline"),
+        )
+    elif json_data.get("kind") == "Passthrough":
+        return SingleAuthToken(
+            kind=SingleAuthTokenKind.PASSTHROUGH,
+        )
+
+    logging.error(f"Unknown auth token kind: {json_data.get('kind')}")
+    return SingleAuthToken(kind=SingleAuthTokenKind.UNKNOWN)

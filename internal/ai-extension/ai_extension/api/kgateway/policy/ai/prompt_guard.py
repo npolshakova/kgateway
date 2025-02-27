@@ -1,7 +1,8 @@
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Optional, List
-from ..ai.authtoken import SingleAuthToken
+from ..ai.authtoken import SingleAuthToken, auth_token_from_json
 
 
 @dataclass
@@ -15,7 +16,7 @@ class CustomResponse:
             message=data.get(
                 "message", "The request was rejected due to inappropriate content"
             ),
-            status_code=data.get("status_code", 403),
+            status_code=data.get("statusCode", 403),
         )
 
 
@@ -35,10 +36,22 @@ class BuiltIn:
     PHONE_NUMBER = "PHONE_NUMBER"
     EMAIL = "EMAIL"
 
+    def __init__(self, type_name=None):
+        if type_name in [self.SSN, self.CREDIT_CARD, self.PHONE_NUMBER, self.EMAIL]:
+            self.type = type_name
+        else:
+            raise ValueError(f"Unknown BuiltIn type: {type_name}")
+
 
 class Action:
     MASK = "MASK"
     REJECT = "REJECT"
+
+    def __init__(self, action_type=None):
+        if action_type in [self.MASK, self.REJECT]:
+            self.type = action_type
+        else:
+            raise ValueError(f"Unknown Action type: {action_type}")
 
 
 @dataclass
@@ -63,7 +76,7 @@ class Host:
 
     @staticmethod
     def from_json(data: dict) -> "Host":
-        return Host(host=data["host"], port=data["port"])
+        return Host(host=data.get("host", ""), port=data.get("port", 0))
 
 
 class Type:
@@ -99,21 +112,40 @@ class Webhook:
 
 
 @dataclass
-class Moderation:
+class OpenAIModeration:
     model: Optional[str] = None
     auth_token: Optional[SingleAuthToken] = None
 
     @staticmethod
-    def from_json(data: dict) -> "Moderation":
-        return Moderation(
+    def from_json(data: dict) -> "OpenAIModeration":
+        auth_token_data = data.get("authToken")
+        auth_token = None
+        if auth_token_data:
+            auth_token = auth_token_from_json(auth_token_data)
+
+        return OpenAIModeration(
             model=data.get("model"),
-            auth_token=SingleAuthToken(**data.get("auth_token", {})),
+            auth_token=auth_token,
         )
 
 
 @dataclass
+class Moderation:
+    openai: Optional[OpenAIModeration] = None
+
+    @staticmethod
+    def from_json(data: dict) -> "Moderation":
+        openai_data = data.get("openAIModeration")
+        if openai_data:
+            return Moderation(openai=OpenAIModeration.from_json(openai_data))
+
+        logging.error(f"Unknown moderation type: {data}")
+        return Moderation()
+
+
+@dataclass
 class PromptguardRequest:
-    customResponse: Optional[CustomResponse] = None
+    custom_response: Optional[CustomResponse] = None
     regex: Optional[Regex] = None
     webhook: Optional[Webhook] = None
     moderation: Optional[Moderation] = None
@@ -125,64 +157,71 @@ class PromptguardResponse:
     webhook: Optional[Webhook] = None
 
 
-@dataclass
-class AIPromptGuard:
-    request: Optional[PromptguardRequest] = None
-    response: Optional[PromptguardResponse] = None
+def resp_from_json(data: str) -> PromptguardResponse:
+    logging.debug(f"{data}")
+    response_data = json.loads(data)
+
+    regex_data = response_data.get("regex")
+    regex = None
+    if regex_data:
+        regex = Regex.from_json(regex_data)
+
+    webhook_data = response_data.get("webhook")
+    webhook = None
+    if webhook_data:
+        webhook = Webhook.from_json(webhook_data)
+
+    return PromptguardResponse(
+        regex=regex,
+        webhook=webhook,
+    )
 
 
-def from_json(data: str) -> AIPromptGuard:
-    json_data = json.loads(data)
-    return AIPromptGuard(
-        request=PromptguardRequest(
-            customResponse=CustomResponse(
-                **json_data.get("request", {}).get("customResponse", {})
-            ),
-            regex=Regex(
-                matches=[
-                    RegexMatch(**m)
-                    for m in json_data.get("request", {})
-                    .get("regex", {})
-                    .get("matches", [])
-                ],
-                builtins=[
-                    BuiltIn(b)
-                    for b in json_data.get("request", {})
-                    .get("regex", {})
-                    .get("builtins", [])
-                ],
-                action=json_data.get("request", {})
-                .get("regex", {})
-                .get("action", Action.MASK),
-            ),
-            webhook=Webhook.from_json(json_data.get("request", {}).get("webhook", {})),
-            moderation=Moderation(
-                model=json_data.get("request", {}).get("moderation", {}).get("model"),
-                auth_token=SingleAuthToken(
-                    **json_data.get("request", {})
-                    .get("moderation", {})
-                    .get("auth_token", {})
-                ),
-            ),
-        ),
-        response=PromptguardResponse(
-            regex=Regex(
-                matches=[
-                    RegexMatch(**m)
-                    for m in json_data.get("response", {})
-                    .get("regex", {})
-                    .get("matches", [])
-                ],
-                builtins=[
-                    BuiltIn(b)
-                    for b in json_data.get("response", {})
-                    .get("regex", {})
-                    .get("builtins", [])
-                ],
-                action=json_data.get("response", {})
-                .get("regex", {})
-                .get("action", Action.MASK),
-            ),
-            webhook=Webhook.from_json(json_data.get("response", {}).get("webhook", {})),
-        ),
+def req_from_json(data: str) -> PromptguardRequest:
+    request_data = json.loads(data)
+
+    webhook_data = request_data.get("webhook")
+    webhook = None
+    if webhook_data:
+        webhook = Webhook.from_json(webhook_data)
+
+    moderation_data = request_data.get("moderation")
+    moderation = None
+    if moderation_data:
+        moderation = Moderation.from_json(moderation_data)
+
+    custom_response_data = request_data.get("customResponse")
+    custom_response = None
+    if custom_response_data:
+        custom_response = CustomResponse.from_json(custom_response_data)
+
+    regex_data = request_data.get("regex")
+    regex = None
+    if regex_data:
+        matches_data = regex_data.get("matches")
+        matches = []
+        if matches_data:
+            matches = [RegexMatch.from_json(m) for m in matches_data]
+
+        builtins_data = regex_data.get("builtins")
+        builtins = []
+        if builtins_data:
+            builtins = [BuiltIn(b) for b in builtins_data]
+
+        action_data = regex_data.get("action")
+        action = None
+        if action_data:
+            action = action_data.get("action", Action.MASK)
+
+        regex = Regex(
+            matches=matches,
+            builtins=builtins,
+            action=action,
+        )
+
+    return PromptguardRequest(
+        custom_response=custom_response,
+        regex=regex,
+        webhook=webhook,
+        moderation=moderation,
     )

@@ -12,15 +12,14 @@ def get_auth_token(
     default: str,
 ) -> str:
     value = ""
-    match auth.WhichOneof("auth_token_source"):
-        case "inline":
-            value: str = auth.inline
-            pass
-        case "passthrough":
-            # Get from headers
-            value = get_http_header(headers, "Authorization").removeprefix("Bearer ")
-        case _:
-            raise ValueError("Unknown auth token source")
+    if auth.kind == authtoken.SingleAuthTokenKind.INLINE:
+        value: str = auth.inline
+        pass
+    elif auth.kind == authtoken.SingleAuthTokenKind.PASSTHROUGH:
+        # Get from headers
+        value = get_http_header(headers, "Authorization").removeprefix("Bearer ")
+    else:
+        raise ValueError(f"Unknown auth token source {auth}")
     if value == "":
         value = default
     return value
