@@ -230,13 +230,14 @@ routes:
             - key: x-request-id
               value: '%REQ(X-REQUEST-ID)%'
         ai.policy.transformation.kgateway.io:
-          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations.RouteTransformation
-          requestMatch:
-            requestTransformation:
-              logRequestResponseInfo: false
-              transformationTemplate:
-                mergeJsonKeys:
-                  jsonKeys:
-                    temperature:
-                      tmpl:
-                        text: '{{ default(0.5, "0.5") }}'
+          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations
+          transformations:
+          - requestMatch:
+              requestTransformation:
+                logRequestResponseInfo: false
+                transformationTemplate:
+                  mergeJsonKeys:
+                    jsonKeys:
+                      temperature:
+                        tmpl:
+                          text: '{{ default(0.5, "0.5") }}'

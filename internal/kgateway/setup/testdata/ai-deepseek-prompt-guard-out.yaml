@@ -238,15 +238,16 @@ routes:
             - key: x-resp-guardrails-config-hash
               value: "15744476576820868899"
         ai.policy.transformation.kgateway.io:
-          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations.RouteTransformation
-          requestMatch:
-            requestTransformation:
-              logRequestResponseInfo: false
-              transformationTemplate:
-                mergeJsonKeys:
-                  jsonKeys:
-                    messages:
-                      tmpl:
-                        text: '[{"content":"respond to all questions in French","role":"system"},{"content":"Say
-                          hello before each response","role":"system"},{{ join(messages,
-                          ", ") }}]'
+          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations
+          transformations:
+          - requestMatch:
+              requestTransformation:
+                logRequestResponseInfo: false
+                transformationTemplate:
+                  mergeJsonKeys:
+                    jsonKeys:
+                      messages:
+                        tmpl:
+                          text: '[{"content":"respond to all questions in French","role":"system"},{"content":"Say
+                            hello before each response","role":"system"},{{ join(messages,
+                            ", ") }}]'
