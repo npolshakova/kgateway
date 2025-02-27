@@ -211,6 +211,7 @@ func applyPromptGuard(pg *v1alpha1.AIPromptGuard, extProcRouteSettings *envoy_ex
 					return err
 				}
 				mod.OpenAIModeration.AuthToken = v1alpha1.SingleAuthToken{
+					Kind:   v1alpha1.Inline,
 					Inline: ptr.To(token),
 				}
 			} else {
