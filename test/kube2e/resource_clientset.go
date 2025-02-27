@@ -165,7 +165,7 @@ func NewKubeResourceClientSet(ctx context.Context, cfg *rest.Config) (*KubeResou
 	}
 	resourceClientSet.upstreamGroupClient = upstreamGroupClient
 
-	// Backend
+	// Upstream
 	upstreamClientFactory := &factory.KubeResourceClientFactory{
 		Crd:         gloov1.UpstreamCrd,
 		Cfg:         cfg,

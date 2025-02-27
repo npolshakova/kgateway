@@ -46,9 +46,9 @@ func ProcessAIBackend(ctx context.Context, in *v1alpha1.AIBackend, aiSecrets *ir
 // It is ALSO used by `ProcessRoute` to create the cluster in the event of backup models being used
 // and fallbacks being required.
 func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *ir.Secret, out *envoy_config_cluster_v3.Cluster) error {
-	// set the type to strict dns
+	// set the type to logical dns
 	out.ClusterDiscoveryType = &envoy_config_cluster_v3.Cluster_Type{
-		Type: envoy_config_cluster_v3.Cluster_STRICT_DNS,
+		Type: envoy_config_cluster_v3.Cluster_LOGICAL_DNS,
 	}
 
 	// fix issue where ipv6 addr cannot bind
@@ -326,18 +326,20 @@ func buildVertexAIEndpoint(ctx context.Context, data *v1alpha1.VertexAIConfig, h
 	)
 	return ep, host, nil
 }
+
+// TODO: Add ssl verification with endpoints (https://github.com/kgateway-dev/kgateway/issues/10719)
 func buildLocalityLbEndpoint(
 	host string,
 	port int32,
-	customHost *v1alpha1.Host,
+	hostOverride *v1alpha1.Host,
 	metadata *envoy_config_core_v3.Metadata,
 ) (*envoy_config_endpoint_v3.LbEndpoint, *envoy_tls_v3.UpstreamTlsContext) {
-	if customHost != nil {
-		if customHost.Host != "" {
-			host = customHost.Host
+	if hostOverride != nil {
+		if hostOverride.Host != "" {
+			host = hostOverride.Host
 		}
-		if customHost.Port != 0 {
-			port = int32(customHost.Port)
+		if hostOverride.Port != 0 {
+			port = int32(hostOverride.Port)
 		}
 	}
 	var tlsContext *envoy_tls_v3.UpstreamTlsContext
@@ -464,11 +466,11 @@ func getTransformation(ctx context.Context, llm *v1alpha1.LLMProvider) (string, 
 }
 
 func getGeminiPath() string {
-	return `/{{host_metadata("api_version")}}/models/{{host_metadata("model")}}:{% if host_metadata("route_type") == "CHAT_STREAMING" %}streamGenerateContent?key={{host_metadata("auth_token")}}&alt=sse{% else %}generateContent?key={{host_metadata("auth_token")}}{% endif %}`
+	return `/{{host_metadata("api_version")}}/models/{{host_metadata("model")}}:{% if dynamic_metadata("route_type") == "CHAT_STREAMING" %}streamGenerateContent?key={{host_metadata("auth_token")}}&alt=sse{% else %}generateContent?key={{host_metadata("auth_token")}}{% endif %}`
 }
 
 func getVertexAIGeminiModelPath() string {
-	return `models/{{host_metadata("model")}}:{% if host_metadata("route_type") == "CHAT_STREAMING" %}streamGenerateContent?alt=sse{% else %}generateContent{% endif %}`
+	return `models/{{host_metadata("model")}}:{% if dynamic_metadata("route_type") == "CHAT_STREAMING" %}streamGenerateContent?alt=sse{% else %}generateContent{% endif %}`
 }
 
 func defaultBodyTransformation() *envoytransformation.TransformationTemplate_MergeJsonKeys {

@@ -35,6 +35,9 @@ func (p *routePolicyPluginGwPass) processAIRoutePolicy(
 	extprocSettings *envoy_ext_proc_v3.ExtProcPerRoute,
 	aiSecret *ir.Secret,
 ) error {
+	// Setup initial transformation template. This may be modified by further
+	transformationTemplate := initTransformationTemplate()
+
 	// If the route options specify this as a chat streaming route, add a header to the ext-proc request
 	if aiConfig.RouteType != nil && *aiConfig.RouteType == v1alpha1.CHAT_STREAMING {
 		// append streaming header if it's a streaming route
@@ -42,11 +45,13 @@ func (p *routePolicyPluginGwPass) processAIRoutePolicy(
 			Key:   "x-chat-streaming",
 			Value: "true",
 		})
+		transformationTemplate.DynamicMetadataValues = append(transformationTemplate.DynamicMetadataValues, &envoytransformation.TransformationTemplate_DynamicMetadataValue{
+			Key:   "route_type",
+			Value: &envoytransformation.InjaTemplate{Text: "CHAT_STREAMING"},
+		})
 		p.setAIFilter = true
 	}
 
-	// Setup initial transformation template. This may be modified by further
-	transformationTemplate := initTransformationTemplate()
 	err := handleAIRoutePolicy(aiConfig, extprocSettings, transformationTemplate, aiSecret)
 	if err != nil {
 		return err

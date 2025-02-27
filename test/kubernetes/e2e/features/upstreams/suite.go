@@ -18,7 +18,7 @@ import (
 
 var _ e2e.NewSuiteFunc = NewTestingSuite
 
-// testingSuite is the entire Suite of tests for the "Backend" feature
+// testingSuite is the entire Suite of tests for the "Upstream" feature
 type testingSuite struct {
 	suite.Suite
 
@@ -63,7 +63,7 @@ func (s *testingSuite) TestConfigureBackingDestinationsWithUpstream() {
 		},
 		expectedUpstreamResp)
 
-	// Check status is accepted on Backend
+	// Check status is accepted on Upstream
 	s.testInstallation.Assertions.EventuallyResourceStatusMatchesState(
 		func() (resources.InputResource, error) {
 			return s.testInstallation.ResourceClients.UpstreamClient().Read(upstreamMeta.GetNamespace(), upstreamMeta.GetName(), clients.ReadOpts{})

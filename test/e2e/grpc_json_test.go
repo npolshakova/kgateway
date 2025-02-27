@@ -101,14 +101,14 @@ var _ = Describe("GRPC to JSON Transcoding Plugin - Envoy API", func() {
 				g.Expect(sendReq()).Should(testmatchers.HaveExactResponseBody(expectedResp), "Did not get expected response")
 			}, 5, 1).Should(Succeed())
 			EventuallyWithOffset(1, func(g Gomega) {
-				g.Expect(tu.C).Should(Receive(PointTo(MatchFields(IgnoreExtras, expectedFields))), "Backend did not record expected request")
+				g.Expect(tu.C).Should(Receive(PointTo(MatchFields(IgnoreExtras, expectedFields))), "Upstream did not record expected request")
 			}).Should(Succeed())
 		} else {
 			EventuallyWithOffset(1, func(g Gomega) {
 				g.Expect(sendReq()).ShouldNot(testmatchers.HaveExactResponseBody(expectedResp), "Got unexpected response")
 			}, 5, 1).Should(Succeed())
 			EventuallyWithOffset(1, func(g Gomega) {
-				g.Expect(tu.C).ShouldNot(Receive(PointTo(MatchFields(IgnoreExtras, expectedFields))), "Backend recorded unexpected request")
+				g.Expect(tu.C).ShouldNot(Receive(PointTo(MatchFields(IgnoreExtras, expectedFields))), "Upstream recorded unexpected request")
 			}).Should(Succeed())
 		}
 	}
@@ -207,7 +207,7 @@ var _ = Describe("GRPC to JSON Transcoding Plugin - Envoy API", func() {
 		})
 	})
 
-	Context("GRPC configured on Backend", func() {
+	Context("GRPC configured on Upstream", func() {
 		It("with protodescriptor on upstream", func() {
 
 			gw := gwdefaults.DefaultGateway(writeNamespace)

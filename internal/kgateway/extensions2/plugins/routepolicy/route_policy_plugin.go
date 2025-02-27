@@ -4,12 +4,9 @@ import (
 	"context"
 	"time"
 
-	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
-	common_set_filter_state_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/set_filter_state/v3"
 	envoy_ext_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
-	http_set_filter_state_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/set_filter_state/v3"
 	envoyhttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/solo-io/go-utils/contextutils"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -144,6 +141,7 @@ func (p *routePolicyPluginGwPass) ApplyForRouteBackend(
 	ctx context.Context,
 	policy ir.PolicyIR,
 	pCtx *ir.RouteBackendContext,
+	// TODO: add output route?
 ) error {
 	extprocSettingsProto := pCtx.GetTypedConfig(wellknown.AIExtProcFilterName)
 	if extprocSettingsProto == nil {
@@ -165,7 +163,6 @@ func (p *routePolicyPluginGwPass) ApplyForRouteBackend(
 		// TODO: report error on status
 		return err
 	}
-	pCtx.AddTypedConfig(wellknown.AIExtProcFilterName, extprocSettings)
 
 	return nil
 }
@@ -174,43 +171,7 @@ func (p *routePolicyPluginGwPass) ApplyForRouteBackend(
 // if a plugin emits new filters, they must be with a plugin unique name.
 // any filter returned from route config must be disabled, so it doesnt impact other routes.
 func (p *routePolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
-	var filters []plugins.StagedHttpFilter
-
-	if p.setAIFilter {
-		// handle route policy RouteType by setting it in the dynamic metadata
-		fsConfig := &http_set_filter_state_v3.Config{
-			OnRequestHeaders: []*common_set_filter_state_v3.FilterStateValue{
-				{
-					Key: &common_set_filter_state_v3.FilterStateValue_ObjectKey{
-						ObjectKey: "envoy.route_type",
-					},
-					FactoryKey: "envoy.route_type",
-					Value: &common_set_filter_state_v3.FilterStateValue_FormatString{
-						FormatString: &envoy_config_core_v3.SubstitutionFormatString{
-							Format: &envoy_config_core_v3.SubstitutionFormatString_TextFormatSource{
-								TextFormatSource: &envoy_config_core_v3.DataSource{
-									Specifier: &envoy_config_core_v3.DataSource_InlineString{
-										InlineString: "%DYNAMIC_METADATA(envoy.route_type)%",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-		stagedFilter, err := plugins.NewStagedFilter(
-			wellknown.SetMetadataFilterName,
-			fsConfig,
-			plugins.BeforeStage(plugins.RouteStage),
-		)
-		if err != nil {
-			return nil, err
-		}
-		filters = append(filters, stagedFilter)
-	}
-
-	return filters, nil
+	return nil, nil
 }
 
 func (p *routePolicyPluginGwPass) UpstreamHttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedUpstreamHttpFilter, error) {

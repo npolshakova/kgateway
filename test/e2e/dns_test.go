@@ -38,7 +38,7 @@ var _ = Describe("DNS E2E Test", func() {
 		testContext.JustAfterEach()
 	})
 
-	Context("Defined on an Backend", func() {
+	Context("Defined on an Upstream", func() {
 		// It would be preferable to assert behaviors
 		// However, in the short term, we assert that the configuration has been received by the gateway-proxy
 
@@ -51,8 +51,8 @@ var _ = Describe("DNS E2E Test", func() {
 				g.Expect(frequency).To(Equal(0))
 			}, "5s", ".5s").Should(Succeed(), "DnsRefreshRate not in ConfigDump")
 
-			// Update the Backend to include DnsRefreshRate in the definition
-			// This is a STATIC Backend, so we would expect the resource to have a warning on it
+			// Update the Upstream to include DnsRefreshRate in the definition
+			// This is a STATIC Upstream, so we would expect the resource to have a warning on it
 			// and not propagate the configuration
 			testContext.PatchDefaultUpstream(func(us *gloov1.Upstream) *gloov1.Upstream {
 				us.DnsRefreshRate = &durationpb.Duration{Seconds: 10}
@@ -77,7 +77,7 @@ var _ = Describe("DNS E2E Test", func() {
 				g.Expect(frequency).To(Equal(0))
 			}, "5s", ".5s").Should(Succeed(), "DnsRefreshRate not in ConfigDump")
 
-			// Update the Backend to have a non-IP host
+			// Update the Upstream to have a non-IP host
 			// This will cause the generated cluster to be STRICT_DNS and the control plane
 			// will accept the DnsRefreshRate change
 			testContext.PatchDefaultUpstream(func(us *gloov1.Upstream) *gloov1.Upstream {
@@ -107,7 +107,7 @@ var _ = Describe("DNS E2E Test", func() {
 				g.Expect(originalFrequency).NotTo(Equal(0))
 			}, "5s", ".5s").Should(Succeed(), "Count initial RespectDnsTtl in ConfigDump")
 
-			// Update the Backend to include RespectDnsTtl in the definition
+			// Update the Upstream to include RespectDnsTtl in the definition
 			testContext.PatchDefaultUpstream(func(us *gloov1.Upstream) *gloov1.Upstream {
 				us.RespectDnsTtl = &wrappers.BoolValue{Value: true}
 				return us

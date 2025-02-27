@@ -63,6 +63,7 @@ func ApplyAIBackend(ctx context.Context, aiBackend *v1alpha1.AIBackend, pCtx *ir
 			Route: &envoy_config_route_v3.RouteAction{},
 		}
 	}
+	// LLM providers (open ai, etc.) expect the auto host rewrite to be set
 	out.GetRoute().HostRewriteSpecifier = &envoy_config_route_v3.RouteAction_AutoHostRewrite{
 		AutoHostRewrite: wrapperspb.Bool(true),
 	}

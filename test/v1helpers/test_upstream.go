@@ -37,7 +37,7 @@ import (
 
 // TestUpstream is a testing utility (used in in-memory e2e tests) to compose the following concepts:
 //  1. Running an application with a custom response message (see: runTestServer)
-//  2. Configuring an Backend object to route to that application (see: newTestUpstream)
+//  2. Configuring an Upstream object to route to that application (see: newTestUpstream)
 //  3. Utility methods for asserting that traffic was successfully routed to the application (see: Assertion Utilities)
 type TestUpstream struct {
 	Upstream    *gloov1.Upstream
@@ -100,7 +100,7 @@ const (
 
 type UpstreamTlsRequired int
 
-// Test Backend Factory Utilities
+// Test Upstream Factory Utilities
 //
 // Below are a collection of methods that can be used to create a TestUpstream with a certain behavior
 
@@ -182,7 +182,7 @@ func NewTestGRPCUpstream(ctx context.Context, addr string, replicas int) *TestUp
 
 var testUpstreamId = 0
 
-// newTestUpstream creates a static Backend that can route traffic to a set of ports for a given address
+// newTestUpstream creates a static Upstream that can route traffic to a set of ports for a given address
 // It contains a unique name (since tests may run in parallel), with a suffix id that increases each invocation
 func newTestUpstream(addr string, ports []uint32, requests <-chan *ReceivedRequest, responses <-chan *ReturnedResponse) *TestUpstream {
 	testUpstreamId += 1

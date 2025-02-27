@@ -103,13 +103,13 @@ func (s *testingSuite) TestWatchedNamespaceValidation() {
 	_, errOut, err := s.TestInstallation.Actions.Kubectl().Execute(s.Ctx, "label", "ns", "random", "label-")
 
 	s.Contains(errOut, `denied the request: resource incompatible with current Gloo snapshot`)
-	s.Contains(errOut, `Route Warning: InvalidDestinationWarning. Reason: *v1.Backend { random.postman-echo } not found`)
+	s.Contains(errOut, `Route Warning: InvalidDestinationWarning. Reason: *v1.Upstream { random.postman-echo } not found`)
 	s.Error(err)
 
 	// Trying to delete the namespace also errors out
 	_, errOut, err = s.TestInstallation.Actions.Kubectl().Execute(s.Ctx, "delete", "ns", "random")
 	s.Contains(errOut, `denied the request: resource incompatible with current Gloo snapshot`)
-	s.Contains(errOut, `Route Warning: InvalidDestinationWarning. Reason: *v1.Backend { random.postman-echo } not found`)
+	s.Contains(errOut, `Route Warning: InvalidDestinationWarning. Reason: *v1.Upstream { random.postman-echo } not found`)
 	s.Error(err)
 
 	// Ensure we didn't break the validation server while we're at it

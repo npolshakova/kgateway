@@ -148,7 +148,7 @@ func upMeta(i int) *core.Metadata {
 	}
 }
 
-// Backend returns a generic upstream included in snapshots generated from ScaledSnapshot
+// Upstream returns a generic upstream included in snapshots generated from ScaledSnapshot
 // The integer argument is used to create a uniquely-named resource
 func Upstream(i int) *v1.Upstream {
 	return &v1.Upstream{
@@ -167,7 +167,7 @@ func Upstream(i int) *v1.Upstream {
 }
 
 // Endpoint returns a generic endpoint included in snapshots generated from ScaledSnapshot
-// The integer argument is used to create a uniquely-named resource which references a corresponding Backend
+// The integer argument is used to create a uniquely-named resource which references a corresponding Upstream
 func Endpoint(i int) *v1.Endpoint {
 	return &v1.Endpoint{
 		Upstreams: []*core.ResourceRef{upMeta(i).Ref()},

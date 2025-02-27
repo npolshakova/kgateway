@@ -22,7 +22,7 @@ import (
 
 var _ e2e.NewSuiteFunc = NewDiscoveryWatchlabelsSuite
 
-// discoveryWatchlabelsSuite is the Suite of tests for validating Backend discovery behavior when watchLabels are enabled
+// discoveryWatchlabelsSuite is the Suite of tests for validating Upstream discovery behavior when watchLabels are enabled
 // This suite replaces the "upstream discovery" Context block from kube2e gateway tests
 type discoveryWatchlabelsSuite struct {
 	suite.Suite
@@ -65,7 +65,7 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverUpstreamMatchingWatchLabels() {
 	err = s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, serviceWithNoMatchingLabelsManifest, "-n", s.testInstallation.Metadata.InstallNamespace)
 	s.Assert().NoError(err, "can apply service")
 
-	// eventually an Backend should be created for the Service with matching labels
+	// eventually an Upstream should be created for the Service with matching labels
 	// Upstreams no longer report status if they have not been translated at all to avoid conflicting with
 	// other syncers that have translated them, so we can only detect that the objects exist here
 	labeledUsName := kubernetes.UpstreamName(s.testInstallation.Metadata.InstallNamespace, "example-svc", 8000)
@@ -75,7 +75,7 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverUpstreamMatchingWatchLabels() {
 		},
 	)
 
-	// the Backend should have DiscoveryMetadata labels matching the parent Service
+	// the Upstream should have DiscoveryMetadata labels matching the parent Service
 	us, err := s.testInstallation.ResourceClients.UpstreamClient().Read(s.testInstallation.Metadata.InstallNamespace, labeledUsName, clients.ReadOpts{Ctx: s.ctx})
 	s.Assert().NoError(err, "can read upstream")
 
@@ -84,7 +84,7 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverUpstreamMatchingWatchLabels() {
 		"bonusKey":   "bonusValue",
 	}, us.GetDiscoveryMetadata().GetLabels())
 
-	// no Backend should be created for the Service that does not have the watchLabels
+	// no Upstream should be created for the Service that does not have the watchLabels
 	noLabelsUsName := kubernetes.UpstreamName(s.testInstallation.Metadata.InstallNamespace, "example-svc-no-labels", 8000)
 	s.testInstallation.Assertions.ConsistentlyObjectsNotExist(
 		s.ctx, &v1.Upstream{
@@ -95,7 +95,7 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverUpstreamMatchingWatchLabels() {
 		},
 	)
 
-	// no Backend should be created for the Service that has a watched label without a watched value
+	// no Upstream should be created for the Service that has a watched label without a watched value
 	noMatchingLabelsUsName := kubernetes.UpstreamName(s.testInstallation.Metadata.InstallNamespace, "example-svc-no-matching-labels", 8000)
 	s.testInstallation.Assertions.ConsistentlyObjectsNotExist(
 		s.ctx, &v1.Upstream{
@@ -110,7 +110,7 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverUpstreamMatchingWatchLabels() {
 	err = s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, serviceWithModifiedLabelsManifest, "-n", s.testInstallation.Metadata.InstallNamespace)
 	s.Assert().NoError(err, "can re-apply service")
 
-	// expect the Backend's DiscoveryMeta to eventually match the modified labels from the parent Service
+	// expect the Upstream's DiscoveryMeta to eventually match the modified labels from the parent Service
 	s.testInstallation.Assertions.Gomega.Eventually(func() (map[string]string, error) {
 		us, err = s.testInstallation.ResourceClients.UpstreamClient().Read(s.testInstallation.Metadata.InstallNamespace, labeledUsName, clients.ReadOpts{Ctx: s.ctx})
 		return us.GetDiscoveryMetadata().GetLabels(), err
@@ -130,7 +130,7 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverySpecPreserved() {
 	err := s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, serviceWithLabelsManifest, "-n", s.testInstallation.Metadata.InstallNamespace)
 	s.Assert().NoError(err, "can apply service")
 
-	// eventually an Backend should be created for the Service with matching labels
+	// eventually an Upstream should be created for the Service with matching labels
 	// Upstreams no longer report status if they have not been translated at all to avoid conflicting with
 	// other syncers that have translated them, so we can only detect that the objects exist here
 	labeledUsName := kubernetes.UpstreamName(s.testInstallation.Metadata.InstallNamespace, "example-svc", 8000)
@@ -140,14 +140,14 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverySpecPreserved() {
 		},
 	)
 
-	// the Backend should have DiscoveryMetadata labels matching the parent Service
+	// the Upstream should have DiscoveryMetadata labels matching the parent Service
 	us, err := s.testInstallation.ResourceClients.UpstreamClient().Read(s.testInstallation.Metadata.InstallNamespace, labeledUsName, clients.ReadOpts{Ctx: s.ctx})
 	s.Assert().NoError(err, "can read upstream")
 
 	s.Assert().NotNil(us.GetKube())
 	s.Assert().Nil(us.GetKube().GetServiceSpec())
 
-	// modify the Backend to have a ServiceSpec
+	// modify the Upstream to have a ServiceSpec
 	us.GetKube().ServiceSpec = &options.ServiceSpec{
 		PluginType: &options.ServiceSpec_GrpcJsonTranscoder{},
 	}
@@ -155,7 +155,7 @@ func (s *discoveryWatchlabelsSuite) TestDiscoverySpecPreserved() {
 	s.Assert().NoError(err, "can update upstream")
 	s.Assert().NotNil(updatedUs.GetKube().GetServiceSpec())
 
-	// expect the Backend to consistently have the modified Spec
+	// expect the Upstream to consistently have the modified Spec
 	s.testInstallation.Assertions.Gomega.Consistently(func() (*options.ServiceSpec, error) {
 		us, err := s.testInstallation.ResourceClients.UpstreamClient().Read(us.GetMetadata().GetNamespace(), us.GetMetadata().GetName(), clients.ReadOpts{Ctx: s.ctx})
 		return us.GetKube().GetServiceSpec(), err

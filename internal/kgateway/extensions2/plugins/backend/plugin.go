@@ -3,6 +3,7 @@ package backend
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"time"
@@ -344,6 +345,7 @@ func (p *backendPlugin) ApplyForBackend(ctx context.Context, pCtx *ir.RouteBacke
 	} else {
 		// If it's not an AI route we want to disable our ext-proc filter just in case.
 		// This will have no effect if we don't add the listener filter
+		// TODO: optimize this be on the route config so it applied to all routes (https://github.com/kgateway-dev/kgateway/issues/10721)
 		disabledExtprocSettings := &envoy_ext_proc_v3.ExtProcPerRoute{
 			Override: &envoy_ext_proc_v3.ExtProcPerRoute_Disabled{
 				Disabled: true,
@@ -379,10 +381,11 @@ func (p *backendPlugin) ApplyForRouteBackend(
 func (p *backendPlugin) HttpFilters(ctx context.Context, fc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
 	result := []plugins.StagedHttpFilter{}
 
+	var errs []error
 	if p.aiGatewayEnabled[fc.FilterChainName] {
 		aiFilters, err := ai.AddExtprocHTTPFilter()
 		if err != nil {
-			return nil, err
+			errs = append(errs, err)
 		}
 		result = append(result, aiFilters...)
 	}
@@ -393,7 +396,7 @@ func (p *backendPlugin) HttpFilters(ctx context.Context, fc ir.FilterChainCommon
 
 		result = append(result, f)
 	}
-	return result, nil
+	return result, errors.Join(errs...)
 }
 
 func (p *backendPlugin) UpstreamHttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedUpstreamHttpFilter, error) {
@@ -417,7 +420,7 @@ func (p *backendPlugin) ResourcesToAdd(ctx context.Context) ir.Resources {
 	var additionalClusters []*envoy_config_cluster_v3.Cluster
 
 	if len(p.aiGatewayEnabled) > 0 {
-		aiClusters := ai.GetAIAdditionalResources()
+		aiClusters := ai.GetAIAdditionalResources(ctx)
 
 		additionalClusters = append(additionalClusters, aiClusters...)
 	}
