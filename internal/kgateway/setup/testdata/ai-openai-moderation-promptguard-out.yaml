@@ -234,14 +234,15 @@ routes:
             - key: x-req-guardrails-config-hash
               value: "7996329749952833575"
         ai.policy.transformation.kgateway.io:
-          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations.RouteTransformation
-          requestMatch:
-            requestTransformation:
-              logRequestResponseInfo: false
-              transformationTemplate:
-                mergeJsonKeys:
-                  jsonKeys:
-                    messages:
-                      tmpl:
-                        text: '[{{ join(messages, ", ") }},{"content":"Make sure the
-                          tone is friendly and professional.","role":"system"}]'
+          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations
+          transformations:
+          - requestMatch:
+              requestTransformation:
+                logRequestResponseInfo: false
+                transformationTemplate:
+                  mergeJsonKeys:
+                    jsonKeys:
+                      messages:
+                        tmpl:
+                          text: '[{{ join(messages, ", ") }},{"content":"Make sure
+                            the tone is friendly and professional.","role":"system"}]'
