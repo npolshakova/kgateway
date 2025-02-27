@@ -231,7 +231,10 @@ func buildTranslateFunc(ctx context.Context, secrets *krtcollections.SecretIndex
 		policyIr := routePolicy{ct: policyCR.CreationTimestamp.Time, spec: policyCR.Spec}
 
 		// Check for the presence of the OpenAI Moderation which may require a secret reference
-		if policyCR.Spec.AI == nil || policyCR.Spec.AI.PromptGuard == nil || policyCR.Spec.AI.PromptGuard.Request.Moderation == nil {
+		if policyCR.Spec.AI == nil ||
+			policyCR.Spec.AI.PromptGuard == nil ||
+			policyCR.Spec.AI.PromptGuard.Request == nil ||
+			policyCR.Spec.AI.PromptGuard.Request.Moderation == nil {
 			return &policyIr
 		}
 
