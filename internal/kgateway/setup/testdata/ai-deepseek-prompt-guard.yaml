@@ -14,7 +14,7 @@ spec:
           from: All
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway
@@ -59,7 +59,7 @@ spec:
             value: /v1/chat/completions
       backendRefs:
         - name: deepseek
-          kind: Upstream
+          kind: Backend
           group: gateway.kgateway.dev
           filters:
             - type: ExtensionRef

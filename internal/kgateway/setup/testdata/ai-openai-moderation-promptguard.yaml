@@ -39,7 +39,7 @@ spec:
             value: /v1/chat/completions
       backendRefs:
         - name: openai
-          kind: Upstream
+          kind: Backend
           group: gateway.kgateway.dev
           filters:
             - type: ExtensionRef
@@ -69,7 +69,7 @@ spec:
                 name: openai-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway

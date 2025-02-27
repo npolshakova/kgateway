@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/controller"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/settings"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/proxy_syncer"
 	ggv2setup "github.com/kgateway-dev/kgateway/v2/internal/kgateway/setup"
@@ -174,19 +175,22 @@ func TestScenarios(t *testing.T) {
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("cant listen %v", err)
+		t.Fatalf("can't listen %v", err)
 	}
 	xdsPort := lis.Addr().(*net.TCPAddr).Port
 	snapCache, err := ggv2setup.NewControlPlaneWithListener(ctx, lis, uniqueClientCallbacks)
 	if err != nil {
-		t.Fatalf("cant listen %v", err)
+		t.Fatalf("can't listen %v", err)
 	}
 
+	st, err := settings.BuildSettings()
+	if err != nil {
+		t.Fatalf("can't get settings %v", err)
+	}
 	setupOpts := &controller.SetupOpts{
-		Cache:       snapCache,
-		KrtDebugger: new(krt.DebugHandler),
-		XdsHost:     "localhost",
-		XdsPort:     9977,
+		Cache:          snapCache,
+		KrtDebugger:    new(krt.DebugHandler),
+		GlobalSettings: st,
 	}
 
 	// start ggv2
@@ -206,10 +210,6 @@ func TestScenarios(t *testing.T) {
 		t.Fatalf("failed to read dir: %v", err)
 	}
 	for _, f := range files {
-		if !strings.Contains(f.Name(), "ai-deepseek") {
-			continue
-		}
-
 		// run tests with the yaml files (but not -out.yaml files)/s
 		parentT := t
 		if strings.HasSuffix(f.Name(), ".yaml") && !strings.HasSuffix(f.Name(), "-out.yaml") {

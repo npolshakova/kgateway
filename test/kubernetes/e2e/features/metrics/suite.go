@@ -46,7 +46,7 @@ func (s *testingSuite) TestKubeServiceSuccessStats() {
 	s.sendAndAssertNumSuccessfulRequests(3, kubeSvcUpstream)
 }
 
-// TestKubeUpstreamSuccessStats sends a number of requests to a kube Upstream and checks that the cluster metrics
+// TestKubeUpstreamSuccessStats sends a number of requests to a kube Backend and checks that the cluster metrics
 // show the expected number of successful requests
 func (s *testingSuite) TestKubeUpstreamSuccessStats() {
 	s.TestInstallation.Assertions.EventuallyReadyReplicas(s.Ctx, proxyDeployment.ObjectMeta, gomega.Equal(1))

@@ -30,7 +30,7 @@ spec:
             value: /vertexai
       backendRefs:
         - name: vertexai
-          kind: Upstream
+          kind: Backend
           group: gateway.kgateway.dev
           filters:
           - type: ExtensionRef
@@ -49,7 +49,7 @@ spec:
     routeType: CHAT_STREAMING
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway

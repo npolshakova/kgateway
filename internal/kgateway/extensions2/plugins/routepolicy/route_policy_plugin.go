@@ -125,7 +125,7 @@ func (p *routePolicyPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.Ro
 		outputRoute.GetRoute().Timeout = durationpb.New(time.Second * time.Duration(policy.spec.Timeout))
 	}
 
-	// TODO: err/warn/ignore if targetRef is set on non-AI Upstream
+	// TODO: err/warn/ignore if targetRef is set on non-AI Backend
 
 	return nil
 }

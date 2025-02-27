@@ -62,7 +62,7 @@ clusters:
 - connectTimeout: 5s
   dnsLookupFamily: V4_ONLY
   loadAssignment:
-    clusterName: upstream_gwtest_anthropic_0
+    clusterName: backend_gwtest_anthropic_0
     endpoints:
     - lbEndpoints:
       - endpoint:
@@ -78,7 +78,7 @@ clusters:
             io.solo.transformation:
               auth_token: ""
   metadata: {}
-  name: upstream_gwtest_anthropic_0
+  name: backend_gwtest_anthropic_0
   transportSocketMatches:
   - match:
       tlsMode: istio
@@ -166,10 +166,10 @@ listeners:
             - name: io.kgateway.wait
               typedConfig:
                 '@type': type.googleapis.com/envoy.config.filter.http.upstream_wait.v2.UpstreamWaitFilterConfig
-            - name: ai.policy.transformation.kgateway.io
+            - name: ai.backend.transformation.kgateway.io
               typedConfig:
                 '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
-            - name: ai.upstream.transformation.kgateway.io
+            - name: ai.policy.transformation.kgateway.io
               typedConfig:
                 '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
             - name: envoy.filters.http.upstream_codec
@@ -195,32 +195,13 @@ routes:
     name: http~test
     routes:
     - match:
-        prefix: /
-      name: http~test-route-1-httproute-route-to-upstream-gwtest-1-0-matcher-0
+        path: /anthropic
+      name: http~test-route-0-httproute-route-to-upstream-gwtest-0-0-matcher-0
       route:
         autoHostRewrite: true
-        cluster: upstream_gwtest_anthropic_0
+        cluster: backend_gwtest_anthropic_0
       typedPerFilterConfig:
-        ai.extproc.kgateway.io:
-          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
-          overrides:
-            grpcInitialMetadata:
-            - key: x-llm-provider
-              value: anthropic
-            - key: x-request-id
-              value: '%REQ(X-REQUEST-ID)%'
-        ai.policy.transformation.kgateway.io:
-          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations.RouteTransformation
-          requestMatch:
-            requestTransformation:
-              logRequestResponseInfo: false
-              transformationTemplate:
-                mergeJsonKeys:
-                  jsonKeys:
-                    temperature:
-                      tmpl:
-                        text: '{{ default(0.5, "0.5") }}'
-        ai.upstream.transformation.kgateway.io:
+        ai.backend.transformation.kgateway.io:
           '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations
           transformations:
           - requestMatch:
@@ -240,3 +221,22 @@ routes:
                         tmpl:
                           text: '{% if host_metadata("model") != "" %}"{{host_metadata("model")}}"{%
                             else %}"{{model}}"{% endif %}'
+        ai.extproc.kgateway.io:
+          '@type': type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+          overrides:
+            grpcInitialMetadata:
+            - key: x-llm-provider
+              value: anthropic
+            - key: x-request-id
+              value: '%REQ(X-REQUEST-ID)%'
+        ai.policy.transformation.kgateway.io:
+          '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations.RouteTransformation
+          requestMatch:
+            requestTransformation:
+              logRequestResponseInfo: false
+              transformationTemplate:
+                mergeJsonKeys:
+                  jsonKeys:
+                    temperature:
+                      tmpl:
+                        text: '{{ default(0.5, "0.5") }}'

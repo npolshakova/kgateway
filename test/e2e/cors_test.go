@@ -67,7 +67,7 @@ var _ = Describe("CORS", func() {
 
 	When("CORS is defined on VirtualHost", func() {
 
-		When("RouteAction is Upstream", func() {
+		When("RouteAction is Backend", func() {
 			BeforeEach(func() {
 				vsWithCors := gloohelpers.NewVirtualServiceBuilder().
 					WithNamespace(writeNamespace).
@@ -338,7 +338,7 @@ var _ = Describe("CORS", func() {
 
 	When("CORS is not defined on VirtualHost", func() {
 
-		When("RouteAction is Upstream", func() {
+		When("RouteAction is Backend", func() {
 			BeforeEach(func() {
 				vsWithoutCors := gloohelpers.NewVirtualServiceBuilder().WithNamespace(writeNamespace).
 					WithName("vs-cors").
