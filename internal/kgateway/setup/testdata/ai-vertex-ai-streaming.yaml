@@ -56,6 +56,7 @@ metadata:
   name: vertexai
   namespace: gwtest
 spec:
+  type: ai
   ai:
     llm:
       provider:

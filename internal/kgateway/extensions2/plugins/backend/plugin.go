@@ -40,7 +40,8 @@ const (
 	ParameterGroup = "kgateway.io"
 	ParameterKind  = "Parameter"
 
-	FilterName = "io.solo.aws_lambda"
+	ExtensionName = "Backend"
+	FilterName    = "io.solo.aws_lambda"
 )
 
 var (
@@ -263,13 +264,12 @@ func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_confi
 	}
 
 	spec := up.Spec
-
 	switch {
-	case spec.Static != nil:
+	case spec.Type == v1alpha1.BackendTypeStatic:
 		processStatic(ctx, spec.Static, out)
-	case spec.Aws != nil:
+	case spec.Type == v1alpha1.BackendTypeAWS:
 		processAws(ctx, spec.Aws, ir, out)
-	case spec.AI != nil:
+	case spec.Type == v1alpha1.BackendTypeAI:
 		err := ai.ProcessAIBackend(ctx, spec.AI, ir.AISecret, out)
 		if err != nil {
 			// TODO: report error on status
@@ -279,6 +279,9 @@ func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_confi
 }
 
 func hostname(in *v1alpha1.Backend) string {
+	if in.Spec.Type != v1alpha1.BackendTypeStatic {
+		return ""
+	}
 	if in.Spec.Static != nil {
 		if len(in.Spec.Static.Hosts) > 0 {
 			return in.Spec.Static.Hosts[0].Host
@@ -290,9 +293,9 @@ func hostname(in *v1alpha1.Backend) string {
 func processEndpoints(up *v1alpha1.Backend) *ir.EndpointsForBackend {
 	spec := up.Spec
 	switch {
-	case spec.Static != nil:
+	case spec.Type == v1alpha1.BackendTypeStatic:
 		return processEndpointsStatic(spec.Static)
-	case spec.Aws != nil:
+	case spec.Type == v1alpha1.BackendTypeAWS:
 		return processEndpointsAws(spec.Aws)
 	}
 	return nil
@@ -303,7 +306,7 @@ func newPlug(ctx context.Context, tctx ir.GwTranslationCtx) ir.ProxyTranslationP
 }
 
 func (p *backendPlugin) Name() string {
-	return "backend"
+	return ExtensionName
 }
 
 // called 1 time for each listener

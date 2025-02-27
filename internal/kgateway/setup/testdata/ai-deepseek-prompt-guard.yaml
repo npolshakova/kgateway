@@ -21,6 +21,7 @@ metadata:
   name: deepseek
   namespace: gwtest
 spec:
+  type: ai
   ai:
     llm:
       hostOverride:
