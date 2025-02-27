@@ -1,5 +1,6 @@
 import json
 import logging
+from enum import Enum
 from dataclasses import dataclass, field
 from typing import Optional, List
 from ..ai.authtoken import SingleAuthToken, auth_token_from_json
@@ -30,29 +31,15 @@ class RegexMatch:
         return RegexMatch(pattern=data.get("pattern"), name=data.get("name"))
 
 
-class BuiltIn:
+class BuiltIn(Enum):
     SSN = "SSN"
     CREDIT_CARD = "CREDIT_CARD"
     PHONE_NUMBER = "PHONE_NUMBER"
     EMAIL = "EMAIL"
 
-    def __init__(self, type_name=None):
-        if type_name in [self.SSN, self.CREDIT_CARD, self.PHONE_NUMBER, self.EMAIL]:
-            self.type = type_name
-        else:
-            raise ValueError(f"Unknown BuiltIn type: {type_name}")
-
-
-class Action:
+class Action(Enum):
     MASK = "MASK"
     REJECT = "REJECT"
-
-    def __init__(self, action_type=None):
-        if action_type in [self.MASK, self.REJECT]:
-            self.type = action_type
-        else:
-            raise ValueError(f"Unknown Action type: {action_type}")
-
 
 @dataclass
 class Regex:
@@ -63,7 +50,7 @@ class Regex:
     @staticmethod
     def from_json(data: dict) -> "Regex":
         matches = [RegexMatch.from_json(m) for m in data.get("matches", [])]
-        builtins = [BuiltIn(b) for b in data.get("builtins", [])]
+        builtins = [BuiltIn[b] for b in data.get("builtins", [])]
         return Regex(
             matches=matches, builtins=builtins, action=data.get("action", Action.MASK)
         )
@@ -197,6 +184,7 @@ def req_from_json(data: str) -> PromptguardRequest:
 
     regex_data = request_data.get("regex")
     regex = None
+    # TODO: clean up
     if regex_data:
         matches_data = regex_data.get("matches")
         matches = []
@@ -206,7 +194,7 @@ def req_from_json(data: str) -> PromptguardRequest:
         builtins_data = regex_data.get("builtins")
         builtins = []
         if builtins_data:
-            builtins = [BuiltIn(b) for b in builtins_data]
+            builtins = [BuiltIn[b] for b in builtins_data]
 
         action_data = regex_data.get("action")
         action = None
