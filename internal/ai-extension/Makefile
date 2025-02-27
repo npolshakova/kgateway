@@ -4,6 +4,13 @@ TEST_DIR = ../../test/kubernetes/e2e/features/aiextension/
 webhooks-openapi.yaml: $(WEBHOOK_API_SOURCES)
 	python docs/export_openapi.py app:app --app-dir samples/ --out docs/$@
 
+# mark the test with @pytest.mark.wip and use this target to run only the marked tests during development
+.PHONY: wip-tests
+wip-tests:
+	(cd ai_extension && python -m pytest -m wip -v -o log_cli_level=INFO)
+
+
+# set TEST_PYTHON_LOG_LEVEL=DEBUG to turn on test debug
 .PHONY: unit-tests
 unit-tests:
 	pyright .

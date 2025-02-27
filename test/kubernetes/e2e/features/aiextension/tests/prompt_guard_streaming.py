@@ -70,6 +70,60 @@ class TestPromptGuardStreaming(LLMClient):
         assert prompt_tokens > 0
         assert completion_tokens > 0
 
+    def test_openai_normal_request_response_multichoice(self):
+        # normal request that does not trigger any guardrail on request and response
+        n = 3
+        resp = openai_helpers.make_request(
+            client=self.openai_client,
+            instruction="Please write a poem about cat in 5 sentences and each sentence must have exactly 5 words.",
+            stream=True,
+            n=n,
+        )
+        assert resp is not None
+
+        contents, prompt_tokens, completion_tokens = (
+            openai_helpers.extract_all_choices_in_chunks(resp)
+        )
+        assert len(contents) == n
+        assert prompt_tokens > 0
+        assert completion_tokens > 0
+
+        for choice_index in range(0, n):
+            content = contents[choice_index]
+            assert len(content) > 0, (
+                f"OpenAI complete response[{choice_index}] is empty."
+            )
+
+            # Ideally, if the LLM can count, we would check the content will have exactly 25 words
+            # to make sure we are not messing up the content when prompt guard is enabled but no
+            # modification is made but the LLM is not consistent in using 5 words per sentence
+
+    def test_openai_mask_response_multichoice(self):
+        # normal request that does not trigger any guardrail on request and response
+        n = 3
+        resp = openai_helpers.make_request(
+            client=self.openai_client,
+            instruction="Please write a short poem incorperating two test email address.",
+            stream=True,
+            n=n,
+        )
+        assert resp is not None
+
+        contents, prompt_tokens, completion_tokens = (
+            openai_helpers.extract_all_choices_in_chunks(resp)
+        )
+        assert len(contents) == n
+        assert prompt_tokens > 0
+        assert completion_tokens > 0
+        for choice_index in range(0, n):
+            content = contents[choice_index]
+            assert len(content) > 0, (
+                f"OpenAI complete response[{choice_index}] is empty."
+            )
+            assert "<EMAIL_ADDRESS>" in content, (
+                f"OpenAI complete response[{choice_index}]:\n{content}"
+            )
+
     def test_gemini_mask_response(self):
         resp = gemini_helpers.make_stream_request(
             provider="gemini",
