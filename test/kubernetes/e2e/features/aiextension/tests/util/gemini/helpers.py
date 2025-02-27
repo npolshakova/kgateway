@@ -84,6 +84,11 @@ def count_pattern_and_extract_data_in_chunks(
                         continue
                     assert "content" in candidate, "Missing 'content' in candidate"
                     content = candidate["content"]
+                    if (
+                        candidate.get("finishReason", None) is not None
+                        and "parts" not in content
+                    ):
+                        continue
                     assert "parts" in content, f"Missing 'parts' in content: {data}"
                     assert len(content["parts"]) > 0, "'parts' should not be empty"
                     for part in content["parts"]:
