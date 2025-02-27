@@ -55,7 +55,7 @@ func TestProcessAIBackend_OpenAI(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify cluster type
-	assert.Equal(t, envoy_config_cluster_v3.Cluster_STRICT_DNS, cluster.GetType())
+	assert.Equal(t, envoy_config_cluster_v3.Cluster_LOGICAL_DNS, cluster.GetType())
 
 	// Verify DNS lookup family
 	assert.Equal(t, envoy_config_cluster_v3.Cluster_V4_ONLY, cluster.DnsLookupFamily)

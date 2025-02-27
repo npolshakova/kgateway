@@ -1,6 +1,5 @@
 clusters:
-- http2ProtocolOptions: {}
-  loadAssignment:
+- loadAssignment:
     clusterName: ai_ext_proc_uds_cluster
     endpoints:
     - lbEndpoints:
@@ -10,6 +9,11 @@ clusters:
               path: '@kgateway-ai-sock'
   name: ai_ext_proc_uds_cluster
   type: STATIC
+  typedExtensionProtocolOptions:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicitHttpConfig:
+        http2ProtocolOptions: {}
 - connectTimeout: 5s
   edsClusterConfig:
     edsConfig:
@@ -119,7 +123,7 @@ clusters:
       name: envoy.transport_sockets.raw_buffer
       typedConfig:
         '@type': type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-  type: STRICT_DNS
+  type: LOGICAL_DNS
 listeners:
 - address:
     socketAddress:
@@ -163,13 +167,13 @@ listeners:
           typedConfig:
             '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
             upstreamHttpFilters:
+            - name: ai.policy.transformation.kgateway.io
+              typedConfig:
+                '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
             - name: io.kgateway.wait
               typedConfig:
                 '@type': type.googleapis.com/envoy.config.filter.http.upstream_wait.v2.UpstreamWaitFilterConfig
             - name: ai.backend.transformation.kgateway.io
-              typedConfig:
-                '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
-            - name: ai.policy.transformation.kgateway.io
               typedConfig:
                 '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
             - name: envoy.filters.http.upstream_codec

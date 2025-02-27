@@ -10,9 +10,10 @@ import (
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_endpoint_v3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	envoy_upstreams_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/solo-io/go-utils/contextutils"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 )
 
 const (

@@ -45,7 +45,7 @@ func (p *routePolicyPluginGwPass) processAIRoutePolicy(
 			Key:   "x-chat-streaming",
 			Value: "true",
 		})
-		transformationTemplate.DynamicMetadataValues = append(transformationTemplate.DynamicMetadataValues, &envoytransformation.TransformationTemplate_DynamicMetadataValue{
+		transformationTemplate.DynamicMetadataValues = append(transformationTemplate.GetDynamicMetadataValues(), &envoytransformation.TransformationTemplate_DynamicMetadataValue{
 			Key:   "route_type",
 			Value: &envoytransformation.InjaTemplate{Text: "CHAT_STREAMING"},
 		})
