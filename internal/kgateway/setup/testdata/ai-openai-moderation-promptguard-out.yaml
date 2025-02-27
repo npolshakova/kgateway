@@ -230,9 +230,9 @@ routes:
             - key: x-request-id
               value: '%REQ(X-REQUEST-ID)%'
             - key: x-req-guardrails-config
-              value: '{"moderation":{"openAIModeration":{"authToken":{"kind":"","inline":"mysecretkey"}}}}'
+              value: '{"moderation":{"openAIModeration":{"authToken":{"kind":"Inline","inline":"mysecretkey"}}}}'
             - key: x-req-guardrails-config-hash
-              value: "7996329749952833575"
+              value: "4438767681701476852"
         ai.policy.transformation.kgateway.io:
           '@type': type.googleapis.com/envoy.api.v2.filter.http.RouteTransformations
           transformations:
