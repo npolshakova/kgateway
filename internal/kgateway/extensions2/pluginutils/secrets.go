@@ -3,7 +3,6 @@ package pluginutils
 import (
 	"fmt"
 
-	"github.com/rotisserie/eris"
 	"istio.io/istio/pkg/kube/krt"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -20,6 +19,6 @@ func GetSecretIr(secrets *krtcollections.SecretIndex, krtctx krt.HandlerContext,
 	if secret != nil {
 		return secret, nil
 	} else {
-		return nil, eris.Wrapf(err, fmt.Sprintf("unable to find the secret %s", secretRef.Name))
+		return nil, fmt.Errorf(fmt.Sprintf("unable to find the secret %s", secretRef.Name), err)
 	}
 }
