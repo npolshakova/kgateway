@@ -16,7 +16,6 @@ spec:
         openai:
           authToken:
             kind: "Passthrough"
-            passthrough: {}
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -33,7 +32,6 @@ spec:
         openai:
           authToken:
             kind: "Passthrough"
-            passthrough: {}
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -53,7 +51,6 @@ spec:
           apiVersion: 2024-02-15-preview
           authToken:
             kind: "Passthrough"
-            passthrough: {}
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -72,7 +69,6 @@ spec:
           apiVersion: "v1beta"
           authToken:
             kind: "Passthrough"
-            passthrough: {}
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -94,4 +90,3 @@ spec:
           publisher: GOOGLE
           authToken:
             kind: "Passthrough"
-            passthrough: {}
