@@ -57,16 +57,16 @@ func NewSuite(
 
 func (s *tsuite) SetupSuite() {
 	s.manifests = map[string][]string{
-		"TestRouting": {commonManifest, upstreamManifest, routesBasicManifest},
-		//"TestRoutingPassthrough":                  {commonManifest, upstreamPassthroughManifest, routesWithExtensionManifest},
-		//"TestStreaming":                           {commonManifest, upstreamManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
-		//"TestPromptGuardWebhook":                  {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardWebhookManifest},
-		//"TestPromptGuardWebhookStreaming":         {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardWebhookStreamingManifest},
-		//"TestPromptGuard":                         {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardManifest},
-		//"TestPromptGuardStreaming":                {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardStreamingManifest},
-		//"TestUserInvokedFunctionCalling":          {commonManifest, upstreamManifest, routesBasicManifest},
-		//"TestUserInvokedFunctionCallingStreaming": {commonManifest, upstreamManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
-		//"TestLangchain":                           {commonManifest, upstreamManifest, routesBasicManifest},
+		"TestRouting":            {commonManifest, backendManifest, routesBasicManifest},
+		"TestRoutingPassthrough": {commonManifest, backendPassthroughManifest, routesWithExtensionManifest},
+		//"TestStreaming":                           {commonManifest, backendManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
+		//"TestPromptGuardWebhook":                  {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardWebhookManifest},
+		//"TestPromptGuardWebhookStreaming":         {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardWebhookStreamingManifest},
+		//"TestPromptGuard":                         {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardManifest},
+		//"TestPromptGuardStreaming":                {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardStreamingManifest},
+		//"TestUserInvokedFunctionCalling":          {commonManifest, backendManifest, routesBasicManifest},
+		//"TestUserInvokedFunctionCallingStreaming": {commonManifest, backendManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
+		//"TestLangchain":                           {commonManifest, backendManifest, routesBasicManifest},
 	}
 }
 
@@ -118,32 +118,32 @@ func (s *tsuite) AfterTest(suiteName, testName string) {
 	if s.T().Failed() {
 		s.testInst.PreFailHandler(s.ctx)
 	}
-	manifests := s.manifests[testName]
-	for _, manifest := range manifests {
-		err := s.testInst.Actions.Kubectl().DeleteFileSafe(s.ctx, manifest)
-		s.Require().NoError(err)
-	}
+	// manifests := s.manifests[testName]
+	// for _, manifest := range manifests {
+	// err := s.testInst.Actions.Kubectl().DeleteFileSafe(s.ctx, manifest)
+	// s.Require().NoError(err)
+	// }
 }
 
 func (s *tsuite) TestRouting() {
 	s.invokePytest("routing.py")
 }
 
-//
-//func (s *tsuite) TestRoutingPassthrough() {
-//	vertexAIToken, err := GetVertexAIToken()
-//	if err != nil {
-//		s.T().Fatal(err)
-//	}
-//	s.invokePytest(
-//		"routing.py",
-//		"TEST_TOKEN_PASSTHROUGH=true",
-//		fmt.Sprintf("OPENAI_API_KEY=%s", os.Getenv("OPENAI_API_KEY")),
-//		fmt.Sprintf("AZURE_OPENAI_API_KEY=%s", os.Getenv("AZURE_OPENAI_API_KEY")),
-//		fmt.Sprintf("GEMINI_API_KEY=%s", os.Getenv("GEMINI_API_KEY")),
-//		fmt.Sprintf("VERTEX_AI_API_KEY=%s", vertexAIToken),
-//	)
-//}
+func (s *tsuite) TestRoutingPassthrough() {
+	vertexAIToken, err := GetVertexAIToken()
+	if err != nil {
+		s.T().Fatal(err)
+	}
+	s.invokePytest(
+		"routing.py",
+		"TEST_TOKEN_PASSTHROUGH=true",
+		fmt.Sprintf("OPENAI_API_KEY=%s", os.Getenv("OPENAI_API_KEY")),
+		fmt.Sprintf("AZURE_OPENAI_API_KEY=%s", os.Getenv("AZURE_OPENAI_API_KEY")),
+		fmt.Sprintf("GEMINI_API_KEY=%s", os.Getenv("GEMINI_API_KEY")),
+		fmt.Sprintf("VERTEX_AI_API_KEY=%s", vertexAIToken),
+	)
+}
+
 //
 //func (s *tsuite) TestStreaming() {
 //	s.invokePytest("streaming.py")
@@ -279,6 +279,7 @@ func (s *tsuite) invokePytest(test string, extraEnv ...string) {
 	cmd.Env = append(cmd.Env, extraEnv...)
 
 	fmt.Printf("Running Test Command: %s\n", cmd.String())
+	// TODO: remove
 	fmt.Printf("Using Environment Values: %v\n", cmd.Env)
 
 	out, err := cmd.CombinedOutput()
