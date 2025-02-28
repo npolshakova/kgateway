@@ -271,7 +271,7 @@ func applyPromptGuard(pg *v1alpha1.AIPromptGuard, extProcRouteSettings *envoy_ex
 }
 
 // hashUnique generates a hash of the struct that is unique to the object by
-// hashing field name and value pairs
+// hashing the entire structure using hashstructure.
 func hashUnique(obj interface{}, hasher hash.Hash64) (uint64, error) {
 	if obj == nil {
 		return 0, nil
@@ -284,6 +284,7 @@ func hashUnique(obj interface{}, hasher hash.Hash64) (uint64, error) {
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
+
 	typ := val.Type()
 
 	// Write type name for consistency with proto implementation
@@ -292,36 +293,15 @@ func hashUnique(obj interface{}, hasher hash.Hash64) (uint64, error) {
 		return 0, err
 	}
 
-	// Iterate through fields
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		fieldType := typ.Field(i)
+	// Compute hash of the entire struct
+	structHash, err := hashstructure.Hash(val.Interface(), &hashstructure.HashOptions{})
+	if err != nil {
+		return 0, err
+	}
 
-		// Write field name
-		if _, err := hasher.Write([]byte(fieldType.Name)); err != nil {
-			return 0, err
-		}
-
-		// Handle nil pointer fields
-		if field.Kind() == reflect.Ptr && field.IsNil() {
-			continue
-		}
-
-		// Get the actual value if it's a pointer
-		if field.Kind() == reflect.Ptr {
-			field = field.Elem()
-		}
-
-		// Hash the field value
-		fieldValue, err := hashstructure.Hash(field.Interface(), nil)
-		if err != nil {
-			return 0, err
-		}
-
-		// Write the hash to our hasher
-		if err := binary.Write(hasher, binary.LittleEndian, fieldValue); err != nil {
-			return 0, err
-		}
+	// Write the struct hash to our hasher
+	if err := binary.Write(hasher, binary.LittleEndian, structHash); err != nil {
+		return 0, err
 	}
 
 	return hasher.Sum64(), nil

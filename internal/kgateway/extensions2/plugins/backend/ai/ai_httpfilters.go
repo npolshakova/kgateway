@@ -65,7 +65,7 @@ func AddUpstreamHttpFilters() ([]plugins.StagedUpstreamHttpFilter, error) {
 			},
 			Stage: plugins.UpstreamHTTPFilterStage{
 				RelativeTo: plugins.TransformationStage,
-				Weight:     -1,
+				Weight:     -2,
 			},
 		},
 	}
