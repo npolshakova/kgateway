@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
@@ -12,8 +13,8 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/aiextension"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/testutils/install"
 	"github.com/kgateway-dev/kgateway/v2/test/testutils"
-	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestAIExtensions tests the AI extension functionality
