@@ -8,6 +8,6 @@ import (
 func AIGatewaySuiteRunner() e2e.SuiteRunner {
 	aiSuiteRunner := e2e.NewSuiteRunner(false)
 
-	aiSuiteRunner.Register("BasicRouting", aiextension.NewSuite)
+	aiSuiteRunner.Register("AIExtensions", aiextension.NewSuite)
 	return aiSuiteRunner
 }
