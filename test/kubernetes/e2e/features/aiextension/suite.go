@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kgateway-dev/kgateway/v2/test/testutils"
 	"github.com/rotisserie/eris"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -46,14 +47,12 @@ type tsuite struct {
 func NewSuite(
 	ctx context.Context,
 	testInst *e2e.TestInstallation,
-	rootDir string,
-	installNamespace string,
 ) suite.TestingSuite {
 	return &tsuite{
 		ctx:              ctx,
 		testInst:         testInst,
-		rootDir:          rootDir,
-		installNamespace: installNamespace,
+		rootDir:          testutils.GitRootDirectory(),
+		installNamespace: os.Getenv(testutils.InstallNamespace),
 	}
 }
 

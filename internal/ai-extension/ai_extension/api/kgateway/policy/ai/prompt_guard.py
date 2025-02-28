@@ -37,9 +37,11 @@ class BuiltIn(Enum):
     PHONE_NUMBER = "PHONE_NUMBER"
     EMAIL = "EMAIL"
 
+
 class Action(Enum):
     MASK = "MASK"
     REJECT = "REJECT"
+
 
 @dataclass
 class Regex:
