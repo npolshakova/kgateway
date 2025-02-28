@@ -10,7 +10,7 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
-	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/aiextension"
+	. "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/tests"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/testutils/install"
 	"github.com/kgateway-dev/kgateway/v2/test/testutils"
 	corev1 "k8s.io/api/core/v1"
@@ -55,9 +55,7 @@ func TestAIExtensions(t *testing.T) {
 		t.Error(err)
 	}
 
-	aiSuiteRunner := e2e.NewSuiteRunner(false)
-	aiSuiteRunner.Register("AIExtension", aiextension.NewSuite)
-	aiSuiteRunner.Run(ctx, t, testInstallation)
+	AIGatewaySuiteRunner().Run(ctx, t, testInstallation)
 }
 
 // Create a secret for the AI extension
