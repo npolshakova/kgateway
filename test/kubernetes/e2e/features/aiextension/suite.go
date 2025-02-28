@@ -118,11 +118,11 @@ func (s *tsuite) AfterTest(suiteName, testName string) {
 	if s.T().Failed() {
 		s.testInst.PreFailHandler(s.ctx)
 	}
-	// manifests := s.manifests[testName]
-	// for _, manifest := range manifests {
-	// err := s.testInst.Actions.Kubectl().DeleteFileSafe(s.ctx, manifest)
-	// s.Require().NoError(err)
-	// }
+	manifests := s.manifests[testName]
+	for _, manifest := range manifests {
+		err := s.testInst.Actions.Kubectl().DeleteFileSafe(s.ctx, manifest)
+		s.Require().NoError(err)
+	}
 }
 
 func (s *tsuite) TestRouting() {
