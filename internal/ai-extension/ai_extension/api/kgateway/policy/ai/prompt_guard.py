@@ -201,7 +201,9 @@ def req_from_json(data: str) -> PromptguardRequest:
         action_data = regex_data.get("action")
         action = None
         if action_data:
-            action = action_data.get("action", Action.MASK)
+            action = action_data
+        else:
+            action = Action.MASK
 
         regex = Regex(
             matches=matches,
