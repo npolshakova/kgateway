@@ -45,7 +45,7 @@ func TestAIExtensions(t *testing.T) {
 			testInstallation.PreFailHandler(ctx)
 		}
 
-		testInstallation.UninstallKgateway(ctx)
+		// testInstallation.UninstallKgateway(ctx)
 	})
 
 	// Install kgateway
