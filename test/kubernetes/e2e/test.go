@@ -182,7 +182,7 @@ func (i *TestInstallation) UninstallKgateway(ctx context.Context) {
 			ReleaseName: helmutils.ChartName,
 		},
 	)
-	i.Assertions.Require.NoError(err)
+	i.Assertions.Require.NoError(err, "failed to uninstall kgateway")
 	i.Assertions.EventuallyKgatewayUninstallSucceeded(ctx)
 }
 

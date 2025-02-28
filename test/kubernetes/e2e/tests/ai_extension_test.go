@@ -25,8 +25,8 @@ func TestAIExtensions(t *testing.T) {
 		t,
 		&install.Context{
 			InstallNamespace:          installNs,
-			ProfileValuesManifestFile: e2e.CommonRecommendationManifest,
-			ValuesManifestFile:        "ai-extension-helm.yaml",
+			ProfileValuesManifestFile: "ai-extension-helm.yaml",
+			ValuesManifestFile:        e2e.EmptyValuesManifestPath,
 		},
 	)
 
