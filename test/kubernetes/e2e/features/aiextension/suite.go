@@ -59,11 +59,11 @@ func (s *tsuite) SetupSuite() {
 	s.manifests = map[string][]string{
 		"TestRouting":            {commonManifest, backendManifest, routesBasicManifest},
 		"TestRoutingPassthrough": {commonManifest, backendPassthroughManifest, routesWithExtensionManifest},
-		//"TestStreaming":                           {commonManifest, backendManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
-		//"TestPromptGuardWebhook":                  {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardWebhookManifest},
+		"TestStreaming":          {commonManifest, backendManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
+		// "TestPromptGuardWebhook": {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardWebhookManifest},
 		//"TestPromptGuardWebhookStreaming":         {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardWebhookStreamingManifest},
-		//"TestPromptGuard":                         {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardManifest},
-		//"TestPromptGuardStreaming":                {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardStreamingManifest},
+		"TestPromptGuard": {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardManifest},
+		// "TestPromptGuardStreaming":                {commonManifest, backendManifest, routesWithExtensionManifest, promptGuardStreamingManifest},
 		//"TestUserInvokedFunctionCalling":          {commonManifest, backendManifest, routesBasicManifest},
 		//"TestUserInvokedFunctionCallingStreaming": {commonManifest, backendManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
 		//"TestLangchain":                           {commonManifest, backendManifest, routesBasicManifest},
@@ -144,15 +144,14 @@ func (s *tsuite) TestRoutingPassthrough() {
 	)
 }
 
-//
-//func (s *tsuite) TestStreaming() {
-//	s.invokePytest("streaming.py")
-//}
-//
-//func (s *tsuite) TestPromptGuard() {
-//	s.invokePytest("prompt_guard.py")
-//}
-//
+func (s *tsuite) TestStreaming() {
+	s.invokePytest("streaming.py")
+}
+
+func (s *tsuite) TestPromptGuard() {
+	s.invokePytest("prompt_guard.py")
+}
+
 //func (s *tsuite) TestPromptGuardStreaming() {
 //	s.invokePytest("prompt_guard_streaming.py")
 //}

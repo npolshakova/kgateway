@@ -7,12 +7,6 @@ spec:
     ai:
       promptGuard:
         request:
-          moderation:
-            openai:
-              authToken:
-                secretRef:
-                  name: openai-secret
-                  namespace: ai-test
           regex:
             builtins:
             - PHONE_NUMBER
