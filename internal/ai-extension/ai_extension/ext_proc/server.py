@@ -335,14 +335,16 @@ class ExtProcServer(external_processor_pb2_grpc.ExternalProcessorServicer):
             handler.req_webhook.forwardHeaders if handler.req_webhook else [],
             headers,
         )
+        logger.debug("auth header: %s", get_http_header(headers.headers, "authorization"))
         auth_header = get_http_header(headers.headers, "authorization").removeprefix(
             "Bearer "
         )
+        logger.debug("auth header found: %s", auth_header)
 
         return external_processor_pb2.ProcessingResponse(
             dynamic_metadata=struct_pb2.Struct(
                 fields={
-                    "ai.gloo.solo.io": struct_pb2.Value(
+                    "ai.kgateway.io": struct_pb2.Value(
                         struct_value=struct_pb2.Struct(
                             fields={
                                 "auth_token": struct_pb2.Value(

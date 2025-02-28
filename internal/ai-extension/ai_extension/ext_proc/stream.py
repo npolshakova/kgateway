@@ -199,7 +199,7 @@ class Handler:
         tokens = self.get_tokens()
         dynamic_meta = struct_pb2.Struct(
             fields={
-                "ai.gloo.solo.io": struct_pb2.Value(
+                "ai.kgateway.io": struct_pb2.Value(
                     struct_value=struct_pb2.Struct(
                         fields={
                             "completion_tokens": struct_pb2.Value(

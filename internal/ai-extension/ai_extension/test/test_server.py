@@ -131,8 +131,8 @@ def test_handle_request_headers():
     }
 
     response = extproc_server.handle_request_headers(headers, handler)
-    assert "ai.gloo.solo.io" in response.dynamic_metadata.fields
-    ai_metadata = response.dynamic_metadata.fields["ai.gloo.solo.io"].struct_value
+    assert "ai.kgateway.io" in response.dynamic_metadata.fields
+    ai_metadata = response.dynamic_metadata.fields["ai.kgateway.io"].struct_value
     assert "auth_token" in ai_metadata.fields
 
 
