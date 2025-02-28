@@ -5,18 +5,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"testing"
-
-	"github.com/stretchr/testify/suite"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/aiextension"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/testutils/install"
 	"github.com/kgateway-dev/kgateway/v2/test/testutils"
+	"github.com/stretchr/testify/suite"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // TestAIExtensions tests the AI extension functionality
@@ -57,10 +54,9 @@ func TestAIExtensions(t *testing.T) {
 		t.Error(err)
 	}
 
-	rootDir := testutils.GitRootDirectory()
-	t.Run("AIExtension", func(t *testing.T) {
-		suite.Run(t, aiextension.NewSuite(ctx, testInstallation, rootDir, installNs))
-	})
+	aiSuiteRunner := e2e.NewSuiteRunner(false)
+	aiSuiteRunner.Register("AIExtension", aiextension.NewSuite)
+	aiSuiteRunner.Run(ctx, t, testInstallation)
 }
 
 // Create a secret for the AI extension
