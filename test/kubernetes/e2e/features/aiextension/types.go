@@ -19,6 +19,9 @@ var (
 	// routes to LLM backends
 	routesBasicManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "routes-basic.yaml")
 
+	// routes to LLM backends with extension ref
+	routesWithExtensionManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "routes-with-extension-ref.yaml")
+
 	// routes options for streaming
 	routeOptionStreamingManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "streaming.yaml")
 

@@ -1,100 +1,121 @@
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway
   name: mistralai
   namespace: ai-test
 spec:
+  type: ai
   ai:
-    mistral:
-      authToken:
-        secretRef:
-          name: mistralai-secret
-          namespace: ai-test
+    llm:
+      hostOverride:
+        host: api.mistral.ai
+        port: 443
+      provider:
+        openai:
+          authToken:
+            kind: "SecretRef"
+            secretRef:
+              name: mistralai-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway
   name: openai
   namespace: ai-test
 spec:
+  type: ai
   ai:
-    openai:
-      authToken:
-        secretRef:
-          name: openai-secret
-          namespace: ai-test
+    llm:
+      provider:
+        openai:
+          authToken:
+            kind: "SecretRef"
+            secretRef:
+              name: openai-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway
   name: anthropic
   namespace: ai-test
 spec:
+  type: ai
   ai:
-    anthropic:
-      authToken:
-        secretRef:
-          name: anthropic-secret
-          namespace: ai-test
+    llm:
+      provider:
+        anthropic:
+          authToken:
+            kind: "SecretRef"
+            secretRef:
+              name: anthropic-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway
   name: azure-openai
   namespace: ai-test
 spec:
+  type: ai
   ai:
-    azureOpenai:
-      endpoint: ai-gateway.openai.azure.com
-      deploymentName: gpt-4o-mini
-      apiVersion: 2024-02-15-preview
-      authToken:
-        secretRef:
-          name: azure-secret
-          namespace: ai-test
+    llm:
+      provider:
+        azureopenai:
+          endpoint: ai-gateway.openai.azure.com
+          deploymentName: gpt-4o-mini
+          apiVersion: 2024-02-15-preview
+          authToken:
+            kind: "SecretRef"
+            secretRef:
+              name: azure-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway
   name: gemini
   namespace: ai-test
 spec:
+  type: ai
   ai:
-    gemini:
-      model: gemini-1.5-flash-001
-      apiVersion: v1beta
-      authToken:
-        secretRef:
-          name: gemini-secret
-          namespace: ai-test
+    llm:
+      provider:
+        gemini:
+          model: gemini-1.5-flash-001
+          apiVersion: v1beta
+          authToken:
+            kind: "SecretRef"
+            secretRef:
+              name: gemini-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Upstream
+kind: Backend
 metadata:
   labels:
     app: kgateway
   name: vertex-ai
   namespace: ai-test
 spec:
+  type: ai
   ai:
-    vertexAi:
-      model: gemini-1.5-flash-001
-      apiVersion: v1
-      location: us-central1
-      projectId: gloo-ee
-      publisher: GOOGLE
-      authToken:
-        secretRef:
-          name: vertex-ai-secret
-          namespace: ai-test
+    llm:
+      provider:
+        vertexai:
+          model: gemini-1.5-flash-001
+          apiVersion: v1
+          location: us-central1
+          projectId: gloo-ee
+          publisher: GOOGLE
+          authToken:
+            kind: "SecretRef"
+            secretRef:
+              name: vertex-ai-secret
 ---

@@ -1,13 +1,9 @@
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: RoutePolicy
 metadata:
-  name: azure-openai-opt
+  name: azure-openai-policy
   namespace: ai-test
 spec:
-  targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: azure-openai
   ai:
     promptGuard:
       request:
@@ -21,13 +17,9 @@ spec:
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: RoutePolicy
 metadata:
-  name: openai-opt
+  name: openai-policy
   namespace: ai-test
 spec:
-  targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: openai
   ai:
     promptGuard:
       response:
@@ -38,13 +30,9 @@ spec:
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: RoutePolicy
 metadata:
-  name: gemini-opt
+  name: gemini-policy
   namespace: ai-test
 spec:
-  targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: gemini
   ai:
     promptGuard:
       response:
@@ -55,13 +43,9 @@ spec:
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: RoutePolicy
 metadata:
-  name: vertex-ai-opt
+  name: vertex-ai-policy
   namespace: ai-test
 spec:
-  targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: vertex-ai
   ai:
     promptGuard:
       response:

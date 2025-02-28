@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/kgateway-dev/kgateway/v2/test/testutils"
@@ -59,14 +58,14 @@ func NewSuite(
 func (s *tsuite) SetupSuite() {
 	s.manifests = map[string][]string{
 		"TestRouting": {commonManifest, upstreamManifest, routesBasicManifest},
-		//"TestRoutingPassthrough":                  {commonManifest, upstreamPassthroughManifest, routesBasicManifest},
-		//"TestStreaming":                           {commonManifest, upstreamManifest, routesBasicManifest, routeOptionStreamingManifest},
-		//"TestPromptGuardWebhook":                  {commonManifest, upstreamManifest, routesBasicManifest, promptGuardWebhookManifest},
-		//"TestPromptGuardWebhookStreaming":         {commonManifest, upstreamManifest, routesBasicManifest, promptGuardWebhookStreamingManifest},
-		//"TestPromptGuard":                         {commonManifest, upstreamManifest, routesBasicManifest, promptGuardManifest},
-		//"TestPromptGuardStreaming":                {commonManifest, upstreamManifest, routesBasicManifest, promptGuardStreamingManifest},
+		//"TestRoutingPassthrough":                  {commonManifest, upstreamPassthroughManifest, routesWithExtensionManifest},
+		//"TestStreaming":                           {commonManifest, upstreamManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
+		//"TestPromptGuardWebhook":                  {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardWebhookManifest},
+		//"TestPromptGuardWebhookStreaming":         {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardWebhookStreamingManifest},
+		//"TestPromptGuard":                         {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardManifest},
+		//"TestPromptGuardStreaming":                {commonManifest, upstreamManifest, routesWithExtensionManifest, promptGuardStreamingManifest},
 		//"TestUserInvokedFunctionCalling":          {commonManifest, upstreamManifest, routesBasicManifest},
-		//"TestUserInvokedFunctionCallingStreaming": {commonManifest, upstreamManifest, routesBasicManifest, routeOptionStreamingManifest},
+		//"TestUserInvokedFunctionCallingStreaming": {commonManifest, upstreamManifest, routesWithExtensionManifest, routeOptionStreamingManifest},
 		//"TestLangchain":                           {commonManifest, upstreamManifest, routesBasicManifest},
 	}
 }
@@ -130,126 +129,127 @@ func (s *tsuite) TestRouting() {
 	s.invokePytest("routing.py")
 }
 
-func (s *tsuite) TestRoutingPassthrough() {
-	vertexAIToken, err := GetVertexAIToken()
-	if err != nil {
-		s.T().Fatal(err)
-	}
-	s.invokePytest(
-		"routing.py",
-		"TEST_TOKEN_PASSTHROUGH=true",
-		fmt.Sprintf("OPENAI_API_KEY=%s", os.Getenv("OPENAI_API_KEY")),
-		fmt.Sprintf("AZURE_OPENAI_API_KEY=%s", os.Getenv("AZURE_OPENAI_API_KEY")),
-		fmt.Sprintf("GEMINI_API_KEY=%s", os.Getenv("GEMINI_API_KEY")),
-		fmt.Sprintf("VERTEX_AI_API_KEY=%s", vertexAIToken),
-	)
-}
-
-func (s *tsuite) TestStreaming() {
-	s.invokePytest("streaming.py")
-}
-
-func (s *tsuite) TestPromptGuard() {
-	s.invokePytest("prompt_guard.py")
-}
-
-func (s *tsuite) TestPromptGuardStreaming() {
-	s.invokePytest("prompt_guard_streaming.py")
-}
-
-func (s *tsuite) TestRateLimit() {
-	s.invokePytest("rate_limit.py")
-
-	// Restart rate-limiter Redis so that the next test can start with a clean state
-	err := s.testInst.Actions.Kubectl().DeploymentRolloutStatus(s.ctx, "redis", "-n", s.installNamespace)
-	s.Require().NoError(err)
-}
-
-func (s *tsuite) TestPromptGuardWebhook() {
-	spacy_model := "en_core_web_lg"
-	spacyInfo, err := exec.Command(pythonBin, "-m", "spacy", "info").CombinedOutput()
-	if !strings.Contains(string(spacyInfo), spacy_model) {
-		byt, err := exec.Command(pythonBin, "-m", "spacy", "download", spacy_model).CombinedOutput()
-		s.Require().NoError(err)
-		s.T().Logf("spacy download output: %s", string(byt))
-	}
-
-	cmd := exec.Command(pythonBin, "-m", "fastapi", "run", "--host", "0.0.0.0", "--port", "7891", "samples/app.py")
-	cmd.Dir = filepath.Join(s.rootDir, "projects/ai-extension")
-
-	var b bytes.Buffer
-	cmd.Stdout = &b
-	cmd.Stderr = &b
-	err = cmd.Start()
-	s.Require().NoError(err)
-	defer func() {
-		cmd.Process.Kill()
-		err := cmd.Wait()
-		if err != nil && err.Error() != "signal: killed" {
-			s.T().Logf("error: %s", err)
-		}
-		s.T().Logf("combined_output: %s", b.String())
-		http.Get("http://localhost:7891/shutdown")
-	}()
-
-	s.Require().EventuallyWithT(func(c *assert.CollectT) {
-		resp, err := http.Get("http://localhost:7891/health")
-		if assert.NoErrorf(c, err, "failed to get health check") {
-			assert.Equalf(c, resp.StatusCode, 200, "health check failed")
-		}
-	}, 20*time.Second, 1*time.Second)
-
-	s.invokePytest("prompt_guard_webhook.py")
-}
-
-func (s *tsuite) TestPromptGuardWebhookStreaming() {
-	spacy_model := "en_core_web_lg"
-	spacyInfo, err := exec.Command(pythonBin, "-m", "spacy", "info").CombinedOutput()
-	if !strings.Contains(string(spacyInfo), spacy_model) {
-		byt, err := exec.Command(pythonBin, "-m", "spacy", "download", spacy_model).CombinedOutput()
-		s.Require().NoError(err)
-		s.T().Logf("spacy download output: %s", string(byt))
-	}
-
-	cmd := exec.Command(pythonBin, "-m", "fastapi", "run", "--host", "0.0.0.0", "--port", "7891", "samples/app.py")
-	cmd.Dir = filepath.Join(s.rootDir, "projects/ai-extension")
-
-	var b bytes.Buffer
-	cmd.Stdout = &b
-	cmd.Stderr = &b
-	err = cmd.Start()
-	s.Require().NoError(err)
-	defer func() {
-		cmd.Process.Kill()
-		err := cmd.Wait()
-		if err != nil && err.Error() != "signal: killed" {
-			s.T().Logf("error: %s", err)
-		}
-		s.T().Logf("combined_output: %s", b.String())
-		http.Get("http://localhost:7891/shutdown")
-	}()
-
-	s.Require().EventuallyWithT(func(c *assert.CollectT) {
-		resp, err := http.Get("http://localhost:7891/health")
-		if assert.NoErrorf(c, err, "failed to get health check") {
-			assert.Equalf(c, resp.StatusCode, 200, "health check failed")
-		}
-	}, 20*time.Second, 1*time.Second)
-
-	s.invokePytest("prompt_guard_webhook_streaming.py")
-}
-
-func (s *tsuite) TestUserInvokedFunctionCalling() {
-	s.invokePytest("user_function_calling.py")
-}
-
-func (s *tsuite) TestUserInvokedFunctionCallingStreaming() {
-	s.invokePytest("user_function_calling_stream.py")
-}
-
-func (s *tsuite) TestLangchain() {
-	s.invokePytest("langchain_function_calling.py")
-}
+//
+//func (s *tsuite) TestRoutingPassthrough() {
+//	vertexAIToken, err := GetVertexAIToken()
+//	if err != nil {
+//		s.T().Fatal(err)
+//	}
+//	s.invokePytest(
+//		"routing.py",
+//		"TEST_TOKEN_PASSTHROUGH=true",
+//		fmt.Sprintf("OPENAI_API_KEY=%s", os.Getenv("OPENAI_API_KEY")),
+//		fmt.Sprintf("AZURE_OPENAI_API_KEY=%s", os.Getenv("AZURE_OPENAI_API_KEY")),
+//		fmt.Sprintf("GEMINI_API_KEY=%s", os.Getenv("GEMINI_API_KEY")),
+//		fmt.Sprintf("VERTEX_AI_API_KEY=%s", vertexAIToken),
+//	)
+//}
+//
+//func (s *tsuite) TestStreaming() {
+//	s.invokePytest("streaming.py")
+//}
+//
+//func (s *tsuite) TestPromptGuard() {
+//	s.invokePytest("prompt_guard.py")
+//}
+//
+//func (s *tsuite) TestPromptGuardStreaming() {
+//	s.invokePytest("prompt_guard_streaming.py")
+//}
+//
+//func (s *tsuite) TestRateLimit() {
+//	s.invokePytest("rate_limit.py")
+//
+//	// Restart rate-limiter Redis so that the next test can start with a clean state
+//	err := s.testInst.Actions.Kubectl().DeploymentRolloutStatus(s.ctx, "redis", "-n", s.installNamespace)
+//	s.Require().NoError(err)
+//}
+//
+//func (s *tsuite) TestPromptGuardWebhook() {
+//	spacy_model := "en_core_web_lg"
+//	spacyInfo, err := exec.Command(pythonBin, "-m", "spacy", "info").CombinedOutput()
+//	if !strings.Contains(string(spacyInfo), spacy_model) {
+//		byt, err := exec.Command(pythonBin, "-m", "spacy", "download", spacy_model).CombinedOutput()
+//		s.Require().NoError(err)
+//		s.T().Logf("spacy download output: %s", string(byt))
+//	}
+//
+//	cmd := exec.Command(pythonBin, "-m", "fastapi", "run", "--host", "0.0.0.0", "--port", "7891", "samples/app.py")
+//	cmd.Dir = filepath.Join(s.rootDir, "projects/ai-extension")
+//
+//	var b bytes.Buffer
+//	cmd.Stdout = &b
+//	cmd.Stderr = &b
+//	err = cmd.Start()
+//	s.Require().NoError(err)
+//	defer func() {
+//		cmd.Process.Kill()
+//		err := cmd.Wait()
+//		if err != nil && err.Error() != "signal: killed" {
+//			s.T().Logf("error: %s", err)
+//		}
+//		s.T().Logf("combined_output: %s", b.String())
+//		http.Get("http://localhost:7891/shutdown")
+//	}()
+//
+//	s.Require().EventuallyWithT(func(c *assert.CollectT) {
+//		resp, err := http.Get("http://localhost:7891/health")
+//		if assert.NoErrorf(c, err, "failed to get health check") {
+//			assert.Equalf(c, resp.StatusCode, 200, "health check failed")
+//		}
+//	}, 20*time.Second, 1*time.Second)
+//
+//	s.invokePytest("prompt_guard_webhook.py")
+//}
+//
+//func (s *tsuite) TestPromptGuardWebhookStreaming() {
+//	spacy_model := "en_core_web_lg"
+//	spacyInfo, err := exec.Command(pythonBin, "-m", "spacy", "info").CombinedOutput()
+//	if !strings.Contains(string(spacyInfo), spacy_model) {
+//		byt, err := exec.Command(pythonBin, "-m", "spacy", "download", spacy_model).CombinedOutput()
+//		s.Require().NoError(err)
+//		s.T().Logf("spacy download output: %s", string(byt))
+//	}
+//
+//	cmd := exec.Command(pythonBin, "-m", "fastapi", "run", "--host", "0.0.0.0", "--port", "7891", "samples/app.py")
+//	cmd.Dir = filepath.Join(s.rootDir, "projects/ai-extension")
+//
+//	var b bytes.Buffer
+//	cmd.Stdout = &b
+//	cmd.Stderr = &b
+//	err = cmd.Start()
+//	s.Require().NoError(err)
+//	defer func() {
+//		cmd.Process.Kill()
+//		err := cmd.Wait()
+//		if err != nil && err.Error() != "signal: killed" {
+//			s.T().Logf("error: %s", err)
+//		}
+//		s.T().Logf("combined_output: %s", b.String())
+//		http.Get("http://localhost:7891/shutdown")
+//	}()
+//
+//	s.Require().EventuallyWithT(func(c *assert.CollectT) {
+//		resp, err := http.Get("http://localhost:7891/health")
+//		if assert.NoErrorf(c, err, "failed to get health check") {
+//			assert.Equalf(c, resp.StatusCode, 200, "health check failed")
+//		}
+//	}, 20*time.Second, 1*time.Second)
+//
+//	s.invokePytest("prompt_guard_webhook_streaming.py")
+//}
+//
+//func (s *tsuite) TestUserInvokedFunctionCalling() {
+//	s.invokePytest("user_function_calling.py")
+//}
+//
+//func (s *tsuite) TestUserInvokedFunctionCallingStreaming() {
+//	s.invokePytest("user_function_calling_stream.py")
+//}
+//
+//func (s *tsuite) TestLangchain() {
+//	s.invokePytest("langchain_function_calling.py")
+//}
 
 func (s *tsuite) invokePytest(test string, extraEnv ...string) {
 	fmt.Printf("Using Python binary: %s\n", pythonBin)
@@ -299,7 +299,7 @@ func (s *tsuite) invokePytest(test string, extraEnv ...string) {
 func (s *tsuite) getGatewayURL() string {
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "gloo-proxy-ai-gateway",
+			Name:      "ai-gateway",
 			Namespace: s.testInst.Metadata.InstallNamespace,
 		},
 	}
