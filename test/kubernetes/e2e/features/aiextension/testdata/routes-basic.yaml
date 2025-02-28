@@ -14,7 +14,7 @@ spec:
     backendRefs:
     - name: openai
       group: gateway.kgateway.dev
-      kind: Upstream
+      kind: Backend
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -32,7 +32,7 @@ spec:
     backendRefs:
     - name: mistralai
       group: gateway.kgateway.dev
-      kind: Upstream
+      kind: Backend
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -52,7 +52,7 @@ spec:
     - name: azure-openai
       namespace: ai-test
       group: gateway.kgateway.dev
-      kind: Upstream
+      kind: Backend
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -69,8 +69,8 @@ spec:
         value: /anthropic
     backendRefs:
     - name: anthropic
-      group: gloo.solo.io
-      kind: Upstream
+      group: gateway.kgateway.dev
+      kind: Backend
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -90,7 +90,7 @@ spec:
         - name: gemini
           namespace: ai-test
           group: gateway.kgateway.dev
-          kind: Upstream
+          kind: Backend
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -110,4 +110,4 @@ spec:
         - name: vertex-ai
           namespace: ai-test
           group: gateway.kgateway.dev
-          kind: Upstream
+          kind: Backend
