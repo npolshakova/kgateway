@@ -77,7 +77,7 @@ clusters:
         metadata:
           filterMetadata:
             envoy.transport_socket_match:
-              tls: api.anthropic.com
+              tls: "true"
             io.solo.transformation:
               auth_token: ""
   metadata: {}

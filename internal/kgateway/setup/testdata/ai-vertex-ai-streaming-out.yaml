@@ -77,7 +77,7 @@ clusters:
         metadata:
           filterMetadata:
             envoy.transport_socket_match:
-              tls: us-central1-aiplatform.googleapis.com
+              tls: "true"
             io.solo.transformation:
               api_version: v1
               auth_token: mysecretkey

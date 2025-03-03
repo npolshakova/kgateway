@@ -87,7 +87,7 @@ func TestProcessAIBackend_OpenAI(t *testing.T) {
 	require.GreaterOrEqual(t, len(cluster.TransportSocketMatches), 2)
 
 	// One should be for TLS
-	tlsMatch := findTransportSocketMatchByPrefix(cluster.TransportSocketMatches, "tls_")
+	tlsMatch := findTransportSocketMatchByPrefix(cluster.TransportSocketMatches, "tls")
 	require.NotNil(t, tlsMatch)
 
 	// Another for plaintext

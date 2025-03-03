@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	// TODO: support capitalized or lower case key names
 	AuthKey = "Authorization"
 )
 

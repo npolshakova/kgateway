@@ -276,7 +276,7 @@ func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_confi
 			// TODO: report error on status
 			contextutils.LoggerFrom(ctx).Error(err)
 		}
-		err = ai.AddUpstreamHttpFilters(out)
+		err = ai.AddUpstreamClusterHttpFilters(out)
 		if err != nil {
 			contextutils.LoggerFrom(ctx).Error(err)
 		}
