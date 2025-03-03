@@ -58,7 +58,7 @@ func TestProcessAIBackend_OpenAI(t *testing.T) {
 	assert.Equal(t, envoy_config_cluster_v3.Cluster_LOGICAL_DNS, cluster.GetType())
 
 	// Verify DNS lookup family
-	assert.Equal(t, envoy_config_cluster_v3.Cluster_V4_ONLY, cluster.DnsLookupFamily)
+	assert.Equal(t, envoy_config_cluster_v3.Cluster_V4_PREFERRED, cluster.DnsLookupFamily)
 
 	// Verify load assignment
 	require.NotNil(t, cluster.LoadAssignment)

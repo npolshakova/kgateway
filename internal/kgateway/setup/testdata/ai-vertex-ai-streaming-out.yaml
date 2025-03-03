@@ -64,7 +64,6 @@ clusters:
         '@type': type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
   type: EDS
 - connectTimeout: 5s
-  dnsLookupFamily: V4_ONLY
   loadAssignment:
     clusterName: backend_gwtest_vertexai_0
     endpoints:
@@ -77,8 +76,6 @@ clusters:
           hostname: us-central1-aiplatform.googleapis.com
         metadata:
           filterMetadata:
-            envoy.transport_socket_match:
-              tls: us-central1-aiplatform.googleapis.com
             io.solo.transformation:
               api_version: v1
               auth_token: mysecretkey
@@ -129,6 +126,19 @@ clusters:
       typedConfig:
         '@type': type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
   type: LOGICAL_DNS
+  typedExtensionProtocolOptions:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      httpFilters:
+      - name: io.kgateway.wait
+        typedConfig:
+          '@type': type.googleapis.com/envoy.config.filter.http.upstream_wait.v2.UpstreamWaitFilterConfig
+      - name: ai.policy.transformation.kgateway.io
+        typedConfig:
+          '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
+      - name: ai.backend.transformation.kgateway.io
+        typedConfig:
+          '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
 listeners:
 - address:
     socketAddress:
@@ -171,19 +181,6 @@ listeners:
         - name: envoy.filters.http.router
           typedConfig:
             '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-            upstreamHttpFilters:
-            - name: ai.policy.transformation.kgateway.io
-              typedConfig:
-                '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
-            - name: io.kgateway.wait
-              typedConfig:
-                '@type': type.googleapis.com/envoy.config.filter.http.upstream_wait.v2.UpstreamWaitFilterConfig
-            - name: ai.backend.transformation.kgateway.io
-              typedConfig:
-                '@type': type.googleapis.com/envoy.api.v2.filter.http.FilterTransformations
-            - name: envoy.filters.http.upstream_codec
-              typedConfig:
-                '@type': type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
         mergeSlashes: true
         normalizePath: true
         rds:

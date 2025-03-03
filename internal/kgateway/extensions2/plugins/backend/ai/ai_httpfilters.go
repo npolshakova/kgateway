@@ -3,77 +3,70 @@ package ai
 import (
 	"time"
 
+	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_ext_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
 	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
+	envoy_upstreams_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3"
 	envoytransformation "github.com/solo-io/envoy-gloo/go/config/filter/http/transformation/v2"
 	upstream_wait "github.com/solo-io/envoy-gloo/go/config/filter/http/upstream_wait/v2"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/plugins"
+	translatorutils "github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
-func AddUpstreamHttpFilters() ([]plugins.StagedUpstreamHttpFilter, error) {
+func AddUpstreamHttpFilters(out *envoy_config_cluster_v3.Cluster) error {
 	transformationMsg, err := utils.MessageToAny(&envoytransformation.FilterTransformations{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	upstreamWaitMsg, err := utils.MessageToAny(&upstream_wait.UpstreamWaitFilterConfig{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	filters := []plugins.StagedUpstreamHttpFilter{
+	// The order of the filters is important as AIPolicyTransformationFilterName must run before the AIBackendTransformationFilterName
+	orderedFilters := []*envoy_hcm.HttpFilter{
 		// The wait filter essentially blocks filter iteration until a host has been selected.
 		// This is important because running as an upstream filter allows access to host
 		// metadata iff the host has already been selected, and that's a
 		// major benefit of running the filter at this stage.
 		{
-			Filter: &envoy_hcm.HttpFilter{
-				Name: waitFilterName,
-				ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
-					TypedConfig: upstreamWaitMsg,
-				},
-			},
-			Stage: plugins.UpstreamHTTPFilterStage{
-				RelativeTo: plugins.TransformationStage,
-				Weight:     -1,
+			Name: waitFilterName,
+			ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
+				TypedConfig: upstreamWaitMsg,
 			},
 		},
 		{
-			Filter: &envoy_hcm.HttpFilter{
-				Name: wellknown.AIBackendTransformationFilterName,
-				ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
-					TypedConfig: transformationMsg,
-				},
-			},
-			Stage: plugins.UpstreamHTTPFilterStage{
-				RelativeTo: plugins.TransformationStage,
-				Weight:     0,
+			Name: wellknown.AIPolicyTransformationFilterName,
+			ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
+				TypedConfig: transformationMsg,
 			},
 		},
 		{
-			Filter: &envoy_hcm.HttpFilter{
-				Name: wellknown.AIPolicyTransformationFilterName,
-				ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
-					TypedConfig: transformationMsg,
-				},
-			},
-			Stage: plugins.UpstreamHTTPFilterStage{
-				RelativeTo: plugins.TransformationStage,
-				Weight:     -2,
+			Name: wellknown.AIBackendTransformationFilterName,
+			ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
+				TypedConfig: transformationMsg,
 			},
 		},
 	}
-	return filters, nil
+
+	if err = translatorutils.MutateHttpOptions(out, func(opts *envoy_upstreams_v3.HttpProtocolOptions) {
+		opts.HttpFilters = append(opts.GetHttpFilters(), orderedFilters...)
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func AddExtprocHTTPFilter() ([]plugins.StagedHttpFilter, error) {
-	result := []plugins.StagedHttpFilter{}
+	var result []plugins.StagedHttpFilter
 
 	// TODO: add ratelimit and jwt_authn if AI Backend is configured
 	extProcSettings := &envoy_ext_proc_v3.ExternalProcessor{

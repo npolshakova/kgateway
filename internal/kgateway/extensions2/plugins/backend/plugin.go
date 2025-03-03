@@ -276,6 +276,10 @@ func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_confi
 			// TODO: report error on status
 			contextutils.LoggerFrom(ctx).Error(err)
 		}
+		err = ai.AddUpstreamHttpFilters(out)
+		if err != nil {
+			contextutils.LoggerFrom(ctx).Error(err)
+		}
 	}
 }
 
@@ -400,15 +404,7 @@ func (p *backendPlugin) HttpFilters(ctx context.Context, fc ir.FilterChainCommon
 }
 
 func (p *backendPlugin) UpstreamHttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedUpstreamHttpFilter, error) {
-	filters := []plugins.StagedUpstreamHttpFilter{}
-	if p.aiGatewayEnabled[fcc.FilterChainName] {
-		aiFilters, err := ai.AddUpstreamHttpFilters()
-		if err != nil {
-			return nil, err
-		}
-		filters = append(filters, aiFilters...)
-	}
-	return filters, nil
+	return nil, nil
 }
 
 func (p *backendPlugin) NetworkFilters(ctx context.Context) ([]plugins.StagedNetworkFilter, error) {

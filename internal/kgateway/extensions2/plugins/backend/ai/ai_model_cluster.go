@@ -51,9 +51,6 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets 
 		Type: envoy_config_cluster_v3.Cluster_LOGICAL_DNS,
 	}
 
-	// fix issue where ipv6 addr cannot bind
-	out.DnsLookupFamily = envoy_config_cluster_v3.Cluster_V4_ONLY
-
 	// We are reliant on https://github.com/envoyproxy/envoy/pull/34154 to merge
 	// before we can do OutlierDetection on 429s here
 	// out.OutlierDetection = getOutlierDetectionConfig(aiUs)
@@ -344,15 +341,8 @@ func buildLocalityLbEndpoint(
 	}
 	var tlsContext *envoy_tls_v3.UpstreamTlsContext
 	if port == tlsPort {
-		// Used for transport socket matching
-		metadata.GetFilterMetadata()["envoy.transport_socket_match"] = &structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"tls": structpb.NewStringValue(host),
-			},
-		}
 		tlsContext = &envoy_tls_v3.UpstreamTlsContext{
-			CommonTlsContext: &envoy_tls_v3.CommonTlsContext{},
-			Sni:              host,
+			AutoHostSni: true,
 		}
 	}
 	return &envoy_config_endpoint_v3.LbEndpoint{
