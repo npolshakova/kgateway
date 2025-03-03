@@ -341,8 +341,17 @@ func buildLocalityLbEndpoint(
 	}
 	var tlsContext *envoy_tls_v3.UpstreamTlsContext
 	if port == tlsPort {
+		// Used for transport socket matching
+		// TODO: switch to autohostsni, this seemed to break?
+		metadata.GetFilterMetadata()["envoy.transport_socket_match"] = &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"tls": structpb.NewStringValue(host),
+			},
+		}
 		tlsContext = &envoy_tls_v3.UpstreamTlsContext{
-			AutoHostSni: true,
+			CommonTlsContext: &envoy_tls_v3.CommonTlsContext{},
+			Sni:              host,
+			AutoHostSni:      true,
 		}
 	}
 	return &envoy_config_endpoint_v3.LbEndpoint{

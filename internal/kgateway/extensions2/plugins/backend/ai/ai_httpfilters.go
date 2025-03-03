@@ -1,11 +1,13 @@
 package ai
 
 import (
+	"fmt"
 	"time"
 
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_ext_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
+	envoy_upstream_codec "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/upstream_codec/v3"
 	envoy_hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	envoy_upstreams_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3"
 	envoytransformation "github.com/solo-io/envoy-gloo/go/config/filter/http/transformation/v2"
@@ -19,6 +21,11 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
+const (
+	// upstreamCodecFilterName is the name of the upstream codec filter.
+	upstreamCodecFilterName = "envoy.filters.http.upstream_codec"
+)
+
 func AddUpstreamHttpFilters(out *envoy_config_cluster_v3.Cluster) error {
 	transformationMsg, err := utils.MessageToAny(&envoytransformation.FilterTransformations{})
 	if err != nil {
@@ -28,6 +35,11 @@ func AddUpstreamHttpFilters(out *envoy_config_cluster_v3.Cluster) error {
 	upstreamWaitMsg, err := utils.MessageToAny(&upstream_wait.UpstreamWaitFilterConfig{})
 	if err != nil {
 		return err
+	}
+
+	codecConfigAny, err := utils.MessageToAny(&envoy_upstream_codec.UpstreamCodec{})
+	if err != nil {
+		return fmt.Errorf("failed to create upstream codec config: %v", err)
 	}
 
 	// The order of the filters is important as AIPolicyTransformationFilterName must run before the AIBackendTransformationFilterName
@@ -54,9 +66,27 @@ func AddUpstreamHttpFilters(out *envoy_config_cluster_v3.Cluster) error {
 				TypedConfig: transformationMsg,
 			},
 		},
+		{
+			Name: upstreamCodecFilterName,
+			ConfigType: &envoy_hcm.HttpFilter_TypedConfig{
+				TypedConfig: codecConfigAny,
+			},
+		},
 	}
 
 	if err = translatorutils.MutateHttpOptions(out, func(opts *envoy_upstreams_v3.HttpProtocolOptions) {
+		opts.UpstreamProtocolOptions = &envoy_upstreams_v3.HttpProtocolOptions_ExplicitHttpConfig_{
+			ExplicitHttpConfig: &envoy_upstreams_v3.HttpProtocolOptions_ExplicitHttpConfig{
+				ProtocolConfig: &envoy_upstreams_v3.HttpProtocolOptions_ExplicitHttpConfig_Http2ProtocolOptions{
+					Http2ProtocolOptions: &envoy_config_core_v3.Http2ProtocolOptions{},
+				},
+			},
+		}
+		opts.CommonHttpProtocolOptions = &envoy_config_core_v3.HttpProtocolOptions{
+			IdleTimeout: &durationpb.Duration{
+				Seconds: 30,
+			},
+		}
 		opts.HttpFilters = append(opts.GetHttpFilters(), orderedFilters...)
 	}); err != nil {
 		return err
