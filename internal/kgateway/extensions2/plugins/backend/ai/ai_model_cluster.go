@@ -3,9 +3,6 @@ package ai
 import (
 	"context"
 	"fmt"
-	"maps"
-	"slices"
-	"strings"
 
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -46,7 +43,7 @@ func ProcessAIBackend(ctx context.Context, in *v1alpha1.AIBackend, aiSecrets *ir
 // It is ALSO used by `ProcessRoute` to create the cluster in the event of backup models being used
 // and fallbacks being required.
 func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *ir.Secret, out *envoy_config_cluster_v3.Cluster) error {
-	// set the type to logical dns
+	// set the type to strict dns to support mutli pool backends
 	out.ClusterDiscoveryType = &envoy_config_cluster_v3.Cluster_Type{
 		Type: envoy_config_cluster_v3.Cluster_STRICT_DNS,
 	}
@@ -56,45 +53,33 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets 
 	// out.OutlierDetection = getOutlierDetectionConfig(aiUs)
 
 	var prioritized []*envoy_config_endpoint_v3.LocalityLbEndpoints
-	var matches []*envoy_config_cluster_v3.Cluster_TransportSocketMatch
+	//var matches []*envoy_config_cluster_v3.Cluster_TransportSocketMatch
 	var err error
 
 	if aiUs.MultiPool != nil {
 		epByType := map[string]struct{}{}
-		tsmByHost := make(map[string]*envoy_config_cluster_v3.Cluster_TransportSocketMatch)
 		prioritized = make([]*envoy_config_endpoint_v3.LocalityLbEndpoints, 0, len(aiUs.MultiPool.Priorities))
 		for idx, pool := range aiUs.MultiPool.Priorities {
 			eps := make([]*envoy_config_endpoint_v3.LbEndpoint, 0, len(pool.Pool))
 			for _, ep := range pool.Pool {
 				var result *envoy_config_endpoint_v3.LbEndpoint
-				var tlsContext *envoy_tls_v3.UpstreamTlsContext
 				var err error
 				epByType[fmt.Sprintf("%T", ep)] = struct{}{}
 				if ep.Provider.OpenAI != nil {
-					result, tlsContext, err = buildOpenAIEndpoint(ep.Provider.OpenAI, ep.HostOverride, aiSecrets)
+					result, err = buildOpenAIEndpoint(ep.Provider.OpenAI, ep.HostOverride, aiSecrets)
 				} else if ep.Provider.Anthropic != nil {
-					result, tlsContext, err = buildAnthropicEndpoint(ep.Provider.Anthropic, ep.HostOverride, aiSecrets)
+					result, err = buildAnthropicEndpoint(ep.Provider.Anthropic, ep.HostOverride, aiSecrets)
 				} else if ep.Provider.AzureOpenAI != nil {
-					result, tlsContext, err = buildAzureOpenAIEndpoint(ep.Provider.AzureOpenAI, ep.HostOverride, aiSecrets)
+					result, err = buildAzureOpenAIEndpoint(ep.Provider.AzureOpenAI, ep.HostOverride, aiSecrets)
 				} else if ep.Provider.Gemini != nil {
-					result, tlsContext, err = buildGeminiEndpoint(ep.Provider.Gemini, ep.HostOverride, aiSecrets)
+					result, err = buildGeminiEndpoint(ep.Provider.Gemini, ep.HostOverride, aiSecrets)
 				} else if ep.Provider.VertexAI != nil {
-					result, tlsContext, err = buildVertexAIEndpoint(ctx, ep.Provider.VertexAI, ep.HostOverride, aiSecrets)
+					result, err = buildVertexAIEndpoint(ctx, ep.Provider.VertexAI, ep.HostOverride, aiSecrets)
 				}
 				if err != nil {
 					return err
 				}
 				eps = append(eps, result)
-				if tlsContext == nil {
-					continue
-				}
-				if _, ok := tsmByHost[tlsContext.GetSni()]; !ok {
-					tsm, err := buildTsm(tlsContext)
-					if err != nil {
-						return err
-					}
-					tsmByHost[tlsContext.GetSni()] = tsm
-				}
 			}
 			priority := idx
 			prioritized = append(prioritized, &envoy_config_endpoint_v3.LocalityLbEndpoints{
@@ -105,31 +90,46 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets 
 		if len(epByType) > 1 {
 			return eris.Errorf("multi backend pools must all be of the same type, got %v", epByType)
 		}
-		slice := slices.Collect(maps.Values(tsmByHost))
-		slices.SortStableFunc(slice, func(a, b *envoy_config_cluster_v3.Cluster_TransportSocketMatch) int {
-			return strings.Compare(a.GetName(), b.GetName())
-		})
-		out.TransportSocketMatches = append(out.GetTransportSocketMatches(), slice...)
 	} else if aiUs.LLM != nil {
-		matches, prioritized, err = buildLLMEndpoint(ctx, aiUs, aiSecrets)
+		prioritized, err = buildLLMEndpoint(ctx, aiUs, aiSecrets)
 		if err != nil {
 			return err
 		}
-		out.TransportSocketMatches = matches
+		//out.TransportSocketMatches = matches
 	}
-	// Default match on plaintext if nothing else is added
-	out.TransportSocketMatches = append(out.GetTransportSocketMatches(), &envoy_config_cluster_v3.Cluster_TransportSocketMatch{
-		Name: "plaintext",
-		TransportSocket: &envoy_config_core_v3.TransportSocket{
-			Name: wellknown.TransportSocketRawBuffer,
-			ConfigType: &envoy_config_core_v3.TransportSocket_TypedConfig{
-				TypedConfig: &anypb.Any{
-					TypeUrl: "type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer",
+	// attempt to match tls, the default match is always plaintext
+	tlsMatch := &envoy_tls_v3.UpstreamTlsContext{
+		CommonTlsContext: &envoy_tls_v3.CommonTlsContext{},
+		AutoHostSni:      true,
+	}
+	tlsMatchAny, err := utils.MessageToAny(tlsMatch)
+	if err != nil {
+		return err
+		// TODO:
+	}
+	out.TransportSocketMatches = append(out.GetTransportSocketMatches(), []*envoy_config_cluster_v3.Cluster_TransportSocketMatch{
+		{
+			Name: "tls",
+			TransportSocket: &envoy_config_core_v3.TransportSocket{
+				Name: wellknown.TransportSocketTls,
+				ConfigType: &envoy_config_core_v3.TransportSocket_TypedConfig{
+					TypedConfig: tlsMatchAny,
 				},
 			},
 		},
-		Match: &structpb.Struct{},
-	})
+		{
+			Name: "plaintext",
+			TransportSocket: &envoy_config_core_v3.TransportSocket{
+				Name: wellknown.TransportSocketRawBuffer,
+				ConfigType: &envoy_config_core_v3.TransportSocket_TypedConfig{
+					TypedConfig: &anypb.Any{
+						TypeUrl: "type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer",
+					},
+				},
+			},
+			Match: &structpb.Struct{},
+		},
+	}...)
 	out.LoadAssignment = &envoy_config_endpoint_v3.ClusterLoadAssignment{
 		ClusterName: out.GetName(),
 		Endpoints:   prioritized,
@@ -138,91 +138,56 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets 
 	return nil
 }
 
-func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *ir.Secret) ([]*envoy_config_cluster_v3.Cluster_TransportSocketMatch, []*envoy_config_endpoint_v3.LocalityLbEndpoints, error) {
-	var tsms []*envoy_config_cluster_v3.Cluster_TransportSocketMatch
+func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *ir.Secret) ([]*envoy_config_endpoint_v3.LocalityLbEndpoints, error) {
 	var prioritized []*envoy_config_endpoint_v3.LocalityLbEndpoints
 	provider := aiUs.LLM.Provider
 	if provider.OpenAI != nil {
-		host, tlsContext, err := buildOpenAIEndpoint(provider.OpenAI, aiUs.LLM.HostOverride, aiSecrets)
+		host, err := buildOpenAIEndpoint(provider.OpenAI, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
-		}
-		if tlsContext != nil {
-			tsm, err := buildTsm(tlsContext)
-			if err != nil {
-				return nil, nil, err
-			}
-			tsms = append(tsms, tsm)
 		}
 	} else if provider.Anthropic != nil {
-		host, tlsContext, err := buildAnthropicEndpoint(provider.Anthropic, aiUs.LLM.HostOverride, aiSecrets)
+		host, err := buildAnthropicEndpoint(provider.Anthropic, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
-		}
-		if tlsContext != nil {
-			tsm, err := buildTsm(tlsContext)
-			if err != nil {
-				return nil, nil, err
-			}
-			tsms = append(tsms, tsm)
 		}
 	} else if provider.AzureOpenAI != nil {
-		host, tlsContext, err := buildAzureOpenAIEndpoint(provider.AzureOpenAI, aiUs.LLM.HostOverride, aiSecrets)
+		host, err := buildAzureOpenAIEndpoint(provider.AzureOpenAI, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
-		}
-		if tlsContext != nil {
-			tsm, err := buildTsm(tlsContext)
-			if err != nil {
-				return nil, nil, err
-			}
-			tsms = append(tsms, tsm)
 		}
 	} else if provider.Gemini != nil {
-		host, tlsContext, err := buildGeminiEndpoint(provider.Gemini, aiUs.LLM.HostOverride, aiSecrets)
+		host, err := buildGeminiEndpoint(provider.Gemini, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
-		}
-		if tlsContext != nil {
-			tsm, err := buildTsm(tlsContext)
-			if err != nil {
-				return nil, nil, err
-			}
-			tsms = append(tsms, tsm)
 		}
 	} else if provider.VertexAI != nil {
-		host, tlsContext, err := buildVertexAIEndpoint(ctx, provider.VertexAI, aiUs.LLM.HostOverride, aiSecrets)
+		host, err := buildVertexAIEndpoint(ctx, provider.VertexAI, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
 		}
-		if tlsContext != nil {
-			tsm, err := buildTsm(tlsContext)
-			if err != nil {
-				return nil, nil, err
-			}
-			tsms = append(tsms, tsm)
-		}
 	}
-	return tsms, prioritized, nil
+	return prioritized, nil
 }
 
-// Build a TransoprtSocketMatch for the given UpstreamTlsContext.
+// Build a TransportSocketMatch for the given UpstreamTlsContext.
 func buildTsm(tlsContext *envoy_tls_v3.UpstreamTlsContext) (*envoy_config_cluster_v3.Cluster_TransportSocketMatch, error) {
+	tlsContext.AutoHostSni = true
 	typedConfig, err := utils.MessageToAny(tlsContext)
 	if err != nil {
 		return nil, err
@@ -231,7 +196,7 @@ func buildTsm(tlsContext *envoy_tls_v3.UpstreamTlsContext) (*envoy_config_cluste
 		Name: "tls_" + tlsContext.GetSni(),
 		Match: &structpb.Struct{
 			Fields: map[string]*structpb.Value{
-				"tls": structpb.NewStringValue(tlsContext.GetSni()),
+				"tls": structpb.NewStringValue("true"),
 			},
 		},
 		TransportSocket: &envoy_config_core_v3.TransportSocket{
@@ -241,70 +206,70 @@ func buildTsm(tlsContext *envoy_tls_v3.UpstreamTlsContext) (*envoy_config_cluste
 	}, nil
 }
 
-func buildOpenAIEndpoint(data *v1alpha1.OpenAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, *envoy_tls_v3.UpstreamTlsContext, error) {
+func buildOpenAIEndpoint(data *v1alpha1.OpenAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	model := ""
 	if data.Model != nil {
 		model = *data.Model
 	}
-	ep, host := buildLocalityLbEndpoint(
+	ep := buildLocalityLbEndpoint(
 		"api.openai.com",
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, model, nil),
 	)
-	return ep, host, nil
+	return ep, nil
 }
-func buildAnthropicEndpoint(data *v1alpha1.AnthropicConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, *envoy_tls_v3.UpstreamTlsContext, error) {
+func buildAnthropicEndpoint(data *v1alpha1.AnthropicConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	model := ""
 	if data.Model != nil {
 		model = *data.Model
 	}
-	ep, host := buildLocalityLbEndpoint(
+	ep := buildLocalityLbEndpoint(
 		"api.anthropic.com",
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, model, nil),
 	)
-	return ep, host, nil
+	return ep, nil
 }
-func buildAzureOpenAIEndpoint(data *v1alpha1.AzureOpenAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, *envoy_tls_v3.UpstreamTlsContext, error) {
+func buildAzureOpenAIEndpoint(data *v1alpha1.AzureOpenAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	ep, host := buildLocalityLbEndpoint(
+	ep := buildLocalityLbEndpoint(
 		data.Endpoint,
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, data.DeploymentName, map[string]string{"api_version": data.ApiVersion}),
 	)
-	return ep, host, nil
+	return ep, nil
 }
-func buildGeminiEndpoint(data *v1alpha1.GeminiConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, *envoy_tls_v3.UpstreamTlsContext, error) {
+func buildGeminiEndpoint(data *v1alpha1.GeminiConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	ep, host := buildLocalityLbEndpoint(
+	ep := buildLocalityLbEndpoint(
 		"generativelanguage.googleapis.com",
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, data.Model, map[string]string{"api_version": data.ApiVersion}),
 	)
-	return ep, host, nil
+	return ep, nil
 }
-func buildVertexAIEndpoint(ctx context.Context, data *v1alpha1.VertexAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, *envoy_tls_v3.UpstreamTlsContext, error) {
+func buildVertexAIEndpoint(ctx context.Context, data *v1alpha1.VertexAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var publisher string
 	switch data.Publisher {
@@ -315,13 +280,13 @@ func buildVertexAIEndpoint(ctx context.Context, data *v1alpha1.VertexAIConfig, h
 		contextutils.LoggerFrom(ctx).Warnf("unsupported Vertex AI publisher: %v. Defaulting to Google.", data.Publisher)
 		publisher = "google"
 	}
-	ep, host := buildLocalityLbEndpoint(
+	ep := buildLocalityLbEndpoint(
 		fmt.Sprintf("%s-aiplatform.googleapis.com", data.Location),
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, data.Model, map[string]string{"api_version": data.ApiVersion, "location": data.Location, "project": data.ProjectId, "publisher": publisher}),
 	)
-	return ep, host, nil
+	return ep, nil
 }
 
 // TODO: Add ssl verification with endpoints (https://github.com/kgateway-dev/kgateway/issues/10719)
@@ -330,7 +295,7 @@ func buildLocalityLbEndpoint(
 	port int32,
 	hostOverride *v1alpha1.Host,
 	metadata *envoy_config_core_v3.Metadata,
-) (*envoy_config_endpoint_v3.LbEndpoint, *envoy_tls_v3.UpstreamTlsContext) {
+) *envoy_config_endpoint_v3.LbEndpoint {
 	if hostOverride != nil {
 		if hostOverride.Host != "" {
 			host = hostOverride.Host
@@ -339,19 +304,13 @@ func buildLocalityLbEndpoint(
 			port = int32(hostOverride.Port)
 		}
 	}
-	var tlsContext *envoy_tls_v3.UpstreamTlsContext
 	if port == tlsPort {
 		// Used for transport socket matching
 		// TODO: switch to autohostsni, this seemed to break?
 		metadata.GetFilterMetadata()["envoy.transport_socket_match"] = &structpb.Struct{
 			Fields: map[string]*structpb.Value{
-				"tls": structpb.NewStringValue(host),
+				"tls": structpb.NewStringValue("true"),
 			},
-		}
-		tlsContext = &envoy_tls_v3.UpstreamTlsContext{
-			CommonTlsContext: &envoy_tls_v3.CommonTlsContext{},
-			Sni:              host,
-			AutoHostSni:      true,
 		}
 	}
 	return &envoy_config_endpoint_v3.LbEndpoint{
@@ -372,7 +331,7 @@ func buildLocalityLbEndpoint(
 				},
 			},
 		},
-	}, tlsContext
+	}
 }
 
 // `buildEndpointMeta` builds the metadata for the endpoint.

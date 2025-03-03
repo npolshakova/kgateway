@@ -26,7 +26,7 @@ const (
 	upstreamCodecFilterName = "envoy.filters.http.upstream_codec"
 )
 
-func AddUpstreamHttpFilters(out *envoy_config_cluster_v3.Cluster) error {
+func AddUpstreamClusterHttpFilters(out *envoy_config_cluster_v3.Cluster) error {
 	transformationMsg, err := utils.MessageToAny(&envoytransformation.FilterTransformations{})
 	if err != nil {
 		return err
@@ -112,7 +112,8 @@ func AddExtprocHTTPFilter() ([]plugins.StagedHttpFilter, error) {
 			},
 		},
 		ProcessingMode: &envoy_ext_proc_v3.ProcessingMode{
-			RequestHeaderMode:   envoy_ext_proc_v3.ProcessingMode_SEND,
+			RequestHeaderMode: envoy_ext_proc_v3.ProcessingMode_SEND,
+			// TODO: Change this to buffered. Set limit by add buffer filter for AI requests, disabled by default
 			RequestBodyMode:     envoy_ext_proc_v3.ProcessingMode_STREAMED,
 			RequestTrailerMode:  envoy_ext_proc_v3.ProcessingMode_SKIP,
 			ResponseHeaderMode:  envoy_ext_proc_v3.ProcessingMode_SEND,
