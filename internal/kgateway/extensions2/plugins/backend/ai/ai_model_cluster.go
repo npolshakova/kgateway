@@ -48,7 +48,7 @@ func ProcessAIBackend(ctx context.Context, in *v1alpha1.AIBackend, aiSecrets *ir
 func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *ir.Secret, out *envoy_config_cluster_v3.Cluster) error {
 	// set the type to logical dns
 	out.ClusterDiscoveryType = &envoy_config_cluster_v3.Cluster_Type{
-		Type: envoy_config_cluster_v3.Cluster_LOGICAL_DNS,
+		Type: envoy_config_cluster_v3.Cluster_STRICT_DNS,
 	}
 
 	// We are reliant on https://github.com/envoyproxy/envoy/pull/34154 to merge

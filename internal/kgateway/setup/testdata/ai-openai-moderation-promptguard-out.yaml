@@ -120,7 +120,7 @@ clusters:
       name: envoy.transport_sockets.raw_buffer
       typedConfig:
         '@type': type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-  type: LOGICAL_DNS
+  type: STRICT_DNS
   typedExtensionProtocolOptions:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
       '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
