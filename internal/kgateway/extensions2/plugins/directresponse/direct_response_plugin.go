@@ -46,9 +46,15 @@ func (d *directResponse) Equals(in any) bool {
 }
 
 type directResponsePluginGwPass struct {
+	ir.UnimplementedProxyTranslationPass
 }
 
 func (p *directResponsePluginGwPass) ApplyHCM(ctx context.Context, pCtx *ir.HcmContext, out *envoyhttp.HttpConnectionManager) error {
+	// no op
+	return nil
+}
+
+func (p *directResponsePluginGwPass) ApplyForBackend(ctx context.Context, pCtx *ir.RouteBackendContext, in ir.HttpBackend, out *envoy_config_route_v3.Route) error {
 	// no op
 	return nil
 }
@@ -155,10 +161,6 @@ func (p *directResponsePluginGwPass) ApplyForRouteBackend(
 // if a plugin emits new filters, they must be with a plugin unique name.
 // any filter returned from route config must be disabled, so it doesnt impact other routes.
 func (p *directResponsePluginGwPass) HttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
-	return nil, nil
-}
-
-func (p *directResponsePluginGwPass) UpstreamHttpFilters(ctx context.Context) ([]plugins.StagedUpstreamHttpFilter, error) {
 	return nil, nil
 }
 
