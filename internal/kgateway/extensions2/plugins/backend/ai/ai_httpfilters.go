@@ -13,7 +13,6 @@ import (
 	envoytransformation "github.com/solo-io/envoy-gloo/go/config/filter/http/transformation/v2"
 	upstream_wait "github.com/solo-io/envoy-gloo/go/config/filter/http/upstream_wait/v2"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/plugins"
 	translatorutils "github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/utils"
@@ -99,12 +98,11 @@ func AddExtprocHTTPFilter() ([]plugins.StagedHttpFilter, error) {
 	var result []plugins.StagedHttpFilter
 
 	// TODO: add ratelimit and jwt_authn if AI Backend is configured
+
 	extProcSettings := &envoy_ext_proc_v3.ExternalProcessor{
 		GrpcService: &envoy_config_core_v3.GrpcService{
-			Timeout: durationpb.New(5 * time.Second),
-			RetryPolicy: &envoy_config_core_v3.RetryPolicy{
-				NumRetries: wrapperspb.UInt32(3),
-			},
+			// Note: retries and timeouts are not set here currently since grpc retries are note useful if the
+			// request size is unknown. See: https://github.com/kgateway-dev/kgateway/issues/10739
 			TargetSpecifier: &envoy_config_core_v3.GrpcService_EnvoyGrpc_{
 				EnvoyGrpc: &envoy_config_core_v3.GrpcService_EnvoyGrpc{
 					ClusterName: extProcUDSClusterName,

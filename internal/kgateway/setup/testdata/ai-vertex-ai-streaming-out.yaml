@@ -166,9 +166,6 @@ listeners:
             grpcService:
               envoyGrpc:
                 clusterName: ai_ext_proc_uds_cluster
-              retryPolicy:
-                numRetries: 3
-              timeout: 5s
             messageTimeout: 5s
             metadataOptions:
               forwardingNamespaces:

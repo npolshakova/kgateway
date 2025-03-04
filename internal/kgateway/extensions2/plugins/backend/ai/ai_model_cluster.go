@@ -53,7 +53,6 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets 
 	// out.OutlierDetection = getOutlierDetectionConfig(aiUs)
 
 	var prioritized []*envoy_config_endpoint_v3.LocalityLbEndpoints
-	//var matches []*envoy_config_cluster_v3.Cluster_TransportSocketMatch
 	var err error
 
 	if aiUs.MultiPool != nil {
@@ -95,7 +94,6 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets 
 		if err != nil {
 			return err
 		}
-		//out.TransportSocketMatches = matches
 	}
 	// attempt to match tls, the default match is always plaintext
 	tlsMatch := &envoy_tls_v3.UpstreamTlsContext{
@@ -105,7 +103,6 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets 
 	tlsMatchAny, err := utils.MessageToAny(tlsMatch)
 	if err != nil {
 		return err
-		// TODO:
 	}
 	out.TransportSocketMatches = append(out.GetTransportSocketMatches(), []*envoy_config_cluster_v3.Cluster_TransportSocketMatch{
 		{
@@ -306,7 +303,6 @@ func buildLocalityLbEndpoint(
 	}
 	if port == tlsPort {
 		// Used for transport socket matching
-		// TODO: switch to autohostsni, this seemed to break?
 		metadata.GetFilterMetadata()["envoy.transport_socket_match"] = &structpb.Struct{
 			Fields: map[string]*structpb.Value{
 				"tls": structpb.NewStringValue("true"),
@@ -417,7 +413,7 @@ func getTransformation(ctx context.Context, llm *v1alpha1.LLMProvider) (string, 
 			// Use user provided model path
 			modelPath = fmt.Sprintf(`models/{{host_metadata("model")}}:%s`, *modelCall)
 		}
-		// https://${LOCATION}-aiplatform.googleapis.com/{VERSION}/projects/${PROJECT_ID}/locations/${LOCATION}/<model-path>
+		// https://${LOCATION}-aiplatform.googleapis.com/${VERSION}/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${MODEL}:{generateContent|streamGenerateContent}
 		path = fmt.Sprintf(`/{{host_metadata("api_version")}}/projects/{{host_metadata("project")}}/locations/{{host_metadata("location")}}/publishers/{{host_metadata("publisher")}}/%s`, modelPath)
 	}
 	return headerName, prefix, path, bodyTransformation
