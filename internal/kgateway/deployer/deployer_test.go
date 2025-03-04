@@ -878,7 +878,7 @@ var _ = Describe("Deployer", func() {
 		fullyDefinedValidationWithoutRunAsUser := func(objs clientObjects, inp *input) error {
 			expectedGwp := inp.defaultGwp.Spec.Kube
 			Expect(objs).NotTo(BeEmpty())
-			// Check we have Deployment, Envoy ConfigMap, ServiceAccount, Service, AIRoutePolicy Stats ConfigMap
+			// Check we have Deployment, Envoy ConfigMap, ServiceAccount, Service, AI Stats ConfigMap
 			Expect(objs).To(HaveLen(5))
 			dep := objs.findDeployment(defaultNamespace, defaultDeploymentName)
 			Expect(dep).ToNot(BeNil())
@@ -941,7 +941,7 @@ var _ = Describe("Deployer", func() {
 			Expect(istioContainer.Resources.Requests.Cpu()).To(Equal(expectedGwp.Istio.IstioProxyContainer.Resources.Requests.Cpu()))
 			// TODO: assert on istio args (e.g. log level, istio meta fields, etc)
 
-			// assert AIRoutePolicy extension container
+			// assert AI extension container
 			expectedAIExtension := fmt.Sprintf("%s/%s",
 				*expectedGwp.AiExtension.Image.Registry,
 				*expectedGwp.AiExtension.Image.Repository,
@@ -1211,7 +1211,7 @@ var _ = Describe("Deployer", func() {
 			}, &expectedOutput{
 				validationFunc: fullyDefinedValidationFloatingUserId,
 			}),
-			Entry("correct deployment with sds and AIRoutePolicy extension enabled", &input{
+			Entry("correct deployment with sds and AI extension enabled", &input{
 				dInputs:     istioEnabledDeployerInputs(),
 				gw:          defaultGatewayWithGatewayParams(gwpOverrideName),
 				defaultGwp:  defaultGatewayParams(),
@@ -1219,7 +1219,7 @@ var _ = Describe("Deployer", func() {
 			}, &expectedOutput{
 				validationFunc: aiAndSdsValidationFunc,
 			}),
-			Entry("correct deployment with sds, AIRoutePolicy extension, and floatinguUserId enabled", &input{
+			Entry("correct deployment with sds, AI extension, and floatinguUserId enabled", &input{
 				dInputs:     istioEnabledDeployerInputs(),
 				gw:          defaultGatewayWithGatewayParams(gwpOverrideName),
 				defaultGwp:  defaultGatewayParams(),
