@@ -101,7 +101,7 @@ func AddExtprocHTTPFilter() ([]plugins.StagedHttpFilter, error) {
 
 	extProcSettings := &envoy_ext_proc_v3.ExternalProcessor{
 		GrpcService: &envoy_config_core_v3.GrpcService{
-			// Note: retries and timeouts are not set here currently since grpc retries are note useful if the
+			// Note: retries and timeouts are not set here currently since grpc retries are not useful if the
 			// request size is unknown. See: https://github.com/kgateway-dev/kgateway/issues/10739
 			TargetSpecifier: &envoy_config_core_v3.GrpcService_EnvoyGrpc_{
 				EnvoyGrpc: &envoy_config_core_v3.GrpcService_EnvoyGrpc{

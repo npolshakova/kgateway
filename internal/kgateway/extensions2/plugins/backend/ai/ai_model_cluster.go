@@ -15,9 +15,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	aiutils "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
-
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	aiutils "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 )
@@ -180,27 +179,6 @@ func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *
 		}
 	}
 	return prioritized, nil
-}
-
-// Build a TransportSocketMatch for the given UpstreamTlsContext.
-func buildTsm(tlsContext *envoy_tls_v3.UpstreamTlsContext) (*envoy_config_cluster_v3.Cluster_TransportSocketMatch, error) {
-	tlsContext.AutoHostSni = true
-	typedConfig, err := utils.MessageToAny(tlsContext)
-	if err != nil {
-		return nil, err
-	}
-	return &envoy_config_cluster_v3.Cluster_TransportSocketMatch{
-		Name: "tls_" + tlsContext.GetSni(),
-		Match: &structpb.Struct{
-			Fields: map[string]*structpb.Value{
-				"tls": structpb.NewStringValue("true"),
-			},
-		},
-		TransportSocket: &envoy_config_core_v3.TransportSocket{
-			Name:       wellknown.TransportSocketTls,
-			ConfigType: &envoy_config_core_v3.TransportSocket_TypedConfig{TypedConfig: typedConfig},
-		},
-	}, nil
 }
 
 func buildOpenAIEndpoint(data *v1alpha1.OpenAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
