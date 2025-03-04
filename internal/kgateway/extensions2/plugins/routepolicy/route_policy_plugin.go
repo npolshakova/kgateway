@@ -141,7 +141,6 @@ func (p *routePolicyPluginGwPass) ApplyForRouteBackend(
 	ctx context.Context,
 	policy ir.PolicyIR,
 	pCtx *ir.RouteBackendContext,
-	// TODO: add output route?
 ) error {
 	extprocSettingsProto := pCtx.GetTypedConfig(wellknown.AIExtProcFilterName)
 	if extprocSettingsProto == nil {
@@ -171,10 +170,6 @@ func (p *routePolicyPluginGwPass) ApplyForRouteBackend(
 // if a plugin emits new filters, they must be with a plugin unique name.
 // any filter returned from route config must be disabled, so it doesnt impact other routes.
 func (p *routePolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedHttpFilter, error) {
-	return nil, nil
-}
-
-func (p *routePolicyPluginGwPass) UpstreamHttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedUpstreamHttpFilter, error) {
 	return nil, nil
 }
 

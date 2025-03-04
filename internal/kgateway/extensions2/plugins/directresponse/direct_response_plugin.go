@@ -164,10 +164,6 @@ func (p *directResponsePluginGwPass) HttpFilters(ctx context.Context, fcc ir.Fil
 	return nil, nil
 }
 
-func (p *directResponsePluginGwPass) UpstreamHttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedUpstreamHttpFilter, error) {
-	return nil, nil
-}
-
 func (p *directResponsePluginGwPass) NetworkFilters(ctx context.Context) ([]plugins.StagedNetworkFilter, error) {
 	return nil, nil
 }

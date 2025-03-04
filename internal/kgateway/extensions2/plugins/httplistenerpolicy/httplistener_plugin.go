@@ -170,10 +170,6 @@ func (p *httpListenerPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir
 	return nil, nil
 }
 
-func (p *httpListenerPolicyPluginGwPass) UpstreamHttpFilters(ctx context.Context, fcc ir.FilterChainCommon) ([]plugins.StagedUpstreamHttpFilter, error) {
-	return nil, nil
-}
-
 func (p *httpListenerPolicyPluginGwPass) NetworkFilters(ctx context.Context) ([]plugins.StagedNetworkFilter, error) {
 	return nil, nil
 }
