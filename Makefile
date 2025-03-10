@@ -26,7 +26,8 @@ help: ## Output the self-documenting make targets
 
 ROOTDIR := $(shell pwd)
 OUTPUT_DIR ?= $(ROOTDIR)/_output
-AI_EXTENSION_DIR := $(ROOTDIR)/internal/ai-extension
+AI_EXTENSION_DIR := $(ROOTDIR)/python
+TEST_AI_PROVIDER_SERVER_DIR := $(ROOTDIR)/test/mocks/mock-ai-provider-server
 
 export IMAGE_REGISTRY ?= ghcr.io/kgateway-dev
 
@@ -344,6 +345,12 @@ kgateway-ai-extension-docker:
 	cd $(AI_EXTENSION_DIR) && docker buildx build $(LOAD_OR_PUSH) $(DOCKER_BUILD_ARGS_AI_EXT) -f Dockerfile . \
 		$(QUAY_EXPIRATION_LABEL) \
 		-t $(IMAGE_REGISTRY)/kgateway-ai-extension:$(VERSION)
+
+.PHONY: test-ai-provider-docker
+test-ai-provider-docker:
+	cd $(TEST_AI_PROVIDER_SERVER_DIR) && docker buildx build $(LOAD_OR_PUSH) $(DOCKER_BUILD_ARGS_AI_EXT) -f Dockerfile . \
+		$(QUAY_EXPIRATION_LABEL) \
+		-t $(IMAGE_REGISTRY)/test-ai-provider:$(VERSION)
 
 # Ensures that accesses for fields which have "getter" functions are exclusively done via said "getter" functions
 # TODO: do we still want this?
