@@ -325,7 +325,6 @@ go-generate-apis: ## Run all go generate directives in the repo, including codeg
 go-generate-mocks: ## Runs all generate directives for mockgen in the repo
 	GO111MODULE=on go generate -run="mockgen" ./...
 
-# TODO: remove this and maintain struct def
 .PHONY: generate-ai-extension-apis
 generate-ai-extension-apis:
 ifeq ($(SKIP_VENV), true)
