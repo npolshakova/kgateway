@@ -3,6 +3,7 @@ package ir
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -28,30 +29,35 @@ type VirtualHostContext struct {
 	Policy PolicyIR
 }
 
-type TypedFilterConfigMap map[string]proto.Message
-
-func (r *TypedFilterConfigMap) AddTypedConfig(key string, v proto.Message) {
-	if *r == nil {
-		*r = make(TypedFilterConfigMap)
-	}
-	(*r)[key] = v
+type TypedFilterConfigMap struct {
+	m sync.Map
 }
 
+// AddTypedConfig adds a key-value pair to the map.
+func (r *TypedFilterConfigMap) AddTypedConfig(key string, v proto.Message) {
+	r.m.Store(key, v)
+}
+
+// GetTypedConfig retrieves a value from the map by key.
 func (r *TypedFilterConfigMap) GetTypedConfig(key string) proto.Message {
-	if r == nil || *r == nil {
-		return nil
-	}
-	if v, ok := (*r)[key]; ok {
-		return v
+	if v, ok := r.m.Load(key); ok {
+		return v.(proto.Message)
 	}
 	return nil
+}
+
+// Range iterates over all the key-value pairs.
+func (r *TypedFilterConfigMap) Range(f func(key string, value proto.Message) bool) {
+	r.m.Range(func(k, v interface{}) bool {
+		return f(k.(string), v.(proto.Message))
+	})
 }
 
 type RouteBackendContext struct {
 	FilterChainName string
 	Backend         *BackendObjectIR
 	// TypedFilterConfig will be output on the Route or WeightedCluster level after all plugins have run
-	TypedFilterConfig TypedFilterConfigMap
+	TypedFilterConfig *TypedFilterConfigMap
 }
 
 type RouteContext struct {
@@ -59,7 +65,7 @@ type RouteContext struct {
 	Policy          PolicyIR
 	In              HttpRouteRuleMatchIR
 	// TypedFilterConfig will be output on the Route level after all plugins have run
-	TypedFilterConfig TypedFilterConfigMap
+	TypedFilterConfig *TypedFilterConfigMap
 }
 
 type HcmContext struct {

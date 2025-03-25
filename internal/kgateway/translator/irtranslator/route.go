@@ -121,7 +121,7 @@ func (h *httpRouteConfigurationTranslator) envoyRoutes(ctx context.Context,
 ) *envoy_config_route_v3.Route {
 	out := h.initRoutes(in, generatedName)
 
-	typedPerFilterConfigRoute := ir.TypedFilterConfigMap(map[string]proto.Message{})
+	typedPerFilterConfigRoute := &ir.TypedFilterConfigMap{}
 	if len(in.Backends) == 1 {
 		// if there's only one backend, we need to reuse typedPerFilterConfigRoute in both translateRouteAction and runRoutePlugins
 		out.Action = h.translateRouteAction(ctx, in, out, typedPerFilterConfigRoute)
@@ -144,15 +144,18 @@ func (h *httpRouteConfigurationTranslator) envoyRoutes(ctx context.Context,
 
 	// apply typed per filter config from translating route action and route plugins
 	typedPerFilterConfigAny := map[string]*anypb.Any{}
-	for k, v := range typedPerFilterConfigRoute {
+	typedPerFilterConfigRoute.Range(func(k string, v proto.Message) bool {
+		// Convert the proto.Message to google.protobuf.Any
 		config, err := utils.MessageToAny(v)
 		if err != nil {
 			// TODO: error on status
 			contextutils.LoggerFrom(ctx).Error(err)
-			continue
+			return true // continue
 		}
+
 		typedPerFilterConfigAny[k] = config
-	}
+		return true // continue
+	})
 	out.TypedPerFilterConfig = typedPerFilterConfigAny
 
 	if err == nil && out.GetAction() == nil {
@@ -223,7 +226,7 @@ func (h *httpRouteConfigurationTranslator) runRoutePlugins(
 	routeReport reports.ParentRefReporter,
 	in ir.HttpRouteRuleMatchIR,
 	out *envoy_config_route_v3.Route,
-	typedPerFilterConfig ir.TypedFilterConfigMap,
+	typedPerFilterConfig *ir.TypedFilterConfigMap,
 ) error {
 	// all policies up to listener have been applied as vhost polices; we need to apply the httproute policies and below
 	//
@@ -332,7 +335,7 @@ func (h *httpRouteConfigurationTranslator) translateRouteAction(
 	ctx context.Context,
 	in ir.HttpRouteRuleMatchIR,
 	outRoute *envoy_config_route_v3.Route,
-	parentTypedPerFilterConfig ir.TypedFilterConfigMap,
+	parentTypedPerFilterConfig *ir.TypedFilterConfigMap,
 ) *envoy_config_route_v3.Route_Route {
 	var clusters []*envoy_config_route_v3.WeightedCluster_ClusterWeight
 
@@ -348,7 +351,7 @@ func (h *httpRouteConfigurationTranslator) translateRouteAction(
 
 		typedPerFilterConfig := parentTypedPerFilterConfig
 		if parentTypedPerFilterConfig == nil {
-			typedPerFilterConfig = map[string]proto.Message{}
+			typedPerFilterConfig = &ir.TypedFilterConfigMap{}
 		}
 
 		pCtx := ir.RouteBackendContext{
@@ -381,15 +384,16 @@ func (h *httpRouteConfigurationTranslator) translateRouteAction(
 
 		// Translating weighted clusters needs the typed per filter config on each cluster
 		typedPerFilterConfigAny := map[string]*anypb.Any{}
-		for k, v := range typedPerFilterConfig {
+		typedPerFilterConfig.Range(func(k string, v proto.Message) bool {
 			config, err := utils.MessageToAny(v)
 			if err != nil {
 				// TODO: error on status
 				contextutils.LoggerFrom(ctx).Error(err)
-				continue
+				return true // continue
 			}
 			typedPerFilterConfigAny[k] = config
-		}
+			return true // continue
+		})
 		cw.TypedPerFilterConfig = typedPerFilterConfigAny
 		clusters = append(clusters, cw)
 	}
