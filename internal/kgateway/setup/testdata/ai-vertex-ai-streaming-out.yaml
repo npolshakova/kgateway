@@ -79,7 +79,7 @@ clusters:
           filterMetadata:
             envoy.transport_socket_match:
               tls: "true"
-            io.solo.transformation:
+            kgateway.transformation:
               api_version: v1
               auth_token: mysecretkey
               location: us-central1
@@ -171,10 +171,10 @@ listeners:
             metadataOptions:
               forwardingNamespaces:
                 typed:
-                - envoy.filters.ai.solo.io
+                - envoy.filters.ai.kgateway
                 untyped:
-                - io.solo.transformation
-                - envoy.filters.ai.solo.io
+                - kgateway.transformation
+                - envoy.filters.ai.kgateway
               receivingNamespaces:
                 untyped:
                 - ai.kgateway.io
