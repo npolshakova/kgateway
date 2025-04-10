@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	eiutils "github.com/kgateway-dev/kgateway/v2/internal/envoyinit/pkg/utils"
 	aiutils "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
@@ -23,6 +24,11 @@ import (
 
 const (
 	tlsPort = 443
+
+	// well-known provider default hosts
+	OpenAIHost    = "api.openai.com"
+	GeminiHost    = "generativelanguage.googleapis.com"
+	AnthropicHost = "api.anthropic.com"
 )
 
 func ProcessAIBackend(ctx context.Context, in *v1alpha1.AIBackend, aiSecret *ir.Secret, multiSecrets map[string]*ir.Secret, out *envoy_config_cluster_v3.Cluster) error {
@@ -53,6 +59,8 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecret *
 
 	var prioritized []*envoy_config_endpoint_v3.LocalityLbEndpoints
 	var err error
+	// custom hosts can skip sslVerification
+	var insecureSkipVerify bool
 
 	if aiUs.MultiPool != nil {
 		epByType := map[string]struct{}{}
@@ -103,6 +111,11 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecret *
 					return err
 				}
 				eps = append(eps, result)
+				if ep.HostOverride != nil && ep.HostOverride.InsecureSkipVerify != nil && *ep.HostOverride.InsecureSkipVerify {
+					// if any of the providers in the pool are using custom host with insecure skip verify set, skip all ssl verification for now
+					// TODO(npolshak): make this per endpoint
+					insecureSkipVerify = true
+				}
 			}
 			priority := idx
 			prioritized = append(prioritized, &envoy_config_endpoint_v3.LocalityLbEndpoints{
@@ -114,15 +127,36 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecret *
 			return eris.Errorf("multi backend pools must all be of the same type, got %v", epByType)
 		}
 	} else if aiUs.LLM != nil {
-		prioritized, err = buildLLMEndpoint(ctx, aiUs, aiSecret)
+		prioritized, insecureSkipVerify, err = buildLLMEndpoint(ctx, aiUs, aiSecret)
 		if err != nil {
 			return err
 		}
 	}
 	// attempt to match tls, the default match is always plaintext
-	tlsMatch := &envoy_tls_v3.UpstreamTlsContext{
-		CommonTlsContext: &envoy_tls_v3.CommonTlsContext{},
-		AutoHostSni:      true,
+	var tlsMatch *envoy_tls_v3.UpstreamTlsContext
+	if insecureSkipVerify {
+		tlsMatch = &envoy_tls_v3.UpstreamTlsContext{
+			CommonTlsContext: &envoy_tls_v3.CommonTlsContext{
+				// Skip validation
+				ValidationContextType: &envoy_tls_v3.CommonTlsContext_ValidationContext{},
+			},
+			AutoHostSni: true,
+		}
+	} else {
+		sdsValidationCtx := &envoy_tls_v3.SdsSecretConfig{
+			Name: eiutils.SystemCaSecretName,
+		}
+		tlsMatch = &envoy_tls_v3.UpstreamTlsContext{
+			CommonTlsContext: &envoy_tls_v3.CommonTlsContext{
+				ValidationContextType: &envoy_tls_v3.CommonTlsContext_CombinedValidationContext{
+					CombinedValidationContext: &envoy_tls_v3.CommonTlsContext_CombinedCertificateValidationContext{
+						DefaultValidationContext:         &envoy_tls_v3.CertificateValidationContext{},
+						ValidationContextSdsSecretConfig: sdsValidationCtx,
+					},
+				},
+			},
+			AutoHostSni: true,
+		}
 	}
 	tlsMatchAny, err := utils.MessageToAny(tlsMatch)
 	if err != nil {
@@ -159,13 +193,17 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecret *
 	return nil
 }
 
-func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *ir.Secret) ([]*envoy_config_endpoint_v3.LocalityLbEndpoints, error) {
+func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *ir.Secret) ([]*envoy_config_endpoint_v3.LocalityLbEndpoints, bool, error) {
 	var prioritized []*envoy_config_endpoint_v3.LocalityLbEndpoints
 	provider := aiUs.LLM.Provider
+	var insecureSkipVerify bool
+	if aiUs.LLM.HostOverride != nil && aiUs.LLM.HostOverride.InsecureSkipVerify != nil {
+		insecureSkipVerify = *aiUs.LLM.HostOverride.InsecureSkipVerify
+	}
 	if provider.OpenAI != nil {
 		host, err := buildOpenAIEndpoint(provider.OpenAI, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, err
+			return nil, insecureSkipVerify, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
@@ -173,7 +211,7 @@ func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *
 	} else if provider.Anthropic != nil {
 		host, err := buildAnthropicEndpoint(provider.Anthropic, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, err
+			return nil, insecureSkipVerify, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
@@ -181,7 +219,7 @@ func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *
 	} else if provider.AzureOpenAI != nil {
 		host, err := buildAzureOpenAIEndpoint(provider.AzureOpenAI, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, err
+			return nil, insecureSkipVerify, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
@@ -189,7 +227,7 @@ func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *
 	} else if provider.Gemini != nil {
 		host, err := buildGeminiEndpoint(provider.Gemini, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, err
+			return nil, insecureSkipVerify, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
@@ -197,13 +235,13 @@ func buildLLMEndpoint(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecrets *
 	} else if provider.VertexAI != nil {
 		host, err := buildVertexAIEndpoint(ctx, provider.VertexAI, aiUs.LLM.HostOverride, aiSecrets)
 		if err != nil {
-			return nil, err
+			return nil, insecureSkipVerify, err
 		}
 		prioritized = []*envoy_config_endpoint_v3.LocalityLbEndpoints{
 			{LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{host}},
 		}
 	}
-	return prioritized, nil
+	return prioritized, insecureSkipVerify, nil
 }
 
 func buildOpenAIEndpoint(data *v1alpha1.OpenAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
@@ -216,7 +254,7 @@ func buildOpenAIEndpoint(data *v1alpha1.OpenAIConfig, hostOverride *v1alpha1.Hos
 		model = *data.Model
 	}
 	ep := buildLocalityLbEndpoint(
-		"api.openai.com",
+		OpenAIHost,
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, model, nil),
@@ -233,7 +271,7 @@ func buildAnthropicEndpoint(data *v1alpha1.AnthropicConfig, hostOverride *v1alph
 		model = *data.Model
 	}
 	ep := buildLocalityLbEndpoint(
-		"api.anthropic.com",
+		AnthropicHost,
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, model, nil),
@@ -259,7 +297,7 @@ func buildGeminiEndpoint(data *v1alpha1.GeminiConfig, hostOverride *v1alpha1.Hos
 		return nil, err
 	}
 	ep := buildLocalityLbEndpoint(
-		"generativelanguage.googleapis.com",
+		GeminiHost,
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, data.Model, map[string]string{"api_version": data.ApiVersion}),

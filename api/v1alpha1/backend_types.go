@@ -174,6 +174,8 @@ type Host struct {
 	// Port is the port to use for the backend.
 	// +kubebuilder:validation:Required
 	Port gwv1.PortNumber `json:"port"`
+	// InsecureSkipVerify allows skipping ssl validation for custom hosts
+	InsecureSkipVerify *bool `json:"insecureSkipVerify,omitempty"`
 }
 
 // BackendStatus defines the observed state of Backend.
