@@ -15,55 +15,6 @@ clusters:
       explicitHttpConfig:
         http2ProtocolOptions: {}
 - connectTimeout: 5s
-  edsClusterConfig:
-    edsConfig:
-      ads: {}
-      resourceApiVersion: V3
-  metadata: {}
-  name: kube_default_kubernetes_443
-  transportSocketMatches:
-  - match:
-      tlsMode: istio
-    name: tlsMode-istio
-    transportSocket:
-      name: envoy.transport_sockets.tls
-      typedConfig:
-        '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        commonTlsContext:
-          alpnProtocols:
-          - istio
-          tlsCertificateSdsSecretConfigs:
-          - name: istio_server_cert
-            sdsConfig:
-              apiConfigSource:
-                apiType: GRPC
-                grpcServices:
-                - envoyGrpc:
-                    clusterName: gateway_proxy_sds
-                setNodeOnFirstMessageOnly: true
-                transportApiVersion: V3
-              resourceApiVersion: V3
-          tlsParams: {}
-          validationContextSdsSecretConfig:
-            name: istio_validation_context
-            sdsConfig:
-              apiConfigSource:
-                apiType: GRPC
-                grpcServices:
-                - envoyGrpc:
-                    clusterName: gateway_proxy_sds
-                setNodeOnFirstMessageOnly: true
-                transportApiVersion: V3
-              resourceApiVersion: V3
-        sni: outbound_.443_._.kubernetes.default.svc.cluster.local
-  - match: {}
-    name: tlsMode-disabled
-    transportSocket:
-      name: envoy.transport_sockets.raw_buffer
-      typedConfig:
-        '@type': type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-  type: EDS
-- connectTimeout: 5s
   dnsLookupFamily: V4_PREFERRED
   loadAssignment:
     clusterName: backend_gwtest_openai_0
@@ -78,7 +29,7 @@ clusters:
         metadata:
           filterMetadata:
             envoy.transport_socket_match:
-              tls: "true"
+              tls: default
             io.solo.transformation:
               auth_token: mysecretkey
               model: gpt-4o
@@ -92,7 +43,7 @@ clusters:
         metadata:
           filterMetadata:
             envoy.transport_socket_match:
-              tls: "true"
+              tls: default
             io.solo.transformation:
               auth_token: mysecretkeytwo
               model: gpt-4.0-turbo
@@ -107,7 +58,7 @@ clusters:
         metadata:
           filterMetadata:
             envoy.transport_socket_match:
-              tls: "true"
+              tls: default
             io.solo.transformation:
               auth_token: mysecretkeythree
               model: gpt-3.5-turbo
@@ -115,6 +66,34 @@ clusters:
   metadata: {}
   name: backend_gwtest_openai_0
   transportSocketMatches:
+  - match:
+      tls: default
+    name: tls
+    transportSocket:
+      name: envoy.transport_sockets.tls
+      typedConfig:
+        '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        autoHostSni: true
+        commonTlsContext:
+          combinedValidationContext:
+            defaultValidationContext: {}
+            validationContextSdsSecretConfig:
+              name: SYSTEM_CA_CERT
+  - match:
+      tls: skipverification
+    name: tls
+    transportSocket:
+      name: envoy.transport_sockets.tls
+      typedConfig:
+        '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        autoHostSni: true
+        commonTlsContext: {}
+  - match: {}
+    name: plaintext
+    transportSocket:
+      name: envoy.transport_sockets.raw_buffer
+      typedConfig:
+        '@type': type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
   - match:
       tlsMode: istio
     name: tlsMode-istio
@@ -175,6 +154,55 @@ clusters:
       - name: envoy.filters.http.upstream_codec
         typedConfig:
           '@type': type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
+- connectTimeout: 5s
+  edsClusterConfig:
+    edsConfig:
+      ads: {}
+      resourceApiVersion: V3
+  metadata: {}
+  name: kube_default_kubernetes_443
+  transportSocketMatches:
+  - match:
+      tlsMode: istio
+    name: tlsMode-istio
+    transportSocket:
+      name: envoy.transport_sockets.tls
+      typedConfig:
+        '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        commonTlsContext:
+          alpnProtocols:
+          - istio
+          tlsCertificateSdsSecretConfigs:
+          - name: istio_server_cert
+            sdsConfig:
+              apiConfigSource:
+                apiType: GRPC
+                grpcServices:
+                - envoyGrpc:
+                    clusterName: gateway_proxy_sds
+                setNodeOnFirstMessageOnly: true
+                transportApiVersion: V3
+              resourceApiVersion: V3
+          tlsParams: {}
+          validationContextSdsSecretConfig:
+            name: istio_validation_context
+            sdsConfig:
+              apiConfigSource:
+                apiType: GRPC
+                grpcServices:
+                - envoyGrpc:
+                    clusterName: gateway_proxy_sds
+                setNodeOnFirstMessageOnly: true
+                transportApiVersion: V3
+              resourceApiVersion: V3
+        sni: outbound_.443_._.kubernetes.default.svc.cluster.local
+  - match: {}
+    name: tlsMode-disabled
+    transportSocket:
+      name: envoy.transport_sockets.raw_buffer
+      typedConfig:
+        '@type': type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+  type: EDS
 listeners:
 - address:
     socketAddress:

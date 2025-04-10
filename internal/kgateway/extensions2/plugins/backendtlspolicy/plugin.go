@@ -8,7 +8,10 @@ import (
 	"strings"
 	"time"
 
+	envoyauth "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
+	envoy_type_matcher_v3 "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	"google.golang.org/protobuf/proto"
+	"istio.io/istio/pkg/ptr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	v1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/avast/retry-go"
 	clusterv3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -33,6 +37,7 @@ import (
 	gwv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1a3 "sigs.k8s.io/gateway-api/apis/v1alpha3"
 
+	eiutils "github.com/kgateway-dev/kgateway/v2/internal/envoyinit/pkg/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	plug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
@@ -135,31 +140,78 @@ func buildTranslateFunc(
 			ct: policyCR.CreationTimestamp.Time,
 		}
 
-		if len(spec.Validation.CACertificateRefs) == 0 {
-			return &policyIr, nil
+		if len(spec.Validation.CACertificateRefs) == 0 && (spec.Validation.WellKnownCACertificates == nil || *spec.Validation.WellKnownCACertificates == "") {
+			err := errors.New(fmt.Sprintf("must specify either CACertificateRefs or WellKnownCACertificates for policy %s in namespace %s", policyCR.Name, policyCR.Namespace))
+			return &policyIr, err
 		}
 
-		certRef := spec.Validation.CACertificateRefs[0]
-		nn := types.NamespacedName{
-			Name:      string(certRef.Name),
-			Namespace: policyCR.Namespace,
+		var validationContext *envoyauth.CertificateValidationContext
+		var err error
+		tlsContext := &envoyauth.CommonTlsContext{
+			// default params
+			TlsParams: &envoyauth.TlsParameters{},
 		}
-		cfgmap := krt.FetchOne(krtctx, cfgmaps, krt.FilterObjectName(nn))
-		if cfgmap == nil {
-			polErr := errors.New(fmt.Sprintf("configmap %s not found", nn))
-			contextutils.LoggerFrom(ctx).Error(polErr)
-			return &policyIr, polErr
+		if len(spec.Validation.CACertificateRefs) > 0 {
+			validationContext, err = buildValidationContextCACertRef(ctx, krtctx, cfgmaps, policyCR, spec.Validation.CACertificateRefs[0])
+			if err != nil {
+				return &policyIr, err
+			}
+			tlsContext.ValidationContextType = &envoyauth.CommonTlsContext_ValidationContext{
+				ValidationContext: validationContext,
+			}
+		} else {
+			switch *spec.Validation.WellKnownCACertificates {
+			case gwv1a3.WellKnownCACertificatesSystem:
+
+				sdsValidationCtx := &envoyauth.SdsSecretConfig{
+					Name: eiutils.SystemCaSecretName,
+				}
+				validationContext = &envoyauth.CertificateValidationContext{}
+				tlsContext.ValidationContextType = &envoyauth.CommonTlsContext_CombinedValidationContext{
+					CombinedValidationContext: &envoyauth.CommonTlsContext_CombinedCertificateValidationContext{
+						DefaultValidationContext:         validationContext,
+						ValidationContextSdsSecretConfig: sdsValidationCtx,
+					},
+				}
+
+			default:
+				polErr := errors.New(fmt.Sprintf("unsupported WellKnownCACertificates type: %s", *spec.Validation.WellKnownCACertificates))
+				contextutils.LoggerFrom(ctx).Error(polErr)
+				return &policyIr, polErr
+			}
 		}
 
-		tlsCfg, err := ResolveUpstreamSslConfig(*cfgmap, string(spec.Validation.Hostname))
-		if err != nil {
-			polErr := errors.New(fmt.Sprintf("could not create TLS config, err: %s", err))
-			contextutils.LoggerFrom(ctx).Error(polErr)
-			return &policyIr, polErr
+		tlsCfg := &envoyauth.UpstreamTlsContext{
+			CommonTlsContext: tlsContext,
+		}
+		tlsCfg.Sni = string(spec.Validation.Hostname)
+		for _, san := range spec.Validation.SubjectAltNames {
+			sanMatcher := &envoyauth.SubjectAltNameMatcher{}
+			switch san.Type {
+			case gwv1a3.HostnameSubjectAltNameType:
+				sanMatcher.SanType = envoyauth.SubjectAltNameMatcher_DNS
+				sanMatcher.Matcher = &envoy_type_matcher_v3.StringMatcher{
+					MatchPattern: &envoy_type_matcher_v3.StringMatcher_Exact{
+						Exact: string(san.Hostname),
+					},
+				}
+			case gwv1a3.URISubjectAltNameType:
+				sanMatcher.SanType = envoyauth.SubjectAltNameMatcher_URI
+				sanMatcher.Matcher = &envoy_type_matcher_v3.StringMatcher{
+					MatchPattern: &envoy_type_matcher_v3.StringMatcher_Exact{
+						Exact: string(san.URI),
+					},
+				}
+			default:
+				polErr := errors.New(fmt.Sprintf("unsupported SAN type: %s", san.Type))
+				contextutils.LoggerFrom(ctx).Error(polErr)
+				return &policyIr, polErr
+			}
+			validationContext.MatchTypedSubjectAltNames = append(validationContext.GetMatchTypedSubjectAltNames(), sanMatcher)
 		}
 		typedConfig, err := utils.MessageToAny(tlsCfg)
 		if err != nil {
-			polErr := errors.New(fmt.Sprintf("could not convert TLS config to proto, err: %s", err))
+			polErr := fmt.Errorf("could not convert TLS config to proto, err: %w", err)
 			contextutils.LoggerFrom(ctx).Error(polErr)
 			return &policyIr, polErr
 		}
@@ -172,6 +224,32 @@ func buildTranslateFunc(
 		}
 		return &policyIr, nil
 	}
+}
+
+func buildValidationContextCACertRef(
+	ctx context.Context,
+	krtctx krt.HandlerContext,
+	cfgmaps krt.Collection[*corev1.ConfigMap],
+	policyCR *gwv1a3.BackendTLSPolicy,
+	certRef v1.LocalObjectReference) (*envoyauth.CertificateValidationContext, error) {
+	nn := types.NamespacedName{
+		Name:      string(certRef.Name),
+		Namespace: policyCR.Namespace,
+	}
+	cfgmap := ptr.Flatten(krt.FetchOne(krtctx, cfgmaps, krt.FilterObjectName(nn)))
+	if cfgmap == nil {
+		polErr := fmt.Errorf("configmap %s not found", nn)
+		contextutils.LoggerFrom(ctx).Error(polErr)
+		return nil, polErr
+	}
+	var err error
+	validationContext, err := getValidationContext(cfgmap)
+	if err != nil {
+		polErr := fmt.Errorf("could not create TLS config, err: %s", err)
+		contextutils.LoggerFrom(ctx).Error(polErr)
+		return nil, polErr
+	}
+	return validationContext, nil
 }
 
 func buildProcessStatus(cl client.Client) func(ctx context.Context, gkStr string, polReport plug.PolicyReport) {
@@ -190,7 +268,7 @@ func buildProcessStatus(cl client.Client) func(ctx context.Context, gkStr string
 			}
 			err := cl.Get(ctx, resNN, &res)
 			if err != nil {
-				logger.Error("error getting backendtlspolicy", err.Error())
+				logger.Error("error getting backendtlspolicy: ", err.Error())
 				continue
 			}
 

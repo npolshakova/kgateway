@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoy_config_endpoint_v3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"knative.dev/pkg/network"
 
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
-	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
@@ -69,6 +70,13 @@ func NewPluginFromCollections(
 }
 
 func BuildServiceBackendObjectIR(svc *corev1.Service, svcPort int32, svcProtocol string) ir.BackendObjectIR {
+	var hostname string
+	if svc.Spec.Type == corev1.ServiceTypeExternalName {
+		hostname = svc.Spec.ExternalName
+	} else {
+		hostname = fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, network.GetClusterDomainName())
+	}
+
 	return ir.BackendObjectIR{
 		ObjectSource: ir.ObjectSource{
 			Kind:      wellknown.ServiceGVK.Kind,
@@ -82,20 +90,54 @@ func BuildServiceBackendObjectIR(svc *corev1.Service, svcPort int32, svcProtocol
 		AppProtocol: ir.ParseAppProtocol(&svcProtocol),
 		GvPrefix:    BackendClusterPrefix,
 		// TODO: reevaluate knative dep, dedupe with pkg/utils/kubeutils/dns.go
-		CanonicalHostname: fmt.Sprintf("%s.%s.svc.%s", svc.Name, svc.Namespace, network.GetClusterDomainName()),
+		CanonicalHostname: hostname,
 	}
 }
 
 func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_config_cluster_v3.Cluster) {
-	out.ClusterDiscoveryType = &envoy_config_cluster_v3.Cluster_Type{
-		Type: envoy_config_cluster_v3.Cluster_EDS,
-	}
-	out.EdsClusterConfig = &envoy_config_cluster_v3.Cluster_EdsClusterConfig{
-		EdsConfig: &envoy_config_core_v3.ConfigSource{
-			ResourceApiVersion: envoy_config_core_v3.ApiVersion_V3,
-			ConfigSourceSpecifier: &envoy_config_core_v3.ConfigSource_Ads{
-				Ads: &envoy_config_core_v3.AggregatedConfigSource{},
+	svc, ok := in.Obj.(*corev1.Service)
+	if ok && svc.Spec.Type == corev1.ServiceTypeExternalName {
+		// external name service needs dns
+		out.ClusterDiscoveryType = &envoy_config_cluster_v3.Cluster_Type{
+			Type: envoy_config_cluster_v3.Cluster_STRICT_DNS,
+		}
+
+		// need to set the LoadAssignment to make sure Envoy resolves the right DNS name + port combination,
+		// otherwise it will use the cluster name
+		out.LoadAssignment = &envoy_config_endpoint_v3.ClusterLoadAssignment{
+			ClusterName: out.GetName(),
+			Endpoints: []*envoy_config_endpoint_v3.LocalityLbEndpoints{{
+				LbEndpoints: []*envoy_config_endpoint_v3.LbEndpoint{{
+					HostIdentifier: &envoy_config_endpoint_v3.LbEndpoint_Endpoint{
+						Endpoint: &envoy_config_endpoint_v3.Endpoint{
+							Address: &envoy_config_core_v3.Address{
+								Address: &envoy_config_core_v3.Address_SocketAddress{
+									SocketAddress: &envoy_config_core_v3.SocketAddress{
+										Address: in.CanonicalHostname,
+										PortSpecifier: &envoy_config_core_v3.SocketAddress_PortValue{
+											PortValue: uint32(in.Port),
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+			}},
+		}
+	} else {
+		// Default: EDS
+		out.ClusterDiscoveryType = &envoy_config_cluster_v3.Cluster_Type{
+			Type: envoy_config_cluster_v3.Cluster_EDS,
+		}
+
+		out.EdsClusterConfig = &envoy_config_cluster_v3.Cluster_EdsClusterConfig{
+			EdsConfig: &envoy_config_core_v3.ConfigSource{
+				ResourceApiVersion: envoy_config_core_v3.ApiVersion_V3,
+				ConfigSourceSpecifier: &envoy_config_core_v3.ConfigSource_Ads{
+					Ads: &envoy_config_core_v3.AggregatedConfigSource{},
+				},
 			},
-		},
+		}
 	}
 }
