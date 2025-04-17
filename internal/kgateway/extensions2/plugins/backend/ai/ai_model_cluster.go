@@ -156,7 +156,7 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecret *
 	if err != nil {
 		return err
 	}
-	tsMatchDefault := &envoy_config_cluster_v3.Cluster_TransportSocketMatch{
+	tlsMatchDefault := &envoy_config_cluster_v3.Cluster_TransportSocketMatch{
 		Name: "tls",
 		TransportSocket: &envoy_config_core_v3.TransportSocket{
 			Name: wellknown.TransportSocketTls,
@@ -188,13 +188,13 @@ func buildModelCluster(ctx context.Context, aiUs *v1alpha1.AIBackend, aiSecret *
 		Match: tlsMatch("skipverification"),
 	}
 
+	// First attempt to match tls or if skip verification is enabled. The default match is always plaintext
 	// append all transport socket matches
 	out.TransportSocketMatches = append(out.GetTransportSocketMatches(), []*envoy_config_cluster_v3.Cluster_TransportSocketMatch{
 		// attempt to match tls default if match is set
-		tsMatchDefault,
-		// attempt to match tls skip validation if match is set
+		tlsMatchDefault,
+		// attempt to match tls skip validation if match is set and skip verification is true
 		tsMatchSkipValidation,
-		// attempt to match tls, the default match is always plaintext
 		// add the plaintext default match
 		{
 			Name: "plaintext",
@@ -278,7 +278,7 @@ func buildOpenAIEndpoint(data *v1alpha1.OpenAIConfig, hostOverride *v1alpha1.Hos
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, model, nil),
-	)
+	), nil
 }
 func buildAnthropicEndpoint(data *v1alpha1.AnthropicConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
@@ -294,7 +294,7 @@ func buildAnthropicEndpoint(data *v1alpha1.AnthropicConfig, hostOverride *v1alph
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, model, nil),
-	)
+	), nil
 }
 func buildAzureOpenAIEndpoint(data *v1alpha1.AzureOpenAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
@@ -306,7 +306,7 @@ func buildAzureOpenAIEndpoint(data *v1alpha1.AzureOpenAIConfig, hostOverride *v1
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, data.DeploymentName, map[string]string{"api_version": data.ApiVersion}),
-	)
+	), nil
 }
 func buildGeminiEndpoint(data *v1alpha1.GeminiConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
@@ -318,7 +318,7 @@ func buildGeminiEndpoint(data *v1alpha1.GeminiConfig, hostOverride *v1alpha1.Hos
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, data.Model, map[string]string{"api_version": data.ApiVersion}),
-	)
+	), nil
 }
 func buildVertexAIEndpoint(ctx context.Context, data *v1alpha1.VertexAIConfig, hostOverride *v1alpha1.Host, aiSecrets *ir.Secret) (*envoy_config_endpoint_v3.LbEndpoint, error) {
 	token, err := aiutils.GetAuthToken(data.AuthToken, aiSecrets)
@@ -339,7 +339,7 @@ func buildVertexAIEndpoint(ctx context.Context, data *v1alpha1.VertexAIConfig, h
 		tlsPort,
 		hostOverride,
 		buildEndpointMeta(token, data.Model, map[string]string{"api_version": data.ApiVersion, "location": data.Location, "project": data.ProjectId, "publisher": publisher}),
-	)
+	), nil
 }
 
 func buildLocalityLbEndpoint(
@@ -347,7 +347,7 @@ func buildLocalityLbEndpoint(
 	port int32,
 	hostOverride *v1alpha1.Host,
 	metadata *envoy_config_core_v3.Metadata,
-) (*envoy_config_endpoint_v3.LbEndpoint, error) {
+) *envoy_config_endpoint_v3.LbEndpoint {
 	var insecureSkipVerify bool
 	if hostOverride != nil {
 		if hostOverride.Host != "" {
@@ -365,7 +365,6 @@ func buildLocalityLbEndpoint(
 			// Used for transport socket matching with validation
 			metadata.GetFilterMetadata()["envoy.transport_socket_match"] = &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					// multi pool providers may have different matches so we need to match on the hostname here
 					"tls": structpb.NewStringValue("default"),
 				},
 			}
@@ -373,7 +372,6 @@ func buildLocalityLbEndpoint(
 			// Used for transport socket matching with skipverification
 			metadata.GetFilterMetadata()["envoy.transport_socket_match"] = &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					// multi pool providers may have different matches so we need to match on the hostname here
 					"tls": structpb.NewStringValue("skipverification"),
 				},
 			}
@@ -398,7 +396,7 @@ func buildLocalityLbEndpoint(
 				},
 			},
 		},
-	}, nil
+	}
 }
 
 // `buildEndpointMeta` builds the metadata for the endpoint.

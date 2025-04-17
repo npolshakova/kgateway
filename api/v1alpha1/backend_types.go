@@ -175,6 +175,8 @@ type Host struct {
 	// +kubebuilder:validation:Required
 	Port gwv1.PortNumber `json:"port"`
 	// InsecureSkipVerify allows skipping ssl validation for custom hosts
+	// +optional
+	// +kubebuilder:validation:Optional
 	InsecureSkipVerify *bool `json:"insecureSkipVerify,omitempty"`
 }
 
