@@ -51,6 +51,10 @@ type Settings struct {
 	// When enabled, backends with the ambient.istio.io/redirection=enabled annotation
 	// will be redirected through a waypoint proxy.
 	IngressUseWaypoints bool `split_words:"true" default:"false"`
+
+	// EnableAgentGateway enables kgateway to send config to the Agent Gateway
+	// TODO: default false?
+	EnableAgentGateway bool `split_words:"true" default:"true"`
 }
 
 // BuildSettings returns a zero-valued Settings obj if error is encountered when parsing env

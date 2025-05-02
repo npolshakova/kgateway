@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
@@ -521,7 +523,7 @@ func (s *ProxySyncer) syncGatewayStatus(ctx context.Context, rm reports.ReportMa
 	stopwatch := utils.NewTranslatorStopWatch("GatewayStatusSyncer")
 	stopwatch.Start()
 
-	// TODO: retry within loop per GW rathen that as a full block
+	// TODO: retry within loop per GW rather that as a full block
 	err := retry.Do(func() error {
 		for gwnn := range rm.Gateways {
 			gw := gwv1.Gateway{}
@@ -530,6 +532,34 @@ func (s *ProxySyncer) syncGatewayStatus(ctx context.Context, rm reports.ReportMa
 				logger.Info("error getting gw", err.Error())
 				return err
 			}
+			gwClassName := gw.Spec.GatewayClassName
+			if gwClassName != "" {
+				gwClass := gwv1.GatewayClass{}
+				err = s.mgr.GetClient().Get(ctx, client.ObjectKey{Name: string(gwClassName), Namespace: gw.Namespace}, &gwClass)
+				if err != nil {
+					logger.Info("error getting gw class", err.Error())
+					return err
+				}
+				if gwClass.Spec.ParametersRef != nil {
+					gwParams := v1alpha1.GatewayParameters{}
+					gwParamNs := ""
+					if gwClass.Spec.ParametersRef.Namespace == nil {
+						gwParamNs = gwClass.Namespace
+					} else {
+						gwParamNs = string(*gwClass.Spec.ParametersRef.Namespace)
+					}
+					err = s.mgr.GetClient().Get(ctx, client.ObjectKey{Namespace: gwParamNs, Name: gwClass.Spec.ParametersRef.Name}, &gwParams)
+					if err != nil {
+						logger.Info("error getting gw params", err.Error())
+						return err
+					}
+					if gwParams.Spec.SelfManaged != nil {
+						// self-managed gateways don't have a status set by kgateway
+						return nil
+					}
+				}
+			}
+
 			gwStatusWithoutAddress := gw.Status
 			gwStatusWithoutAddress.Addresses = nil
 			if status := rm.BuildGWStatus(ctx, gw); status != nil {

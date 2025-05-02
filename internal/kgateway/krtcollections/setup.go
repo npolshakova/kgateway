@@ -9,6 +9,7 @@ import (
 	"istio.io/istio/pkg/kube/kubetypes"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 
 	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/config/schema/gvr"
@@ -25,8 +26,7 @@ import (
 
 // registertypes for common collections
 
-func registerTypes(ourCli versioned.Interface) {
-	// if it is a sig gateway api then it can pull directly from the kubeclientgetter
+func registerTypes(ourCli versioned.Interface, restConfig *rest.Config) {
 	kubeclient.Register[*gwv1.HTTPRoute](
 		gvr.HTTPRoute_v1,
 		gvk.HTTPRoute_v1.Kubernetes(),
@@ -78,7 +78,7 @@ func InitCollections(
 	refgrants *RefGrantIndex,
 	krtopts krtutil.KrtOptions,
 ) (*GatewayIndex, *RoutesIndex, *BackendIndex, krt.Collection[ir.EndpointsForBackend]) {
-	registerTypes(ourClient)
+	registerTypes(ourClient, istioClient.RESTConfig())
 
 	// create the KRT clients, remember to also register any needed types in the type registration setup.
 	httpRoutes := krt.WrapClient(kclient.New[*gwv1.HTTPRoute](istioClient), krtopts.ToOptions("HTTPRoute")...)
@@ -97,10 +97,10 @@ func InitCollections(
 	backendIndex := NewBackendIndex(krtopts, backendRefPlugins, policies, refgrants)
 	initBackends(plugins, backendIndex)
 	endpointIRs := initEndpoints(plugins, krtopts)
-	gateways := NewGatewayIndex(krtopts, controllerName, policies, kubeRawGateways, gatewayClasses)
 
+	kubeGateways := NewGatewayIndex(krtopts, controllerName, policies, kubeRawGateways, gatewayClasses)
 	routes := NewRoutesIndex(krtopts, httpRoutes, tcproutes, tlsRoutes, policies, backendIndex, refgrants)
-	return gateways, routes, backendIndex, endpointIRs
+	return kubeGateways, routes, backendIndex, endpointIRs
 }
 
 func initBackends(plugins extensionsplug.Plugin, backendIndex *BackendIndex) {

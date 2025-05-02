@@ -21,6 +21,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
@@ -191,6 +192,23 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	)
 	proxySyncer.Init(ctx, cfg.KrtOptions)
 
+	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
+		agentGatewaySyncer := agentgatewaysyncer.NewAgentGwSyncer(
+			ctx,
+			cfg.ControllerName,
+			mgr,
+			cfg.Client,
+			commoncol,
+			cfg.SetupOpts.Cache,
+		)
+		agentGatewaySyncer.Init(ctx, cfg.KrtOptions)
+
+		if err := mgr.Add(agentGatewaySyncer); err != nil {
+			setupLog.Error(err, "unable to add agentGatewaySyncer runnable")
+			return nil, err
+		}
+	}
+
 	if err := mgr.Add(proxySyncer); err != nil {
 		setupLog.Error(err, "unable to add proxySyncer runnable")
 		return nil, err
@@ -291,7 +309,7 @@ func (c *ControllerBuilder) Start(ctx context.Context) error {
 	}
 
 	// mgr WaitForCacheSync is part of proxySyncer's HasSynced
-	// so we can can mark ready here before we call mgr.Start
+	// so we can mark ready here before we call mgr.Start
 	c.ready.Store(true)
 
 	setupLog.Info("starting manager")
