@@ -20,8 +20,13 @@ type Settings struct {
 	// Defaults to "istio-system".
 	IstioNamespace string `split_words:"true" default:"istio-system"`
 
+	// XdsServiceHost is the host that serves xDS config.
+	// It overrides xdsServiceName if set.
+	XdsServiceHost string `split_words:"true"`
+
 	// XdsServiceName is the name of the Kubernetes Service that serves xDS config.
 	// It it assumed to be in the kgateway install namespace.
+	// Ignored if XdsServiceHost is set.
 	XdsServiceName string `split_words:"true" default:"kgateway"`
 
 	// XdsServicePort is the port of the Kubernetes Service that serves xDS config.
@@ -46,6 +51,11 @@ type Settings struct {
 	// so that only the zTunnel can make connections to it. This requires the zTunnel
 	// shipped with Istio 1.26.0+.
 	WaypointLocalBinding bool `split_words:"true" default:"false"`
+
+	// IngressUseWaypoints enables the waypoint feature for ingress traffic.
+	// When enabled, backends with the ambient.istio.io/redirection=enabled annotation
+	// will be redirected through a waypoint proxy.
+	IngressUseWaypoints bool `split_words:"true" default:"false"`
 }
 
 // BuildSettings returns a zero-valued Settings obj if error is encountered when parsing env

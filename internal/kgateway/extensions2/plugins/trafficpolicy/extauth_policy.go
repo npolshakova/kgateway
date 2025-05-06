@@ -1,17 +1,38 @@
-package routepolicy
+package trafficpolicy
 
 import (
 	"fmt"
 
+	routev3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoy_ext_authz_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_authz/v3"
-	envoytransformation "github.com/solo-io/envoy-gloo/go/config/filter/http/transformation/v2"
+	set_metadata "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/set_metadata/v3"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 	"istio.io/istio/pkg/kube/krt"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
+)
+
+var (
+	// from envoy code:
+	// If the field `config` is configured but is empty, we treat the filter is enabled
+	// explicitly.
+	// see: https://github.com/envoyproxy/envoy/blob/8ed93ef372f788456b708fc93a7e54e17a013aa7/source/common/router/config_impl.cc#L2552
+	enableFilterPerRoute = &routev3.FilterConfig{Config: &anypb.Any{}}
+	setMetadataConfig    = &set_metadata.Config{
+		Metadata: []*set_metadata.Metadata{
+			{
+				MetadataNamespace: extAuthGlobalDisableFilterMetadataNamespace,
+				Value: &structpb.Struct{Fields: map[string]*structpb.Value{
+					extAuthGlobalDisableKey: structpb.NewBoolValue(true),
+				}},
+			},
+		},
+	}
 )
 
 type extAuthIR struct {
@@ -56,29 +77,25 @@ func extAuthForSpec(
 	trafficpolicy *v1alpha1.TrafficPolicy,
 	gatewayExtensions krt.Collection[trafficPolicyGatewayExtensionIR],
 	out *trafficPolicySpecIr,
-) {
+) error {
 	policySpec := &trafficpolicy.Spec
 
 	if policySpec.ExtAuth == nil {
-		return
+		return nil
 	}
 	spec := policySpec.ExtAuth
 	var provider *trafficPolicyGatewayExtensionIR
-
 	if spec.ExtensionRef != nil {
 		gwExtName := types.NamespacedName{Name: spec.ExtensionRef.Name, Namespace: trafficpolicy.GetNamespace()}
 		gatewayExtension := krt.FetchOne(krtctx, gatewayExtensions, krt.FilterObjectName(gwExtName))
 		if gatewayExtension == nil {
-			out.errors = append(out.errors, fmt.Errorf("extauth extension not found"))
-			return
+			return fmt.Errorf("gateway extension %s not found", gwExtName)
 		}
 		if gatewayExtension.err != nil {
-			out.errors = append(out.errors, gatewayExtension.err)
-			return
+			return gatewayExtension.err
 		}
 		if gatewayExtension.extAuth == nil {
-			out.errors = append(out.errors, pluginutils.ErrInvalidExtensionType(v1alpha1.GatewayExtensionTypeExtAuth, gatewayExtension.extType))
-			return
+			return pluginutils.ErrInvalidExtensionType(v1alpha1.GatewayExtensionTypeExtAuth, gatewayExtension.extType)
 		}
 		provider = gatewayExtension
 	}
@@ -88,6 +105,7 @@ func extAuthForSpec(
 		enablement:      spec.Enablement,
 		extauthPerRoute: translatePerFilterConfig(spec),
 	}
+	return nil
 }
 
 func translatePerFilterConfig(spec *v1alpha1.ExtAuthPolicy) *envoy_ext_authz_v3.ExtAuthzPerRoute {
@@ -116,23 +134,4 @@ func translatePerFilterConfig(spec *v1alpha1.ExtAuthPolicy) *envoy_ext_authz_v3.
 		}
 	}
 	return nil
-}
-
-// extAuthEnablementPerRoute returns a transformation that sets the ext auth filter key to false
-// this then fires on the metadata match that all top level configuration shall have.
-func extAuthEnablementPerRoute() proto.Message {
-	return &envoytransformation.RouteTransformations{
-		RequestTransformation: &envoytransformation.Transformation{
-			TransformationType: &envoytransformation.Transformation_TransformationTemplate{
-				TransformationTemplate: &envoytransformation.TransformationTemplate{
-					DynamicMetadataValues: []*envoytransformation.TransformationTemplate_DynamicMetadataValue{
-						{
-							Key:   extAuthGlobalDisableFilterKey,
-							Value: &envoytransformation.InjaTemplate{Text: "false"},
-						},
-					},
-				},
-			},
-		},
-	}
 }

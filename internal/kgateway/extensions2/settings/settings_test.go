@@ -43,6 +43,7 @@ func TestSettings(t *testing.T) {
 				DefaultImageTag:        "",
 				DefaultImagePullPolicy: "IfNotPresent",
 				WaypointLocalBinding:   false,
+				IngressUseWaypoints:    false,
 			},
 		},
 		{
@@ -53,6 +54,7 @@ func TestSettings(t *testing.T) {
 				"KGW_ENABLE_ISTIO_AUTO_MTLS":    "true",
 				"KGW_STS_CLUSTER_NAME":          "my-cluster",
 				"KGW_STS_URI":                   "my.sts.uri",
+				"KGW_XDS_SERVICE_HOST":          "my-xds-host",
 				"KGW_XDS_SERVICE_NAME":          "custom-svc",
 				"KGW_XDS_SERVICE_PORT":          "1234",
 				"KGW_USE_RUST_FORMATIONS":       "true",
@@ -62,12 +64,14 @@ func TestSettings(t *testing.T) {
 				"KGW_DEFAULT_IMAGE_TAG":         "my-tag",
 				"KGW_DEFAULT_IMAGE_PULL_POLICY": "Always",
 				"KGW_WAYPOINT_LOCAL_BINDING":    "true",
+				"KGW_INGRESS_USE_WAYPOINTS":     "true",
 			},
 			expectedSettings: &settings.Settings{
 				DnsLookupFamily:        "V4_ONLY",
 				EnableIstioIntegration: true,
 				EnableIstioAutoMtls:    true,
 				IstioNamespace:         "istio-system",
+				XdsServiceHost:         "my-xds-host",
 				XdsServiceName:         "custom-svc",
 				XdsServicePort:         1234,
 				UseRustFormations:      true,
@@ -77,6 +81,7 @@ func TestSettings(t *testing.T) {
 				DefaultImageTag:        "my-tag",
 				DefaultImagePullPolicy: "Always",
 				WaypointLocalBinding:   true,
+				IngressUseWaypoints:    true,
 			},
 		},
 		{
