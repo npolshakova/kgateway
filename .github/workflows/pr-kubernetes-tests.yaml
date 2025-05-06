@@ -51,6 +51,11 @@ jobs:
           go-test-args: '-v -timeout=25m'
           go-test-run-regex: '^TestAIExtension'
           localstack: 'false'
+        # May 6, 2025: 5 minutes
+        - cluster-name: 'agent-gateway-cluster'
+          go-test-args: '-v -timeout=25m'
+          go-test-run-regex: '^TestAgentGatewayIntegration'
+          localstack: 'false'
 
 #         # Dec 4, 2024: 23 minutes
 #         - cluster-name: 'cluster-two'

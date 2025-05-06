@@ -58,8 +58,7 @@ type Settings struct {
 	IngressUseWaypoints bool `split_words:"true" default:"false"`
 
 	// EnableAgentGateway enables kgateway to send config to the Agent Gateway
-	// TODO: default false?
-	EnableAgentGateway bool `split_words:"true" default:"true"`
+	EnableAgentGateway bool `split_words:"true" default:"false"`
 }
 
 // BuildSettings returns a zero-valued Settings obj if error is encountered when parsing env
