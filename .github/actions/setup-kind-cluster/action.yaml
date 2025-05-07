@@ -50,6 +50,9 @@ runs:
         LOCALSTACK: ${{ inputs.localstack }}
         # AI Tests rely on metal LB
         CONFORMANCE: true
+      run: |
         # Agent Gateway tests require another image to be built and loaded for testing a2a agent
-        AGENTGATEWAY:  ${{ inputs.cluster-name == 'agent-gateway-cluster' }}true${{ else }}false${{ end }}
-      run: ./hack/kind/setup-kind.sh
+        if [[ "${CLUSTER_NAME}" == "agent-gateway-cluster" ]]; then
+          export AGENTGATEWAY="true"
+        fi
+        ./hack/kind/setup-kind.sh
