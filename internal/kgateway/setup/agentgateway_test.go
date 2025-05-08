@@ -17,6 +17,8 @@ import (
 
 func TestAgentGateway(t *testing.T) {
 	st, err := settings.BuildSettings()
+	st.EnableAgentGateway = true
+
 	if err != nil {
 		t.Fatalf("can't get settings %v", err)
 	}
