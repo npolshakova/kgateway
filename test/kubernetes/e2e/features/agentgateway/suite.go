@@ -3,7 +3,9 @@ package agentgateway
 import (
 	"context"
 	"net/http"
+	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -67,17 +69,17 @@ func (s *testingSuite) TestAgentGateway() {
 	// check curl pod is running
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, defaults.CurlPod.GetNamespace(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/name=curl",
-	})
+	}, time.Minute*2)
 	// Check agentgateway, a2a-agent and mcp-tool are running
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, "default", metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=a2a-agent",
-	})
+		LabelSelector: "app=a2a-agent",
+	}, time.Minute*2)
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, "default", metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=mcp-tool",
-	})
+		LabelSelector: "app=mcp-tool",
+	}, time.Minute*2)
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, proxyObjMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=agentgateway",
-	})
+		LabelSelector: "app=agent-gateway",
+	}, time.Minute*2)
 
 	// Check MCP SSE endpoint is reachable through the Agent Gateway
 	// curl -v http://localhost:8080/sse
@@ -86,11 +88,14 @@ func (s *testingSuite) TestAgentGateway() {
 		defaults.CurlPodExecOpt,
 		[]curl.Option{
 			curl.WithHost(kubeutils.ServiceFQDN(proxyService.ObjectMeta)),
-			curl.WithPort(a2aPort),
+			curl.WithPort(mcpPort),
 			curl.WithPath("/sse"),
+			curl.WithConnectionTimeout(2), // allow the connection to terminate stream
 		},
 		&matchers.HttpResponse{
-			StatusCode: http.StatusOK,
+			StatusCode:     http.StatusOK,
+			Body:           gomega.Not(gomega.BeEmpty()), // returns the session id
+			IgnoreExitCode: 28,                           // curl exits with 28 when the connection is closed
 		})
 
 	// Check A2A Agent endpoint is reachable through the Agent Gateway

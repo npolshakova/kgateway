@@ -342,6 +342,7 @@ func (d *Deployer) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameter
 	statsConfig := kubeProxyConfig.GetStats()
 	istioContainerConfig := istioConfig.GetIstioProxyContainer()
 	aiExtensionConfig := kubeProxyConfig.GetAiExtension()
+	agentGatewayIntegrationConfig := kubeProxyConfig.GetAgentGatewayIntegration()
 
 	gateway := vals.Gateway
 	// deployment values
@@ -390,6 +391,9 @@ func (d *Deployer) getValues(gw *api.Gateway, gwParam *v1alpha1.GatewayParameter
 	}
 
 	gateway.Stats = getStatsValues(statsConfig)
+
+	// agent gateway integration values
+	gateway.AgentGatewayIntegration, err = getAgentGatewayIntegrationValues(agentGatewayIntegrationConfig)
 
 	return vals, nil
 }

@@ -65,6 +65,3 @@ image:
 inferenceExtension:
   enabled: false
   autoProvision: false
-
-agentGatewayIntegration:
-  enabled: false

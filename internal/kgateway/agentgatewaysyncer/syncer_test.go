@@ -245,5 +245,4 @@ func TestAgentGwSnapshot(t *testing.T) {
 	err = snapshot.ConstructVersionMap()
 	assert.NoError(t, err)
 	assert.NotNil(t, snapshot.VersionMap)
-
 }

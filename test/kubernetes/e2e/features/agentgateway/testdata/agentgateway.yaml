@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: agent-gateway
+  labels:
+    app: agent-gateway
 spec:
   selector:
     matchLabels:
@@ -14,8 +16,7 @@ spec:
       terminationGracePeriodSeconds: 1
       containers:
         - name: agent-gateway
-          image: ghcr.io/agentgateway/agentgateway:0b53199 # ghcr.io/agentgateway/agentgateway:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/agentgateway/agentgateway:0.4.26
           args:
             - --file=/config/config.json
           env:
@@ -71,7 +72,7 @@ data:
   config.json: |
     {
       "type": "xds",
-      "xds_address": "http://kgateway.kgateway-system.svc.cluster.local:9977",
+      "xds_address": "http://kgateway.agent-gateway-test.svc.cluster.local:9977",
       "metadata": {},
       "alt_xds_hostname": "agent-gateway.default.svc.cluster.local",
       "listeners": []

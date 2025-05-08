@@ -356,7 +356,6 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 
 	s.xDS.RegisterBatch(func(events []krt.Event[agentGwXdsResources], _ bool) {
 		for _, e := range events {
-
 			if e.Event == controllers.EventDelete {
 				// TODO: do we need to handle deletes?
 				continue

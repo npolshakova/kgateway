@@ -16,7 +16,7 @@ var (
 
 	AIValuesManifestPath = ManifestPath("ai-extension-helm.yaml")
 
-	AgentGatewayIntegrationManifestPath = ManifestPath("agent-gateway-integration.yaml")
+	AgentGatewayIntegratioValuesPath = ManifestPath("agent-gateway-integration.yaml")
 )
 
 // ManifestPath returns the absolute path to a manifest file.

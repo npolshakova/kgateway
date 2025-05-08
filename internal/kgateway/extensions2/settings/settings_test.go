@@ -65,6 +65,7 @@ func TestSettings(t *testing.T) {
 				"KGW_DEFAULT_IMAGE_PULL_POLICY": "Always",
 				"KGW_WAYPOINT_LOCAL_BINDING":    "true",
 				"KGW_INGRESS_USE_WAYPOINTS":     "true",
+				"KGW_ENABLE_AGENT_GATEWAY":      "true",
 			},
 			expectedSettings: &settings.Settings{
 				DnsLookupFamily:        "V4_ONLY",
@@ -82,6 +83,7 @@ func TestSettings(t *testing.T) {
 				DefaultImagePullPolicy: "Always",
 				WaypointLocalBinding:   true,
 				IngressUseWaypoints:    true,
+				EnableAgentGateway:     true,
 			},
 		},
 		{

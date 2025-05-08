@@ -1,8 +1,12 @@
+# Deployment for the MCP github tool
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mcp-tool
+  labels:
+    app: mcp-tool
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: mcp-tool
@@ -13,27 +17,67 @@ spec:
     spec:
       containers:
         - name: mcp-tool
-#          image: ghcr.io/peterj/mcp-website-fetcher:sha-d2db5b3
-          image: us-docker.pkg.dev/developers-369321/gloo-platform-dev/markitdown-mcp:2.0.0-mcpdemo
+          image: ghcr.io/agentgateway/agentgateway:0.4.26
           args:
-            - "--sse"
-            - "--host=0.0.0.0"
-            - "--port=8080"
+            - -f
+            - /etc/agentgateway/config.json
           ports:
-            - containerPort: 8000
+            - containerPort: 3000
+          volumeMounts:
+            - name: github-config
+              mountPath: /etc/agentgateway/config.json
+              subPath: config.json
+      volumes:
+        - name: github-config
+          configMap:
+            name: github-config
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: mcp-tool
-  annotations:
-    kgateway.dev/mcp-path: "/sse"
 spec:
   selector:
     app: mcp-tool
-  type: ClusterIP
   ports:
     - protocol: TCP
-      port: 8000
-      targetPort: 8000
+      port: 3000
+      targetPort: 3000
       appProtocol: kgateway.dev/mcp
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-config
+data:
+  config.json: |
+    {
+      "type": "static",
+      "listeners": [
+        {
+          "name": "sse",
+          "protocol": "MCP",
+          "sse": {
+            "address": "[::]",
+            "port": 3000
+          }
+        }
+      ],
+      "targets": {
+        "mcp": [
+          {
+            "name": "github",
+            "stdio": {
+              "cmd": "npx",
+              "args": [
+                "-y",
+                "@modelcontextprotocol/server-github"
+              ],
+              "env": {
+                "GITHUB_PERSONAL_ACCESS_TOKEN": "fake"
+              }
+            }
+          }
+        ]
+      }
+    }

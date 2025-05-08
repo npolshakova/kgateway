@@ -122,6 +122,9 @@ type KubernetesProxyConfig struct {
 
 	// Used to unset the `runAsUser` values in security contexts.
 	FloatingUserId *bool `json:"floatingUserId,omitempty"`
+
+	// Agent Gateway integration
+	AgentGatewayIntegration *AgentGatewayIntegration `json:"agentGatewayIntegration,omitempty"`
 }
 
 func (in *KubernetesProxyConfig) GetDeployment() *ProxyDeployment {
@@ -185,6 +188,13 @@ func (in *KubernetesProxyConfig) GetAiExtension() *AiExtension {
 		return nil
 	}
 	return in.AiExtension
+}
+
+func (in *KubernetesProxyConfig) GetAgentGatewayIntegration() *AgentGatewayIntegration {
+	if in == nil {
+		return nil
+	}
+	return in.AgentGatewayIntegration
 }
 
 func (in *KubernetesProxyConfig) GetFloatingUserId() *bool {
@@ -687,6 +697,17 @@ func (in *AiExtensionStats) GetCustomLabels() []*CustomLabel {
 		return nil
 	}
 	return in.CustomLabels
+}
+
+type AgentGatewayIntegration struct {
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+func (in *AgentGatewayIntegration) GetEnabled() *bool {
+	if in == nil {
+		return nil
+	}
+	return in.Enabled
 }
 
 type CustomLabel struct {
