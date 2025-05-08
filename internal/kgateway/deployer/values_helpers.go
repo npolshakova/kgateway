@@ -241,13 +241,3 @@ func getAIExtensionValues(config *v1alpha1.AiExtension) (*helmAIExtension, error
 		Stats:           byt,
 	}, nil
 }
-
-func getAgentGatewayIntegrationValues(config *v1alpha1.AgentGatewayIntegration) (*helmAgentGatewayIntegration, error) {
-	if config == nil {
-		return nil, nil
-	}
-
-	return &helmAgentGatewayIntegration{
-		Enabled: *config.GetEnabled(),
-	}, nil
-}
