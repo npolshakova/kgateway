@@ -1,10 +1,5 @@
 package agentgatewaysyncer
 
-//go:generate go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
-//go:generate protoc --proto_path=. --go_out=. --go_opt=paths=source_relative listener.proto
-//go:generate protoc --proto_path=. --go_out=. --go_opt=paths=source_relative a2a/a2a_target.proto
-//go:generate protoc --proto_path=. --go_out=. --go_opt=paths=source_relative mcp/mcp_target.proto
-
 import (
 	"context"
 	"fmt"
