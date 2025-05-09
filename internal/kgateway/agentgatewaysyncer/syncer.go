@@ -470,14 +470,17 @@ func newTranslator(
 // getTargetName sanitizes the given resource name to ensure it matches the AgentGateway required pattern:
 // ^[a-zA-Z0-9-]+$ by replacing slashes and removing invalid characters.
 func getTargetName(resourceName string) string {
-	invalidChars := regexp.MustCompile(`[^a-zA-Z0-9-]+`)
+	var (
+		invalidCharsRegex      = regexp.MustCompile(`[^a-zA-Z0-9-]+`)
+		consecutiveDashesRegex = regexp.MustCompile(`-+`)
+	)
 
 	// Replace all invalid characters with dashes
-	sanitized := invalidChars.ReplaceAllString(resourceName, "-")
+	sanitized := invalidCharsRegex.ReplaceAllString(resourceName, "-")
 
 	// Remove leading/trailing dashes and collapse consecutive dashes
 	sanitized = strings.Trim(sanitized, "-")
-	sanitized = regexp.MustCompile(`-+`).ReplaceAllString(sanitized, "-")
+	sanitized = consecutiveDashesRegex.ReplaceAllString(sanitized, "-")
 
 	return sanitized
 }
