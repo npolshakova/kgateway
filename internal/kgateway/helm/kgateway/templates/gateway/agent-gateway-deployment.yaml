@@ -4,19 +4,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-gateway
+  name: {{ include "kgateway.gateway.fullname" . }}
   labels:
-    app: agent-gateway
+    {{- include "kgateway.gateway.constLabels" . | nindent 4 }}
+    {{- include "kgateway.gateway.labels" . | nindent 4 }}
 spec:
+  {{- if not $gateway.autoscaling.enabled }}
+  replicas: {{ $gateway.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
-      app: agent-gateway
+          {{- include "kgateway.gateway.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+      {{- with $gateway.extraPodAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
-        app: agent-gateway
+        {{- include "kgateway.gateway.selectorLabels" . | nindent 8 }}
+        {{- with $gateway.extraPodLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
-      terminationGracePeriodSeconds: 1
       containers:
         - name: agent-gateway
           image: ghcr.io/agentgateway/agentgateway:0.4.26
@@ -36,11 +46,11 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: GW_NAME
-              value: agent-gateway
+              value: {{ include "kgateway.gateway.fullname" . }}
             - name: RUST_BACKTRACE
               value: "1"
             - name: RUST_LOG
-              value: debug
+              value: {{- include "kgateway.gateway.logLevel" . }}
           volumeMounts:
             - name: config-volume
               mountPath: /config
@@ -48,25 +58,38 @@ spec:
         - name: config-volume
           configMap:
             name: agent-gateway-config
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: agent-gateway
+  name: {{ include "kgateway.gateway.fullname" . }}
+  {{- with $gateway.service.extraAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "kgateway.gateway.constLabels" . | nindent 4 }}
+    {{- include "kgateway.gateway.labels" . | nindent 4 }}
+    {{- with $gateway.service.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
-  selector:
-    app: agent-gateway
+  type: {{ $gateway.service.type }}
+  {{- with $gateway.service.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
   ports:
-    - protocol: TCP
-      port: 8080
-      targetPort: 8080
-      name: mcp
-    - protocol: TCP
-      port: 9090
-      targetPort: 9090
-      name: a2a
-  type: ClusterIP
+  {{- range $p := $gateway.ports }}
+    - name: {{ $p.name }}
+      protocol: {{ $p.protocol }}
+      targetPort: {{ $p.targetPort }}
+      port: {{ $p.port }}
+    {{- if $p.nodePort }}
+      nodePort: {{ $p.nodePort }}
+    {{- end }}
+  {{- end }}
+  selector:
+    {{- include "kgateway.gateway.selectorLabels" . | nindent 4 }}
 
 ---
 apiVersion: v1
@@ -77,7 +100,7 @@ data:
   config.json: |
     {
       "type": "xds",
-      "xds_address": "http://kgateway.agent-gateway-test.svc.cluster.local:9977",
+      "xds_address": "http://{{ $gateway.xds.host }}:{{ $gateway.xds.port }}",
       "metadata": {},
       "alt_xds_hostname": "agent-gateway.default.svc.cluster.local",
       "listeners": []

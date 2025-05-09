@@ -120,6 +120,11 @@ type KubernetesProxyConfig struct {
 	// +kubebuilder:validation:Optional
 	AiExtension *AiExtension `json:"aiExtension,omitempty"`
 
+	// Configure the AgentGateway integration
+	//
+	// +kubebuilder:validation:Optional
+	AgentGateway *AgentGateway `json:"agentGateway,omitempty"`
+
 	// Used to unset the `runAsUser` values in security contexts.
 	FloatingUserId *bool `json:"floatingUserId,omitempty"`
 }
@@ -745,4 +750,19 @@ func (in *CustomLabel) GetKeyDelimiter() *string {
 		return nil
 	}
 	return in.KeyDelimiter
+}
+
+// Configuration of the AgentGateway integration
+type AgentGateway struct {
+	// Whether to enable the extension.
+	//
+	// +kubebuilder:validation:Optional
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+func (in *AgentGateway) GetEnabled() *bool {
+	if in == nil {
+		return nil
+	}
+	return in.Enabled
 }

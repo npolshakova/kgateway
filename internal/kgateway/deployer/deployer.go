@@ -808,6 +808,9 @@ func defaultGatewayParameters(imageInfo *ImageInfo) *v1alpha1.GatewayParameters 
 						PullPolicy: (*corev1.PullPolicy)(ptr.To(imageInfo.PullPolicy)),
 					},
 				},
+				AgentGateway: &v1alpha1.AgentGateway{
+					Enabled: ptr.To(false),
+				},
 			},
 		},
 	}

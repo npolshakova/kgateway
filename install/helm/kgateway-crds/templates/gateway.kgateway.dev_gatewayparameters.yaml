@@ -33,6 +33,11 @@ spec:
             properties:
               kube:
                 properties:
+                  agentGateway:
+                    properties:
+                      enabled:
+                        type: boolean
+                    type: object
                   aiExtension:
                     properties:
                       enabled:
