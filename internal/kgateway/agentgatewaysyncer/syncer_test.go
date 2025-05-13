@@ -80,10 +80,10 @@ func TestXDSCacheState(t *testing.T) {
 	}
 
 	snapshot := &agentGwSnapshot{
-		AgentGwA2AServices: envoycache.NewResources("v1", []envoytypes.Resource{
+		A2ATargets: envoycache.NewResources("v1", []envoytypes.Resource{
 			a2aTarget,
 		}),
-		AgentGwMcpServices: envoycache.NewResources("v1", []envoytypes.Resource{
+		MCPTargets: envoycache.NewResources("v1", []envoytypes.Resource{
 			mcpTarget,
 		}),
 		Listeners: envoycache.NewResources("v1", []envoytypes.Resource{
@@ -204,10 +204,10 @@ func TestAgentGwSnapshot(t *testing.T) {
 
 	// manually build the snapshot
 	snapshot := &agentGwSnapshot{
-		AgentGwA2AServices: envoycache.NewResources("v1", []envoytypes.Resource{
+		A2ATargets: envoycache.NewResources("v1", []envoytypes.Resource{
 			a2aTarget,
 		}),
-		AgentGwMcpServices: envoycache.NewResources("v1", []envoytypes.Resource{
+		MCPTargets: envoycache.NewResources("v1", []envoytypes.Resource{
 			mcpTarget,
 		}),
 		Listeners: envoycache.NewResources("v1", []envoytypes.Resource{

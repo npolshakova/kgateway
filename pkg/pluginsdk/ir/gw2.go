@@ -45,6 +45,7 @@ type ListenerIR struct {
 	Name             string
 	BindAddress      string
 	BindPort         uint32
+	Protocol         string
 	AttachedPolicies AttachedPolicies
 
 	HttpFilterChain []HttpFilterChainIR
