@@ -7,15 +7,16 @@ import (
 	"os"
 	"time"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
-	"github.com/kgateway-dev/kgateway/v2/test/gomega/matchers"
-	"github.com/kgateway-dev/kgateway/v2/test/testutils"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
+	"github.com/kgateway-dev/kgateway/v2/test/gomega/matchers"
+	"github.com/kgateway-dev/kgateway/v2/test/testutils"
 
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
@@ -57,17 +58,16 @@ func NewTestingSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.
 func (s *testingSuite) SetupSuite() {
 	s.manifests = map[string][]string{
 		"TestSelfManaged": {
+			selfManagedGatewayManifest,
 			agentgatewayManifest,
 			a2aAgentManifest,
 			mcpManifest,
-			selfManagedGatewayManifest,
 			defaults.CurlPodManifest,
 		},
 		"TestAgentGatewayDeployment": {
-			agentgatewayManifest,
+			deployAgentGatewayManifest,
 			a2aAgentManifest,
 			mcpManifest,
-			deployAgentGatewayManifest,
 			defaults.CurlPodManifest,
 		},
 	}
@@ -109,8 +109,10 @@ func (s *testingSuite) TestSelfManaged() {
 		LabelSelector: "app=agent-gateway",
 	}, time.Minute*2)
 
-	s.testA2ARouting()
+	time.Sleep(time.Minute * 1)
+
 	s.testMCPRouting()
+	s.testA2ARouting()
 }
 
 func (s *testingSuite) TestAgentGatewayDeployment() {
@@ -120,12 +122,13 @@ func (s *testingSuite) TestAgentGatewayDeployment() {
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, defaults.CurlPod.GetNamespace(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/name=curl",
 	}, time.Minute*2)
+	// match auto labels created by kgateway deployer
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, proxyObjMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app=agent-gateway",
+		LabelSelector: "app.kubernetes.io/name=agent-gateway",
 	}, time.Minute*2)
 
-	s.testA2ARouting()
 	s.testMCPRouting()
+	s.testA2ARouting()
 }
 
 func (s *testingSuite) testA2ARouting() {
@@ -171,7 +174,7 @@ func (s *testingSuite) testA2ARouting() {
 		},
 		&matchers.HttpResponse{
 			StatusCode: http.StatusOK,
-		})
+		}, time.Minute*2)
 }
 
 func (s *testingSuite) testMCPRouting() {
@@ -194,5 +197,5 @@ func (s *testingSuite) testMCPRouting() {
 			StatusCode:     http.StatusOK,
 			Body:           gomega.Not(gomega.BeEmpty()), // returns the session id
 			IgnoreExitCode: 28,                           // curl exits with 28 when the connection is closed
-		})
+		}, time.Minute*2)
 }
