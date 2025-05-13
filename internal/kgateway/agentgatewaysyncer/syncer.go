@@ -155,7 +155,6 @@ func (s *AgentGwSyncer) Init(ctx context.Context, krtopts krtutil.KrtOptions) {
 	// TODO: convert auth to rbac json config for agent gateways
 
 	gateways := krt.NewCollection(s.commonCols.GatewayIndex.Gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *ir.Gateway {
-		// TODO: support dynamic config, don't hard code the GatewayClassName
 		if gw.Obj.Spec.GatewayClassName != wellknown.AgentGatewayClassName {
 			return nil
 		}

@@ -1,4 +1,3 @@
-# TODO: GatewayClass -> create helm crd
 kind: GatewayParameters
 apiVersion: gateway.kgateway.dev/v1alpha1
 metadata:
