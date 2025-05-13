@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"strings"
 
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
@@ -130,7 +131,7 @@ type agentGwService struct {
 }
 
 func (r agentGwService) Equals(in agentGwService) bool {
-	return r.ip == in.ip && r.port == in.port && r.path == in.path
+	return r.ip == in.ip && r.port == in.port && r.path == in.path && r.protocol == in.protocol && slices.Equal(r.allowedListeners, in.allowedListeners)
 }
 
 type agentGwTranslator struct {
@@ -158,7 +159,7 @@ func (s *AgentGwSyncer) Init(ctx context.Context, krtopts krtutil.KrtOptions) {
 
 	// TODO: convert auth to rbac json config for agent gateways
 
-	gateways := krt.NewCollection(s.commonCols.GatewayIndex.Gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *ir.Gateway {
+	gatewaysCol := krt.NewCollection(s.commonCols.GatewayIndex.Gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *ir.Gateway {
 		if gw.Obj.Spec.GatewayClassName != wellknown.AgentGatewayClassName {
 			return nil
 		}
@@ -167,7 +168,9 @@ func (s *AgentGwSyncer) Init(ctx context.Context, krtopts krtutil.KrtOptions) {
 
 	agentGwServices := krt.NewManyCollection(s.commonCols.Services, func(kctx krt.HandlerContext, s *corev1.Service) []agentGwService {
 		var allowedA2AListeners, allowedMCPListeners []string
-		for _, gw := range gateways.List() {
+
+		gws := krt.Fetch(kctx, gatewaysCol)
+		for _, gw := range gws {
 			for _, listener := range gw.Listeners {
 				if listener.Protocol != A2AProtocol && listener.Protocol != MCPProtocol {
 					continue
@@ -200,7 +203,7 @@ func (s *AgentGwSyncer) Init(ctx context.Context, krtopts krtutil.KrtOptions) {
 							}
 						}
 					case gwv1.NamespacesFromSelector:
-						// TODO: implement namespace selectors
+						// TODO: implement namespace selectors with gateway index
 						contextutils.LoggerFrom(ctx).Errorf("namespace selectors not supported for agent gateways")
 						continue
 					}
@@ -244,7 +247,7 @@ func (s *AgentGwSyncer) Init(ctx context.Context, krtopts krtutil.KrtOptions) {
 	}, krtopts.ToOptions("mcp-target-xds")...)
 
 	// translate gateways to xds
-	s.xDS = krt.NewCollection(gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *agentGwXdsResources {
+	s.xDS = krt.NewCollection(gatewaysCol, func(kctx krt.HandlerContext, gw ir.Gateway) *agentGwXdsResources {
 		// listeners for the agent gateway
 		agwListeners := make([]envoytypes.Resource, 0, len(gw.Listeners))
 		var listenerVersion uint64
@@ -317,7 +320,7 @@ func (s *AgentGwSyncer) Init(ctx context.Context, krtopts krtutil.KrtOptions) {
 		s.commonCols.HasSynced,
 		xdsA2AServices.HasSynced,
 		xdsMcpServices.HasSynced,
-		gateways.HasSynced,
+		gatewaysCol.HasSynced,
 		agentGwServices.HasSynced,
 		s.xDS.HasSynced,
 	}

@@ -285,7 +285,6 @@ spec:
 			// same namespace should have mcp listener
 			if strings.Contains(mcpTarget.Name, "mcp-allowed") {
 				if len(mcpTarget.Listeners) != 1 {
-					// TODO: eventual consistency, need to wait for sync to finish
 					t.Fatalf("expected mcp target to have 1 listener, got %v", mcpTarget.Listeners)
 				}
 				if mcpTarget.Listeners[0] != "mcp" {
