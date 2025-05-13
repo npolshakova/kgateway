@@ -119,10 +119,32 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.IstioContainerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("IstioIntegration"):
 		return &apiv1alpha1.IstioIntegrationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWKS"):
+		return &apiv1alpha1.JWKSApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTAuthorizationPolicy"):
+		return &apiv1alpha1.JWTAuthorizationPolicyApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTAuthorizationPolicySpec"):
+		return &apiv1alpha1.JWTAuthorizationPolicySpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTClaimMatch"):
+		return &apiv1alpha1.JWTClaimMatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTClaimToHeader"):
+		return &apiv1alpha1.JWTClaimToHeaderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTPrincipals"):
+		return &apiv1alpha1.JWTPrincipalsApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTProvider"):
+		return &apiv1alpha1.JWTProviderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTTokenSource"):
+		return &apiv1alpha1.JWTTokenSourceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTValidationPolicy"):
+		return &apiv1alpha1.JWTValidationPolicyApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTValidationPolicySpec"):
+		return &apiv1alpha1.JWTValidationPolicySpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("KubernetesProxyConfig"):
 		return &apiv1alpha1.KubernetesProxyConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LLMProvider"):
 		return &apiv1alpha1.LLMProviderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LocalJWKS"):
+		return &apiv1alpha1.LocalJWKSApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LocalPolicyTargetReference"):
 		return &apiv1alpha1.LocalPolicyTargetReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LocalRateLimitPolicy"):
@@ -165,6 +187,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.RegexApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RegexMatch"):
 		return &apiv1alpha1.RegexMatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RemoteJWKS"):
+		return &apiv1alpha1.RemoteJWKSApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ResponseFlagFilter"):
 		return &apiv1alpha1.ResponseFlagFilterApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SdsBootstrap"):

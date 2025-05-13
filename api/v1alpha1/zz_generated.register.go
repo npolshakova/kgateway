@@ -55,6 +55,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GatewayParametersList{},
 		&HTTPListenerPolicy{},
 		&HTTPListenerPolicyList{},
+		&JWTAuthorizationPolicy{},
+		&JWTAuthorizationPolicyList{},
+		&JWTValidationPolicy{},
+		&JWTValidationPolicyList{},
 		&TrafficPolicy{},
 		&TrafficPolicyList{},
 	)

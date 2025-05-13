@@ -18,6 +18,8 @@ type GatewayV1alpha1Interface interface {
 	GatewayExtensionsGetter
 	GatewayParametersesGetter
 	HTTPListenerPoliciesGetter
+	JWTAuthorizationPoliciesGetter
+	JWTValidationPoliciesGetter
 	TrafficPoliciesGetter
 }
 
@@ -44,6 +46,14 @@ func (c *GatewayV1alpha1Client) GatewayParameterses(namespace string) GatewayPar
 
 func (c *GatewayV1alpha1Client) HTTPListenerPolicies(namespace string) HTTPListenerPolicyInterface {
 	return newHTTPListenerPolicies(c, namespace)
+}
+
+func (c *GatewayV1alpha1Client) JWTAuthorizationPolicies(namespace string) JWTAuthorizationPolicyInterface {
+	return newJWTAuthorizationPolicies(c, namespace)
+}
+
+func (c *GatewayV1alpha1Client) JWTValidationPolicies(namespace string) JWTValidationPolicyInterface {
+	return newJWTValidationPolicies(c, namespace)
 }
 
 func (c *GatewayV1alpha1Client) TrafficPolicies(namespace string) TrafficPolicyInterface {

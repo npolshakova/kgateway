@@ -809,6 +809,162 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: istioProxyContainer
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.IstioContainer
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWKS
+  map:
+    fields:
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: localJwks
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+    - name: remoteJwks
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RemoteJWKS
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTAuthorizationPolicy
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTAuthorizationPolicySpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.sigs.gateway-api.apis.v1alpha2.PolicyStatus
+      default: {}
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTAuthorizationPolicySpec
+  map:
+    fields:
+    - name: action
+      type:
+        scalar: string
+    - name: principals
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipals
+          elementRelationship: atomic
+    - name: targetRefs
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
+          elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: value
+      type:
+        scalar: string
+      default: ""
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
+  map:
+    fields:
+    - name: header
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipals
+  map:
+    fields:
+    - name: allowedProviders
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: requiredClaims
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
+          elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
+  map:
+    fields:
+    - name: audience
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: claimToHeaders
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
+          elementRelationship: atomic
+    - name: issuer
+      type:
+        scalar: string
+      default: ""
+    - name: jwks
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWKS
+    - name: tokenSource
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTTokenSource
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTTokenSource
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidationPolicy
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidationPolicySpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.sigs.gateway-api.apis.v1alpha2.PolicyStatus
+      default: {}
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidationPolicySpec
+  map:
+    fields:
+    - name: providers
+      type:
+        map:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
+    - name: targetRefs
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
+          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.KubernetesProxyConfig
   map:
     fields:
@@ -852,6 +1008,22 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SupportedLLMProvider
       default: {}
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+  map:
+    fields:
+    - name: file
+      type:
+        scalar: string
+    - name: key
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: secretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
   map:
     fields:
@@ -1124,6 +1296,19 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pattern
       type:
         scalar: string
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RemoteJWKS
+  map:
+    fields:
+    - name: targetRefs
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
+          elementRelationship: atomic
+    - name: url
+      type:
+        scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ResponseFlagFilter
   map:
     fields:

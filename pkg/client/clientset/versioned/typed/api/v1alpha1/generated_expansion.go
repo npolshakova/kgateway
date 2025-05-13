@@ -12,4 +12,8 @@ type GatewayParametersExpansion interface{}
 
 type HTTPListenerPolicyExpansion interface{}
 
+type JWTAuthorizationPolicyExpansion interface{}
+
+type JWTValidationPolicyExpansion interface{}
+
 type TrafficPolicyExpansion interface{}

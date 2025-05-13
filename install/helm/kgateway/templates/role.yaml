@@ -76,6 +76,8 @@ rules:
   - gatewayextensions
   - gatewayparameters
   - httplistenerpolicies
+  - jwtauthorizationpolicies
+  - jwtvalidationpolicies
   - trafficpolicies
   verbs:
   - get
@@ -89,6 +91,8 @@ rules:
   - gatewayextensions/status
   - gatewayparameters/status
   - httplistenerpolicies/status
+  - jwtauthorizationpolicies/status
+  - jwtvalidationpolicies/status
   - trafficpolicies/status
   verbs:
   - get

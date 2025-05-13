@@ -33,6 +33,14 @@ func (c *FakeGatewayV1alpha1) HTTPListenerPolicies(namespace string) v1alpha1.HT
 	return newFakeHTTPListenerPolicies(c, namespace)
 }
 
+func (c *FakeGatewayV1alpha1) JWTAuthorizationPolicies(namespace string) v1alpha1.JWTAuthorizationPolicyInterface {
+	return newFakeJWTAuthorizationPolicies(c, namespace)
+}
+
+func (c *FakeGatewayV1alpha1) JWTValidationPolicies(namespace string) v1alpha1.JWTValidationPolicyInterface {
+	return newFakeJWTValidationPolicies(c, namespace)
+}
+
 func (c *FakeGatewayV1alpha1) TrafficPolicies(namespace string) v1alpha1.TrafficPolicyInterface {
 	return newFakeTrafficPolicies(c, namespace)
 }
