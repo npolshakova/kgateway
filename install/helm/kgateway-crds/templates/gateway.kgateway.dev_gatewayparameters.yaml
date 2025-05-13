@@ -37,6 +37,8 @@ spec:
                     properties:
                       enabled:
                         type: boolean
+                      logLevel:
+                        type: string
                     type: object
                   aiExtension:
                     properties:

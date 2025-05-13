@@ -5,7 +5,8 @@ package v1alpha1
 // AgentGatewayApplyConfiguration represents a declarative configuration of the AgentGateway type for use
 // with apply.
 type AgentGatewayApplyConfiguration struct {
-	Enabled *bool `json:"enabled,omitempty"`
+	Enabled  *bool   `json:"enabled,omitempty"`
+	LogLevel *string `json:"logLevel,omitempty"`
 }
 
 // AgentGatewayApplyConfiguration constructs a declarative configuration of the AgentGateway type for use with
@@ -19,5 +20,13 @@ func AgentGateway() *AgentGatewayApplyConfiguration {
 // If called multiple times, the Enabled field is set to the value of the last call.
 func (b *AgentGatewayApplyConfiguration) WithEnabled(value bool) *AgentGatewayApplyConfiguration {
 	b.Enabled = &value
+	return b
+}
+
+// WithLogLevel sets the LogLevel field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LogLevel field is set to the value of the last call.
+func (b *AgentGatewayApplyConfiguration) WithLogLevel(value string) *AgentGatewayApplyConfiguration {
+	b.LogLevel = &value
 	return b
 }

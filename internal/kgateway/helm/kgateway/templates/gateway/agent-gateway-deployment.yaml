@@ -1,5 +1,5 @@
 {{- $gateway := .Values.gateway }}
-{{- if $gateway.agentGatewayIntegration.enabled }}
+{{- if $gateway.agentGateway.enabled }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -50,14 +50,14 @@ spec:
             - name: RUST_BACKTRACE
               value: "1"
             - name: RUST_LOG
-              value: {{- include "kgateway.gateway.logLevel" . }}
+              value: {{ $gateway.agentGateway.logLevel }}
           volumeMounts:
             - name: config-volume
               mountPath: /config
       volumes:
         - name: config-volume
           configMap:
-            name: agent-gateway-config
+            name: {{ include "kgateway.gateway.fullname" . }}
 ---
 apiVersion: v1
 kind: Service
@@ -95,15 +95,18 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agent-gateway-config
+  name: {{ include "kgateway.gateway.fullname" . }}
+  labels:
+    {{- include "kgateway.gateway.constLabels" . | nindent 4 }}
+    {{- include "kgateway.gateway.labels" . | nindent 4 }}
 data:
   config.json: |
     {
       "type": "xds",
       "xds_address": "http://{{ $gateway.xds.host }}:{{ $gateway.xds.port }}",
       "metadata": {},
-      "alt_xds_hostname": "agent-gateway.default.svc.cluster.local",
+      "alt_xds_hostname": "{{ $gateway.gatewayName | default (include "kgateway.gateway.fullname" .) }}.{{ $gateway.gatewayNamespace }}.svc.cluster.local",
       "listeners": []
     }
 
-{{- end }} {{/* if $gateway.agentGatewayIntegration.enabled */}}
+{{- end }} {{/* if $gateway.agentGateway.enabled */}}

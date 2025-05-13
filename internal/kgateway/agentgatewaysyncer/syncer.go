@@ -9,6 +9,7 @@ import (
 
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/solo-io/go-utils/contextutils"
 	"google.golang.org/protobuf/proto"
 	"istio.io/istio/pkg/kube"
@@ -154,7 +155,7 @@ func (s *AgentGwSyncer) Init(ctx context.Context, krtopts krtutil.KrtOptions) {
 
 	gateways := krt.NewCollection(s.commonCols.GatewayIndex.Gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *ir.Gateway {
 		// TODO: support dynamic config, don't hard code the GatewayClassName
-		if gw.Obj.Spec.GatewayClassName != GatewayClassName {
+		if gw.Obj.Spec.GatewayClassName != wellknown.AgentGatewayClassName {
 			return nil
 		}
 		return &gw

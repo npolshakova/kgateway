@@ -192,6 +192,13 @@ func (in *KubernetesProxyConfig) GetAiExtension() *AiExtension {
 	return in.AiExtension
 }
 
+func (in *KubernetesProxyConfig) GetAgentGateway() *AgentGateway {
+	if in == nil {
+		return nil
+	}
+	return in.AgentGateway
+}
+
 func (in *KubernetesProxyConfig) GetFloatingUserId() *bool {
 	if in == nil {
 		return nil
@@ -758,6 +765,12 @@ type AgentGateway struct {
 	//
 	// +kubebuilder:validation:Optional
 	Enabled *bool `json:"enabled,omitempty"`
+
+	// Log level for the agent gateway. Defaults to info.
+	// Levels include "trace", "debug", "info", "error", "warn". See: https://docs.rs/tracing/latest/tracing/struct.Level.html
+	//
+	// +kubebuilder:validation:Optional
+	LogLevel *string `json:"logLevel,omitempty"`
 }
 
 func (in *AgentGateway) GetEnabled() *bool {
@@ -765,4 +778,11 @@ func (in *AgentGateway) GetEnabled() *bool {
 		return nil
 	}
 	return in.Enabled
+}
+
+func (in *AgentGateway) GetLogLevel() *string {
+	if in == nil {
+		return nil
+	}
+	return in.LogLevel
 }

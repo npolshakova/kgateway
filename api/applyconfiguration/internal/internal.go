@@ -131,6 +131,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: enabled
       type:
         scalar: boolean
+    - name: logLevel
+      type:
+        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AiExtension
   map:
     fields:

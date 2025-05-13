@@ -12,6 +12,8 @@ const (
 	// WaypointClassName is the GatewayClass name for the waypoint.
 	WaypointClassName = "kgateway-waypoint"
 
+	AgentGatewayClassName = "agentgateway"
+
 	// GatewayControllerName is the name of the controller that has implemented the Gateway API
 	// It is configured to manage GatewayClasses with the name GatewayClassName
 	GatewayControllerName = "kgateway.dev/kgateway"
