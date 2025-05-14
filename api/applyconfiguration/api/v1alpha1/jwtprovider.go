@@ -10,7 +10,7 @@ import (
 // with apply.
 type JWTProviderApplyConfiguration struct {
 	Issuer         *string                           `json:"issuer,omitempty"`
-	Audience       []string                          `json:"audience,omitempty"`
+	Audiences      []string                          `json:"audiences,omitempty"`
 	TokenSource    *JWTTokenSourceApplyConfiguration `json:"tokenSource,omitempty"`
 	ClaimToHeaders []*apiv1alpha1.JWTClaimToHeader   `json:"claimToHeaders,omitempty"`
 	JWKS           *JWKSApplyConfiguration           `json:"jwks,omitempty"`
@@ -30,12 +30,12 @@ func (b *JWTProviderApplyConfiguration) WithIssuer(value string) *JWTProviderApp
 	return b
 }
 
-// WithAudience adds the given value to the Audience field in the declarative configuration
+// WithAudiences adds the given value to the Audiences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Audience field.
-func (b *JWTProviderApplyConfiguration) WithAudience(values ...string) *JWTProviderApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Audiences field.
+func (b *JWTProviderApplyConfiguration) WithAudiences(values ...string) *JWTProviderApplyConfiguration {
 	for i := range values {
-		b.Audience = append(b.Audience, values[i])
+		b.Audiences = append(b.Audiences, values[i])
 	}
 	return b
 }

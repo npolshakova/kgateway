@@ -1,4 +1,4 @@
-package httplistenerpolicy
+package jwtvalidation
 
 import (
 	"context"
@@ -16,7 +16,7 @@ func getPolicyStatusFn(
 	cl client.Client,
 ) extensionsplug.GetPolicyStatusFn {
 	return func(ctx context.Context, nn types.NamespacedName) (gwv1alpha2.PolicyStatus, error) {
-		res := v1alpha1.HTTPListenerPolicy{}
+		res := v1alpha1.JWTValidationPolicy{}
 		err := cl.Get(ctx, nn, &res)
 		if err != nil {
 			return gwv1alpha2.PolicyStatus{}, err
@@ -29,7 +29,7 @@ func patchPolicyStatusFn(
 	cl client.Client,
 ) extensionsplug.PatchPolicyStatusFn {
 	return func(ctx context.Context, nn types.NamespacedName, policyStatus gwv1alpha2.PolicyStatus) error {
-		res := v1alpha1.HTTPListenerPolicy{}
+		res := v1alpha1.JWTValidationPolicy{}
 		err := cl.Get(ctx, nn, &res)
 		if err != nil {
 			return err
@@ -37,7 +37,7 @@ func patchPolicyStatusFn(
 
 		res.Status = policyStatus
 		if err := cl.Status().Patch(ctx, &res, client.Merge); err != nil {
-			return fmt.Errorf("error updating status for HTTPListenerPolicy %s: %w", nn.String(), err)
+			return fmt.Errorf("error updating status for JWTValidationPolicy %s: %w", nn.String(), err)
 		}
 		return nil
 	}

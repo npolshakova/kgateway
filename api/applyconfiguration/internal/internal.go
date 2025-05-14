@@ -901,7 +901,7 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
   map:
     fields:
-    - name: audience
+    - name: audiences
       type:
         list:
           elementType:
@@ -920,6 +920,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: jwks
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWKS
+      default: {}
     - name: tokenSource
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTTokenSource
@@ -1301,10 +1302,8 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: targetRefs
       type:
-        list:
-          elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
-          elementRelationship: atomic
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
+      default: {}
     - name: url
       type:
         scalar: string

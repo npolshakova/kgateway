@@ -35,7 +35,7 @@ spec:
               providers:
                 additionalProperties:
                   properties:
-                    audience:
+                    audiences:
                       items:
                         type: string
                       minItems: 1
@@ -92,29 +92,25 @@ spec:
                         remoteJwks:
                           properties:
                             targetRefs:
-                              items:
-                                properties:
-                                  group:
-                                    maxLength: 253
-                                    pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-                                    type: string
-                                  kind:
-                                    maxLength: 63
-                                    minLength: 1
-                                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
-                                    type: string
-                                  name:
-                                    maxLength: 253
-                                    minLength: 1
-                                    type: string
-                                required:
-                                - group
-                                - kind
-                                - name
-                                type: object
-                              maxItems: 16
-                              minItems: 1
-                              type: array
+                              properties:
+                                group:
+                                  maxLength: 253
+                                  pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                  type: string
+                                kind:
+                                  maxLength: 63
+                                  minLength: 1
+                                  pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                                  type: string
+                                name:
+                                  maxLength: 253
+                                  minLength: 1
+                                  type: string
+                              required:
+                              - group
+                              - kind
+                              - name
+                              type: object
                             url:
                               format: uri
                               maxLength: 253
@@ -137,8 +133,9 @@ spec:
                       - name
                       type: object
                   required:
-                  - audience
+                  - audiences
                   - issuer
+                  - jwks
                   type: object
                 minProperties: 1
                 type: object

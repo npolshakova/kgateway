@@ -14,6 +14,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/directresponse"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/httplistenerpolicy"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/istio"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/jwtvalidation"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/kubernetes"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/sandwich"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/serviceentry"
@@ -83,5 +84,6 @@ func Plugins(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plu
 		serviceentry.NewPlugin(ctx, commoncol),
 		waypoint.NewPlugin(ctx, commoncol),
 		sandwich.NewPlugin(),
+		jwtvalidation.NewPlugin(ctx, commoncol),
 	}
 }

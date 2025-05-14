@@ -17,12 +17,14 @@ func buildKgatewayGvk(kind string) schema.GroupVersionKind {
 // TODO: consider generating these?
 // manually updated GVKs of the kgateway API types; for convenience
 var (
-	GatewayParametersGVK  = buildKgatewayGvk("GatewayParameters")
-	GatewayExtensionGVK   = buildKgatewayGvk("GatewayExtension")
-	DirectResponseGVK     = buildKgatewayGvk("DirectResponse")
-	BackendGVK            = buildKgatewayGvk("Backend")
-	TrafficPolicyGVK      = buildKgatewayGvk("TrafficPolicy")
-	HTTPListenerPolicyGVK = buildKgatewayGvk("HTTPListenerPolicy")
+	GatewayParametersGVK      = buildKgatewayGvk("GatewayParameters")
+	GatewayExtensionGVK       = buildKgatewayGvk("GatewayExtension")
+	DirectResponseGVK         = buildKgatewayGvk("DirectResponse")
+	BackendGVK                = buildKgatewayGvk("Backend")
+	TrafficPolicyGVK          = buildKgatewayGvk("TrafficPolicy")
+	HTTPListenerPolicyGVK     = buildKgatewayGvk("HTTPListenerPolicy")
+	JWTValidationPolicyGVK    = buildKgatewayGvk("JWTValidationPolicy")
+	JWTAuthorizationPolicyGVK = buildKgatewayGvk("JWTAuthorizationPolicy")
 
 	GatewayParametersGVR  = GatewayParametersGVK.GroupVersion().WithResource("gatewayparameters")
 	GatewayExtensionGVR   = GatewayExtensionGVK.GroupVersion().WithResource("gatewayextensions")

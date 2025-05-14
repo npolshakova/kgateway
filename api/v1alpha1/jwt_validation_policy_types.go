@@ -57,7 +57,7 @@ type JWTProvider struct {
 	// Audience is the list of audiences to be used for the JWT provider.
 	// An incoming JWT must have an 'aud' claim, and it must be in this list.
 	// +kubebuilder:validation:MinItems=1
-	Audience []string `json:"audience"`
+	Audiences []string `json:"audiences"`
 
 	// TokenSource is the token source to be used for the JWT provider.
 	TokenSource *JWTTokenSource `json:"tokenSource,omitempty"`
@@ -68,7 +68,7 @@ type JWTProvider struct {
 	ClaimToHeaders []*JWTClaimToHeader `json:"claimToHeaders,omitempty"`
 
 	// JWKS is the source for the JSON Web Keys to be used to validate the JWT.
-	JWKS *JWKS `json:"jwks,omitempty"`
+	JWKS JWKS `json:"jwks"`
 }
 
 type JWTTokenSource struct {
@@ -142,9 +142,8 @@ type RemoteJWKS struct {
 	// TargetRef is the target reference to the JWKS server.
 	// If the JWKS server runs in your cluster, the destination can be a Kubernetes Service or kgateway Backend.
 	// If the JWKS server runs outside your cluster, the destination should be a static kgateway Backend.
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=16
-	TargetRefs []LocalPolicyTargetReference `json:"targetRefs"`
+	// +kubebuilder:validation:Required
+	TargetRef LocalPolicyTargetReference `json:"targetRefs"`
 
 	// URL is used when accessing the upstream for Json Web Key Set.
 	// This is used to set the host and path in the request

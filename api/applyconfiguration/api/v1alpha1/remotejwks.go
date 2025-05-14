@@ -5,8 +5,8 @@ package v1alpha1
 // RemoteJWKSApplyConfiguration represents a declarative configuration of the RemoteJWKS type for use
 // with apply.
 type RemoteJWKSApplyConfiguration struct {
-	TargetRefs []LocalPolicyTargetReferenceApplyConfiguration `json:"targetRefs,omitempty"`
-	URL        *string                                        `json:"url,omitempty"`
+	TargetRef *LocalPolicyTargetReferenceApplyConfiguration `json:"targetRefs,omitempty"`
+	URL       *string                                       `json:"url,omitempty"`
 }
 
 // RemoteJWKSApplyConfiguration constructs a declarative configuration of the RemoteJWKS type for use with
@@ -15,16 +15,11 @@ func RemoteJWKS() *RemoteJWKSApplyConfiguration {
 	return &RemoteJWKSApplyConfiguration{}
 }
 
-// WithTargetRefs adds the given value to the TargetRefs field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the TargetRefs field.
-func (b *RemoteJWKSApplyConfiguration) WithTargetRefs(values ...*LocalPolicyTargetReferenceApplyConfiguration) *RemoteJWKSApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithTargetRefs")
-		}
-		b.TargetRefs = append(b.TargetRefs, *values[i])
-	}
+// WithTargetRef sets the TargetRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TargetRef field is set to the value of the last call.
+func (b *RemoteJWKSApplyConfiguration) WithTargetRef(value *LocalPolicyTargetReferenceApplyConfiguration) *RemoteJWKSApplyConfiguration {
+	b.TargetRef = value
 	return b
 }
 
