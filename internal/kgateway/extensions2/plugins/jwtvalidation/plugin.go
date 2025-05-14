@@ -84,8 +84,8 @@ func registerTypes(ourCli versioned.Interface) {
 func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensionsplug.Plugin {
 	registerTypes(commoncol.OurClient)
 
-	col := krt.WrapClient(kclient.New[*v1alpha1.HTTPListenerPolicy](commoncol.Client), commoncol.KrtOpts.ToOptions("HTTPListenerPolicy")...)
-	gk := wellknown.HTTPListenerPolicyGVK.GroupKind()
+	col := krt.WrapClient(kclient.New[*v1alpha1.JWTValidationPolicy](commoncol.Client), commoncol.KrtOpts.ToOptions("JWTValidationPolicy")...)
+	gk := wellknown.JWTValidationPolicyGVK.GroupKind()
 
 	translateFn := buildTranslateFunc(ctx, commoncol.Secrets)
 	policyCol := krt.NewCollection(col, func(krtctx krt.HandlerContext, i *v1alpha1.JWTValidationPolicy) *ir.PolicyWrapper {
@@ -126,16 +126,16 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 func buildTranslateFunc(
 	ctx context.Context,
 	secrets *krtcollections.SecretIndex,
-) func(krtctx krt.HandlerContext, jwtPolicy *v1alpha1.JWTValidationPolicy) *jwtValidationPolicyIr {
-	return func(krtctx krt.HandlerContext, jwtPolicy *v1alpha1.JWTValidationPolicy) *jwtValidationPolicyIr {
+) func(krtctx krt.HandlerContext, policy *v1alpha1.JWTValidationPolicy) *jwtValidationPolicyIr {
+	return func(krtctx krt.HandlerContext, policy *v1alpha1.JWTValidationPolicy) *jwtValidationPolicyIr {
 		var errs []error
-		jwt, err := convertJwtValidationConfig(krtctx, jwtPolicy, secrets)
+		jwt, err := convertJwtValidationConfig(krtctx, policy, secrets)
 		if err != nil {
 			contextutils.LoggerFrom(ctx).Error(err)
 			errs = append(errs, err)
 		}
 		return &jwtValidationPolicyIr{
-			ct:        jwtPolicy.CreationTimestamp.Time,
+			ct:        policy.CreationTimestamp.Time,
 			jwtConfig: jwt,
 			Errors:    errs,
 		}

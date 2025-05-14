@@ -125,8 +125,8 @@ func translateJwks(krtctx krt.HandlerContext, jwkConfig v1alpha1.JWKS, secrets *
 			RemoteJwks: &jwtauthnv3.RemoteJwks{
 				// TODO: Support CacheDuration and AsyncFetch
 				HttpUri: &envoycore.HttpUri{
-					Timeout: &duration.Duration{Seconds: RemoteJwksTimeoutSecs},
-					Uri:     jwkConfig.RemoteJwks.URL,
+					Timeout:          &duration.Duration{Seconds: RemoteJwksTimeoutSecs},
+					Uri:              jwkConfig.RemoteJwks.URL,
 					HttpUpstreamType: &envoycore.HttpUri_Cluster{
 						// TODO:
 						//Cluster: TargetRefToClusterName(jwkConfig.RemoteJwks.TargetRef),
