@@ -104,6 +104,12 @@ func (b *TrafficPolicyBuilder) Translate(
 		errors = append(errors, err)
 	}
 
+	// Apply jwt specific translation
+	err = b.jwtForPolicy(krtctx, *policyCR, &outSpec)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
 	for _, err := range errors {
 		logger.Error("error translating gateway extension", "namespace", policyCR.GetNamespace(), "name", policyCR.GetName(), "error", err)
 	}

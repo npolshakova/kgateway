@@ -79,12 +79,18 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HTTPListenerPolicyList":                    schema_kgateway_v2_api_v1alpha1_HTTPListenerPolicyList(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HTTPListenerPolicySpec":                    schema_kgateway_v2_api_v1alpha1_HTTPListenerPolicySpec(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderFilter":                              schema_kgateway_v2_api_v1alpha1_HeaderFilter(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderSource":                              schema_kgateway_v2_api_v1alpha1_HeaderSource(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderTransformation":                      schema_kgateway_v2_api_v1alpha1_HeaderTransformation(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Host":                                      schema_kgateway_v2_api_v1alpha1_Host(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Http1ProtocolOptions":                      schema_kgateway_v2_api_v1alpha1_Http1ProtocolOptions(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Image":                                     schema_kgateway_v2_api_v1alpha1_Image(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.IstioContainer":                            schema_kgateway_v2_api_v1alpha1_IstioContainer(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.IstioIntegration":                          schema_kgateway_v2_api_v1alpha1_IstioIntegration(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWKS":                                      schema_kgateway_v2_api_v1alpha1_JWKS(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTClaimToHeader":                          schema_kgateway_v2_api_v1alpha1_JWTClaimToHeader(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider":                               schema_kgateway_v2_api_v1alpha1_JWTProvider(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTTokenSource":                            schema_kgateway_v2_api_v1alpha1_JWTTokenSource(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTValidation":                             schema_kgateway_v2_api_v1alpha1_JWTValidation(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.KubernetesProxyConfig":                     schema_kgateway_v2_api_v1alpha1_KubernetesProxyConfig(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LLMProvider":                               schema_kgateway_v2_api_v1alpha1_LLMProvider(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LoadBalancer":                              schema_kgateway_v2_api_v1alpha1_LoadBalancer(ref),
@@ -93,6 +99,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LoadBalancerRandomConfig":                  schema_kgateway_v2_api_v1alpha1_LoadBalancerRandomConfig(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LoadBalancerRingHashConfig":                schema_kgateway_v2_api_v1alpha1_LoadBalancerRingHashConfig(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LoadBalancerRoundRobinConfig":              schema_kgateway_v2_api_v1alpha1_LoadBalancerRoundRobinConfig(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalJWKS":                                 schema_kgateway_v2_api_v1alpha1_LocalJWKS(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReference":                schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetReference(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReferenceWithSectionName": schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetReferenceWithSectionName(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetSelector":                 schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetSelector(ref),
@@ -3110,6 +3117,33 @@ func schema_kgateway_v2_api_v1alpha1_HeaderFilter(ref common.ReferenceCallback) 
 	}
 }
 
+func schema_kgateway_v2_api_v1alpha1_HeaderSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "HeaderSource configures how to retrieve a JWT from a header",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"header": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Header is the name of the header. for example, \"Authorization\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"prefix": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Prefix before the token. for example, \"Bearer \"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_kgateway_v2_api_v1alpha1_HeaderTransformation(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -3350,6 +3384,205 @@ func schema_kgateway_v2_api_v1alpha1_IstioIntegration(ref common.ReferenceCallba
 		},
 		Dependencies: []string{
 			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.IstioContainer", "k8s.io/api/core/v1.Container"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_JWKS(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JWKS (JSON Web Key Set) configures the source for the JWKS",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"local": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LocalJWKS configures provide a PEM-formatted public key or file to verify the JWT token.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalJWKS"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalJWKS"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_JWTClaimToHeader(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JWTClaimToHeader allows copying verified claims to headers sent upstream",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the JWT claim name, for example, \"sub\".",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"header": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Header is the header the claim will be copied to, for example, \"x-sub\".",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "header"},
+			},
+		},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_JWTProvider(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JWTProvider configures the JWT Provider",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"issuer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Issuer of the JWT. the 'iss' claim of the JWT must match this.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"audiences": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Audiences is the list of audiences to be used for the JWT provider. If specified an incoming JWT must have an 'aud' claim, and it must be in this list. If not specified, the audiences will not be checked in the token.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"tokenSource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TokenSource configures where to find the JWT of the current provider.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTTokenSource"),
+						},
+					},
+					"claimsToHeaders": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ClaimsToHeaders is the list of claims to headers to be used for the JWT provider. Optionally set the claims from the JWT payload that you want to extract and add as headers to the request before the request is forwarded to the upstream destination.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTClaimToHeader"),
+									},
+								},
+							},
+						},
+					},
+					"jwks": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JWKS is the source for the JSON Web Keys to be used to validate the JWT.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWKS"),
+						},
+					},
+					"keepToken": {
+						SchemaProps: spec.SchemaProps{
+							Description: "KeepToken configures if the token forwarded upstream. if false, the header containing the token will be removed.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"jwks"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWKS", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTClaimToHeader", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTTokenSource"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_JWTTokenSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JWTTokenSource configures the source for the JWTToken",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"headers": {
+						SchemaProps: spec.SchemaProps{
+							Description: "HeaderSource configures retrieving token from the headers",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderSource"),
+									},
+								},
+							},
+						},
+					},
+					"queryParams": {
+						SchemaProps: spec.SchemaProps{
+							Description: "QueryParams configures retrieving token from these query params",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.HeaderSource"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_JWTValidation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JWTValidation defines the providers used to configure JWT validation",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"providers": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Providers configures a map of JWT provider name to Provider. If multiple providers are specified, the providers will be `OR`-ed together and will allow validation to any of the providers.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"providers"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider"},
 	}
 }
 
@@ -3648,6 +3881,41 @@ func schema_kgateway_v2_api_v1alpha1_LoadBalancerRoundRobinConfig(ref common.Ref
 		},
 		Dependencies: []string{
 			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.SlowStart"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_LocalJWKS(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LocalJWKS configures getting the public keys to validate the JWT from a local source, such as a Kubernetes secret, inline, raw string JWKS or file source.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"file": {
+						SchemaProps: spec.SchemaProps{
+							Description: "File is the path to the file containing the JWKS",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "InlineKey is the JWKS key as the raw, inline JWKS string",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"secretRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SecretRef configures storing the JWK in a Kubernetes secret in the same namespace as the JWTValidationPolicy.",
+							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.LocalObjectReference"},
 	}
 }
 
@@ -5539,11 +5807,17 @@ func schema_kgateway_v2_api_v1alpha1_TrafficPolicySpec(ref common.ReferenceCallb
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CSRFPolicy"),
 						},
 					},
+					"jwt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JWT specifies the JWT validation configuration for the policy. This defines the JWT providers and their configurations.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTValidation"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AIPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CSRFPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CorsPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtAuthPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtProcPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReferenceWithSectionName", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetSelector", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RateLimit", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TransformationPolicy"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AIPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CSRFPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CorsPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtAuthPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtProcPolicy", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTValidation", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReferenceWithSectionName", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetSelector", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RateLimit", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TransformationPolicy"},
 	}
 }
 

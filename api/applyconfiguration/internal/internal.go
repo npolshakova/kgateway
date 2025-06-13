@@ -896,6 +896,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.sigs.gateway-api.apis.v1.HTTPHeaderMatch
       default: {}
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderSource
+  map:
+    fields:
+    - name: header
+      type:
+        scalar: string
+    - name: prefix
+      type:
+        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderTransformation
   map:
     fields:
@@ -985,6 +994,75 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: istioProxyContainer
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.IstioContainer
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWKS
+  map:
+    fields:
+    - name: local
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
+  map:
+    fields:
+    - name: header
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
+  map:
+    fields:
+    - name: audiences
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: claimsToHeaders
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
+          elementRelationship: atomic
+    - name: issuer
+      type:
+        scalar: string
+      default: ""
+    - name: jwks
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWKS
+      default: {}
+    - name: keepToken
+      type:
+        scalar: string
+    - name: tokenSource
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTTokenSource
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTTokenSource
+  map:
+    fields:
+    - name: headers
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderSource
+          elementRelationship: atomic
+    - name: queryParams
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidation
+  map:
+    fields:
+    - name: providers
+      type:
+        map:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.KubernetesProxyConfig
   map:
     fields:
@@ -1120,6 +1198,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: slowStart
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SlowStart
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+  map:
+    fields:
+    - name: file
+      type:
+        scalar: string
+    - name: key
+      type:
+        scalar: string
+    - name: secretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
   map:
     fields:
@@ -1744,6 +1834,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extProc
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ExtProcPolicy
+    - name: jwt
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidation
     - name: rateLimit
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RateLimit
