@@ -13,6 +13,7 @@ import (
 	corsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/cors/v3"
 	envoy_csrf_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/csrf/v3"
 	dynamicmodulesv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3"
+	jwtauthnv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/jwt_authn/v3"
 	localratelimitv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3"
 	envoy_wellknown "github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -55,6 +56,7 @@ const (
 	localRateLimitFilterNamePrefix              = "ratelimit/local"
 	localRateLimitStatPrefix                    = "http_local_rate_limiter"
 	rateLimitFilterNamePrefix                   = "ratelimit"
+	jwtFilterNamePrefix                         = "jwt"
 )
 
 var (
@@ -96,6 +98,7 @@ type trafficPolicySpecIr struct {
 	csrf            *csrfIR
 	hashPolicies    *hashPolicyIR
 	autoHostRewrite *autoHostRewriteIR
+	jwt             *JwtIr
 }
 
 func (d *TrafficPolicy) CreationTime() time.Time {
@@ -147,6 +150,9 @@ func (d *TrafficPolicy) Equals(in any) bool {
 	if !d.spec.hashPolicies.Equals(d2.spec.hashPolicies) {
 		return false
 	}
+	if !d.spec.jwt.Equals(d2.spec.jwt) {
+		return false
+	}
 	return true
 }
 
@@ -167,6 +173,7 @@ func (p *TrafficPolicy) Validate() error {
 	validators = append(validators, p.spec.buffer.Validate)
 	validators = append(validators, p.spec.hashPolicies.Validate)
 	validators = append(validators, p.spec.autoHostRewrite.Validate)
+	validators = append(validators, p.spec.jwt.Validate)
 	for _, validator := range validators {
 		if err := validator(); err != nil {
 			return err
@@ -190,6 +197,7 @@ type trafficPolicyPluginGwPass struct {
 	corsInChain           map[string]*corsv3.Cors
 	csrfInChain           map[string]*envoy_csrf_v3.CsrfPolicy
 	bufferInChain         map[string]*bufferv3.Buffer
+	jwtInChain            map[string]*jwtauthnv3.JwtAuthentication
 }
 
 var _ ir.ProxyTranslationPass = &trafficPolicyPluginGwPass{}
@@ -602,6 +610,17 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 		filters = append(filters, filter)
 	}
 
+	// Add the JWT filter to enable JWT for the listener.
+	// Requires the JWT policy to be set as typed_per_filter_config.
+	if p.jwtInChain[fcc.FilterChainName] != nil {
+		// Adds the jwt config to the typed_per_filter_config.
+		// Also requires JWT http_filter to be added to the filter chain.
+		filter := plugins.MustNewStagedFilter(JwtFilterName,
+			p.jwtInChain[fcc.FilterChainName],
+			plugins.DuringStage(plugins.AuthNStage))
+		filters = append(filters, filter)
+	}
+
 	if len(filters) == 0 {
 		return nil, nil
 	}
@@ -623,6 +642,9 @@ func (p *trafficPolicyPluginGwPass) handlePolicies(fcn string, typedFilterConfig
 	p.handleCsrf(fcn, typedFilterConfig, spec.csrf)
 
 	p.handleBuffer(fcn, typedFilterConfig, spec.buffer)
+
+	// Apply jwt configuration if present
+	p.handleJwt(fcn, typedFilterConfig, spec.jwt)
 }
 
 func (p *trafficPolicyPluginGwPass) SupportsPolicyMerge() bool {
@@ -655,6 +677,7 @@ func MergeTrafficPolicies(
 		mergeBuffer,
 		mergeAutoHostRewrite,
 		mergeHashPolicies,
+		mergeJwt,
 	}
 
 	for _, mergeFunc := range mergeFuncs {

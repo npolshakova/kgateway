@@ -92,6 +92,11 @@ func (c *TrafficPolicyConstructor) ConstructIR(
 	// Construct buffer specific IR
 	constructBuffer(policyCR.Spec, &outSpec)
 
+	// Construct jwt specific IR
+	if err := constructJwt(krtctx, policyCR, &outSpec, c.commoncol.Secrets); err != nil {
+		errors = append(errors, err)
+	}
+
 	for _, err := range errors {
 		logger.Error("error translating gateway extension", "namespace", policyCR.GetNamespace(), "name", policyCR.GetName(), "error", err)
 	}

@@ -349,3 +349,30 @@ func mergeHashPolicies(
 		logger.Warn("unsupported merge strategy for hashPolicies policy", "strategy", opts.Strategy, "policy", p2Ref)
 	}
 }
+
+func mergeJwt(
+	p1, p2 *TrafficPolicy,
+	p2Ref *pluginsdkir.AttachedPolicyRef,
+	p2MergeOrigins pluginsdkir.MergeOrigins,
+	opts policy.MergeOptions,
+	mergeOrigins pluginsdkir.MergeOrigins,
+) {
+	if !policy.IsMergeable(p1.spec.jwt, p2.spec.jwt, opts) {
+		return
+	}
+
+	switch opts.Strategy {
+	case policy.AugmentedDeepMerge, policy.OverridableDeepMerge:
+		if p1.spec.jwt != nil {
+			return
+		}
+		fallthrough // can override p1 if it is unset
+
+	case policy.AugmentedShallowMerge, policy.OverridableShallowMerge:
+		p1.spec.jwt = p2.spec.jwt
+		mergeOrigins.SetOne("jwt", p2Ref, p2MergeOrigins)
+
+	default:
+		logger.Warn("unsupported merge strategy for jwt policy", "strategy", opts.Strategy, "policy", p2Ref)
+	}
+}

@@ -151,6 +151,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.HeaderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("HeaderFilter"):
 		return &apiv1alpha1.HeaderFilterApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("HeaderSource"):
+		return &apiv1alpha1.HeaderSourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("HeaderTransformation"):
 		return &apiv1alpha1.HeaderTransformationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("HeaderValue"):
@@ -177,6 +179,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.IstioContainerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("IstioIntegration"):
 		return &apiv1alpha1.IstioIntegrationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWKS"):
+		return &apiv1alpha1.JWKSApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTClaimToHeader"):
+		return &apiv1alpha1.JWTClaimToHeaderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTProvider"):
+		return &apiv1alpha1.JWTProviderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTTokenSource"):
+		return &apiv1alpha1.JWTTokenSourceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTValidation"):
+		return &apiv1alpha1.JWTValidationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("KeyAnyValue"):
 		return &apiv1alpha1.KeyAnyValueApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("KeyAnyValueList"):
@@ -195,6 +207,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.LoadBalancerRingHashConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LoadBalancerRoundRobinConfig"):
 		return &apiv1alpha1.LoadBalancerRoundRobinConfigApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LocalJWKS"):
+		return &apiv1alpha1.LocalJWKSApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LocalPolicyTargetReference"):
 		return &apiv1alpha1.LocalPolicyTargetReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LocalPolicyTargetReferenceWithSectionName"):

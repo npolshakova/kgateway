@@ -1,0 +1,68 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httpbin-route
+  namespace: default
+spec:
+  hostnames:
+    - httpbin
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gw
+      namespace: default
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: httpbin
+          port: 8000
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /status/200
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: httpbin
+          port: 8000
+          weight: 1
+      matches:
+        - path:
+            type: PathPrefix
+            value: /get
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: gateway.kgateway.dev
+            kind: TrafficPolicy
+            name: jwt-policy
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: jwt-policy
+spec:
+  jwt:
+    providers:
+      my-example:
+        claimsToHeaders:
+          - name: org
+            header: x-org
+          - name: email
+            header: x-email
+        issuer: https://dev.example.com
+        jwks:
+          local:
+            key: |
+              -----BEGIN PUBLIC KEY-----
+              MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA10wLlnj/yIbd4FHCyyd8
+              t/a3jbZIND2p3ak01ytdk4r7KCMDEFctX1+UYbz3+pyB01qu0jZpLMnESrVQIyZY
+              s8X9T2RTquZ713LiBKPQiDlx0ClBH1aB9uWSk0XEryv85qh46peuu9QSA5NitWok
+              pYyaHdE+1ASGzEYLIEN4W86k0ZTw/fZGhCJ6NH6QS2vabIk7hLm4ntu7yx5PG9AD
+              g4bOT/powWnztB8aB61T1Fgib5xTapxJhWFVTr6KdZLyZdd+lHesECpDjEk/SlL9
+              mplzAHjXBfrbRY4geLEUOXKnPmy3Mk5WvHT4+N0XHZejG8E30nHVRbU+pKIrrjTo
+              zQIDAQAB
+              -----END PUBLIC KEY-----
