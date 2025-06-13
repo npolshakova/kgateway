@@ -76,6 +76,11 @@ type TrafficPolicySpec struct {
 	// Csrf specifies the Cross-Site Request Forgery (CSRF) policy for this traffic policy.
 	// +optional
 	Csrf *CSRFPolicy `json:"csrf,omitempty"`
+
+	// JWT specifies the JWT validation configuration for the policy.
+	// This defines the JWT providers and their configurations.
+	// +optional
+	JWT *JWTValidation `json:"jwt,omitempty"`
 }
 
 // TransformationPolicy config is used to modify envoy behavior at a route level.
