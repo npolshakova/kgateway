@@ -287,6 +287,7 @@ func parseKey(key string) (*jose.JSONWebKeySet, error) {
 }
 
 func parsePem(key string) (*jose.JSONWebKeySet, error) {
+
 	block, _ := pem.Decode([]byte(key))
 	if block == nil {
 		return nil, errors.New("no PEM block found")
