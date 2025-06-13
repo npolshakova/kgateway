@@ -1132,6 +1132,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.sigs.gateway-api.apis.v1.HTTPHeaderMatch
       default: {}
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderSource
+  map:
+    fields:
+    - name: header
+      type:
+        scalar: string
+    - name: prefix
+      type:
+        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderTransformation
   map:
     fields:
@@ -1444,6 +1453,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: slowStart
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.SlowStart
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+  map:
+    fields:
+    - name: file
+      type:
+        scalar: string
+    - name: key
+      type:
+        scalar: string
+    - name: secretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalPolicyTargetReference
   map:
     fields:
@@ -2185,6 +2206,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extProc
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ExtProcPolicy
+    - name: jwt
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidation
     - name: rateLimit
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RateLimit
