@@ -72,6 +72,11 @@ type TrafficPolicySpec struct {
 	// Cors specifies the CORS configuration for the policy.
 	// +optional
 	Cors *CorsPolicy `json:"cors,omitempty"`
+
+	// JWT specifies the JWT validation configuration for the policy.
+	// This defines the JWT providers and their configurations.
+	// +optional
+	JWT *JWTValidation `json:"jwt,omitempty"`
 }
 
 // TransformationPolicy config is used to modify envoy behavior at a route level.

@@ -13,6 +13,7 @@ type TrafficPolicySpecApplyConfiguration struct {
 	ExtAuth         *ExtAuthPolicyApplyConfiguration                              `json:"extAuth,omitempty"`
 	RateLimit       *RateLimitApplyConfiguration                                  `json:"rateLimit,omitempty"`
 	Cors            *CorsPolicyApplyConfiguration                                 `json:"cors,omitempty"`
+	JWT             *JWTValidationApplyConfiguration                              `json:"jwt,omitempty"`
 }
 
 // TrafficPolicySpecApplyConfiguration constructs a declarative configuration of the TrafficPolicySpec type for use with
@@ -92,5 +93,13 @@ func (b *TrafficPolicySpecApplyConfiguration) WithRateLimit(value *RateLimitAppl
 // If called multiple times, the Cors field is set to the value of the last call.
 func (b *TrafficPolicySpecApplyConfiguration) WithCors(value *CorsPolicyApplyConfiguration) *TrafficPolicySpecApplyConfiguration {
 	b.Cors = value
+	return b
+}
+
+// WithJWT sets the JWT field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the JWT field is set to the value of the last call.
+func (b *TrafficPolicySpecApplyConfiguration) WithJWT(value *JWTValidationApplyConfiguration) *TrafficPolicySpecApplyConfiguration {
+	b.JWT = value
 	return b
 }

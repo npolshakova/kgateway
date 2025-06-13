@@ -12,6 +12,7 @@ import (
 	exteniondynamicmodulev3 "github.com/envoyproxy/go-control-plane/envoy/extensions/dynamic_modules/v3"
 	corsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/cors/v3"
 	dynamicmodulesv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3"
+	jwtauthnv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/jwt_authn/v3"
 	localratelimitv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3"
 	envoy_wellknown "github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"google.golang.org/protobuf/proto"
@@ -54,6 +55,7 @@ const (
 	localRateLimitFilterNamePrefix              = "ratelimit/local"
 	localRateLimitStatPrefix                    = "http_local_rate_limiter"
 	rateLimitFilterNamePrefix                   = "ratelimit"
+	jwtFilterNamePrefix                         = "jwt"
 )
 
 var (
@@ -83,6 +85,7 @@ type trafficPolicySpecIr struct {
 	localRateLimit             *localratelimitv3.LocalRateLimit
 	rateLimit                  *GlobalRateLimitIR
 	cors                       *CorsIR
+	jwt                        *JwtIr
 }
 
 func (d *TrafficPolicy) CreationTime() time.Time {
@@ -144,6 +147,10 @@ func (d *TrafficPolicy) Equals(in any) bool {
 		return false
 	}
 
+	if !d.spec.jwt.Equals(d2.spec.jwt) {
+		return false
+	}
+
 	return true
 }
 
@@ -160,6 +167,7 @@ type trafficPolicyPluginGwPass struct {
 	extProcPerProvider    ProviderNeededMap
 	rateLimitPerProvider  ProviderNeededMap
 	corsInChain           map[string]*corsv3.Cors
+	jwtInChain            map[string]*jwtauthnv3.JwtAuthentication
 }
 
 var _ ir.ProxyTranslationPass = &trafficPolicyPluginGwPass{}
@@ -341,6 +349,7 @@ func (p *trafficPolicyPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.
 			p.processAITrafficPolicy(&pCtx.TypedFilterConfig, policy.spec.AI)
 		}
 	}
+
 	p.handlePolicies(pCtx.FilterChainName, &pCtx.TypedFilterConfig, policy.spec)
 
 	return nil
@@ -508,6 +517,17 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 		filters = append(filters, filter)
 	}
 
+	// Add the JWT filter to enable JWT for the listener.
+	// Requires the JWT policy to be set as typed_per_filter_config.
+	if p.jwtInChain[fcc.FilterChainName] != nil {
+		// Adds the jwt config to the typed_per_filter_config.
+		// Also requires JWT http_filter to be added to the filter chain.
+		filter := plugins.MustNewStagedFilter(JwtFilterName,
+			p.jwtInChain[fcc.FilterChainName],
+			plugins.DuringStage(plugins.AuthNStage))
+		filters = append(filters, filter)
+	}
+
 	if len(filters) == 0 {
 		return nil, nil
 	}
@@ -527,6 +547,11 @@ func (p *trafficPolicyPluginGwPass) handlePolicies(fcn string, typedFilterConfig
 
 	// Apply CORS configuration if present
 	p.handleCors(fcn, typedFilterConfig, spec.cors)
+
+	// Apply jwt configuration if present
+	if spec.jwt != nil {
+		p.handleJwt(fcn, typedFilterConfig, spec.jwt)
+	}
 }
 
 func (p *trafficPolicyPluginGwPass) SupportsPolicyMerge() bool {
@@ -636,6 +661,11 @@ func MergeTrafficPolicies(
 	if policy.IsMergeable(p1.spec.cors, p2.spec.cors, mergeOpts) {
 		p1.spec.cors = p2.spec.cors
 		mergeOrigins["cors"] = p2Ref
+	}
+	// Handle jwt merging
+	if policy.IsMergeable(p1.spec.jwt, p2.spec.jwt, mergeOpts) {
+		p1.spec.jwt = p2.spec.jwt
+		mergeOrigins["jwt"] = p2Ref
 	}
 
 	return mergeOrigins

@@ -1,0 +1,139 @@
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: http-gw-for-test
+  namespace: gwtest
+spec:
+  gatewayClassName: kgateway
+  listeners:
+    - protocol: HTTP
+      hostname: "example.com"
+      port: 8080
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reviews
+  namespace: gwtest
+  labels:
+    app: reviews
+    service: reviews
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: reviews
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: extproc
+  namespace: gwtest
+spec:
+  ports:
+    - port: 9091
+      protocol: TCP
+      appProtocol: kubernetes.io/h2c
+      targetPort: 9091
+  selector:
+    app: extproc
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: reviews-slice
+  namespace: gwtest
+  labels:
+    kubernetes.io/service-name: reviews
+    app: reviews
+    service: reviews
+addressType: IPv4
+endpoints:
+  - addresses:
+      - 10.244.1.11
+    conditions:
+      ready: true
+    nodeName: worker
+    targetRef:
+      kind: Pod
+      name: reviews-1
+      namespace: gwtest
+  - addresses:
+      - 10.244.2.14
+    conditions:
+      ready: true
+    nodeName: worker
+    targetRef:
+      kind: Pod
+      name: extproc
+      namespace: gwtest
+ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: GatewayExtension
+metadata:
+  name: extproc-ext
+  namespace: gwtest
+spec:
+  type: ExtProc
+  extProc:
+    grpcService:
+      backendRef:
+        name: extproc
+        port: 9091
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: route-test
+  namespace: gwtest
+spec:
+  targetRefs:
+    - kind: HTTPRoute
+      group: gateway.networking.k8s.io
+      name: route
+  jwt:
+    providers:
+      my-example:
+        claimsToHeaders:
+          - name: org
+            header: x-org
+          - name: email
+            header: x-email
+        issuer: https://my.example.com
+        jwks:
+          local:
+            key: |
+              -----BEGIN PUBLIC KEY-----
+              MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmXtvzsvqA619Cgw/z4p+
+              M7iz04ZRK9Kcb1l2u+/YY4GXWE2/sCANs3BgbRdnyebB3Q4xyb7w7HWHGQujd+hm
+              V4coSHU6BZFCqCnUUY97wHMCkDJW8F/o/sNjO2kRLc1VkVDEAlYTCGWyzW1w9oyQ
+              lIsGngDW9IkV/jpd/WULsXXMxQcpVamJFNF9aqvXRkMEw/3/s5+PrK6KX2xryKx6
+              aeBy9fUsvzIhZuI8qErpBhj0EWIsPPIkpLcF0kxm2vTAkuKO39+i4Gy1t66JqzVw
+              xOvtWzQGnG9ahTAx3dAkxzpQW8tA0l3BhGEpK+0JjoaQEX/MVWK+IvsdbtpcBZi1
+              SwIDAQAB
+              -----END PUBLIC KEY-----
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: route
+  namespace: gwtest
+spec:
+  parentRefs:
+    - name: http-gw-for-test
+  hostnames:
+    - "example.com"
+  rules:
+    - backendRefs:
+        - name: reviews
+          port: 8080
