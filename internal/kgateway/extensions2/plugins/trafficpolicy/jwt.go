@@ -212,13 +212,14 @@ func translateTokenSource(provider v1alpha1.JWTProvider, out *jwtauthnv3.JwtProv
 
 func translateJwks(krtctx krt.HandlerContext, jwkConfig v1alpha1.JWKS, secrets *krtcollections.SecretIndex, policyNs string, out *jwtauthnv3.JwtProvider) error {
 	var err error
+	var secret *ir.Secret
 	var jwkSource *jwtauthnv3.JwtProvider_LocalJwks
 	if jwkConfig.LocalJWKS.File != nil {
 		jwkSource, err = translateJwksFile(*jwkConfig.LocalJWKS.File)
 	} else if jwkConfig.LocalJWKS.InlineKey != nil {
 		jwkSource, err = translateJwksInline(*jwkConfig.LocalJWKS.InlineKey)
 	} else if jwkConfig.LocalJWKS.SecretRef != nil {
-		secret, err := GetSecretIr(secrets, krtctx, jwkConfig.LocalJWKS.SecretRef.Name, policyNs)
+		secret, err = GetSecretIr(secrets, krtctx, jwkConfig.LocalJWKS.SecretRef.Name, policyNs)
 		if err != nil {
 			return errors.New("failed to find secret " + jwkConfig.LocalJWKS.SecretRef.Name)
 		}
@@ -310,7 +311,6 @@ func parseKey(key string) (*jose.JSONWebKeySet, error) {
 }
 
 func parsePem(key string) (*jose.JSONWebKeySet, error) {
-
 	block, _ := pem.Decode([]byte(key))
 	if block == nil {
 		return nil, errors.New("no PEM block found")
