@@ -7,7 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
 )
 
@@ -28,12 +27,4 @@ var (
 		Namespace: "httpbin",
 	}
 	httpbinDeployment = &appsv1.Deployment{ObjectMeta: httpbinObjectMeta}
-
-	// JWT TrafficPolicy objects
-	jwtConfig = &v1alpha1.TrafficPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "jwt-policy",
-			Namespace: "default",
-		},
-	}
 )
