@@ -33,9 +33,6 @@ type testingSuite struct {
 	// maps test name to a list of manifests to apply before the test
 	manifests map[string][]string
 
-	// maps manifest name to a list of objects to verify
-	manifestObjects map[string][]client.Object
-
 	// Track core objects for cleanup
 	coreObjects []client.Object
 }
