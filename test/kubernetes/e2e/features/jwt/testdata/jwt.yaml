@@ -46,15 +46,24 @@ metadata:
   name: jwt-policy
 spec:
   jwt:
-    providers:
-      my-example:
-        claimsToHeaders:
+    extensionRef:
+      name: basic-jwt-provider
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: GatewayExtension
+metadata:
+  name: basic-jwt-provider
+spec:
+  type: JWT
+  jwtProviders:
+    my-example:
+      claimsToHeaders:
           - name: org
             header: x-org
           - name: email
             header: x-email
-        issuer: https://dev.example.com
-        jwks:
+      issuer: https://dev.example.com
+      jwks:
           local:
             key: |
               -----BEGIN PUBLIC KEY-----

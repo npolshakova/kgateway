@@ -13,7 +13,6 @@ import (
 	corsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/cors/v3"
 	envoy_csrf_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/csrf/v3"
 	dynamicmodulesv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3"
-	jwtauthnv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/jwt_authn/v3"
 	localratelimitv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3"
 	envoy_wellknown "github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"google.golang.org/protobuf/proto"
@@ -172,9 +171,9 @@ type trafficPolicyPluginGwPass struct {
 	extAuthPerProvider    ProviderNeededMap
 	extProcPerProvider    ProviderNeededMap
 	rateLimitPerProvider  ProviderNeededMap
+	jwtPerProvider        ProviderNeededMap
 	corsInChain           map[string]*corsv3.Cors
 	csrfInChain           map[string]*envoy_csrf_v3.CsrfPolicy
-	jwtInChain            map[string]*jwtauthnv3.JwtAuthentication
 }
 
 var _ ir.ProxyTranslationPass = &trafficPolicyPluginGwPass{}
@@ -246,6 +245,10 @@ func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, re
 	return &trafficPolicyPluginGwPass{
 		reporter:                 reporter,
 		setTransformationInChain: make(map[string]bool),
+		extAuthPerProvider:       ProviderNeededMap{Providers: make(map[string]map[string]*TrafficPolicyGatewayExtensionIR)},
+		extProcPerProvider:       ProviderNeededMap{Providers: make(map[string]map[string]*TrafficPolicyGatewayExtensionIR)},
+		rateLimitPerProvider:     ProviderNeededMap{Providers: make(map[string]map[string]*TrafficPolicyGatewayExtensionIR)},
+		jwtPerProvider:           ProviderNeededMap{Providers: make(map[string]map[string]*TrafficPolicyGatewayExtensionIR)},
 	}
 }
 
@@ -532,15 +535,20 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 		filters = append(filters, filter)
 	}
 
-	// Add the JWT filter to enable JWT for the listener.
-	// Requires the JWT policy to be set as typed_per_filter_config.
-	if p.jwtInChain[fcc.FilterChainName] != nil {
-		// Adds the jwt config to the typed_per_filter_config.
-		// Also requires JWT http_filter to be added to the filter chain.
-		filter := plugins.MustNewStagedFilter(JwtFilterName,
-			p.jwtInChain[fcc.FilterChainName],
-			plugins.DuringStage(plugins.AuthNStage))
-		filters = append(filters, filter)
+	// Add jwt filter for listener
+	for providerName, provider := range p.jwtPerProvider.Providers[fcc.FilterChainName] {
+		jwtFilter := provider.Jwt
+		if jwtFilter == nil {
+			continue
+		}
+
+		// add the specific jwt filter
+		jwtName := jwtFilterName(providerName)
+		stagedJwtFilter := plugins.MustNewStagedFilter(jwtName,
+			jwtFilter,
+			plugins.DuringStage(plugins.AuthZStage))
+
+		filters = append(filters, stagedJwtFilter)
 	}
 
 	if len(filters) == 0 {

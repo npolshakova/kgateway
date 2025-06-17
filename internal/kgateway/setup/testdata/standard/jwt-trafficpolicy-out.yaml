@@ -4,6 +4,7 @@ clusters:
     edsConfig:
       ads: {}
       resourceApiVersion: V3
+  ignoreHealthOnHostRemoval: true
   metadata: {}
   name: kube_default_kubernetes_443
   type: EDS
@@ -12,6 +13,7 @@ clusters:
     edsConfig:
       ads: {}
       resourceApiVersion: V3
+  ignoreHealthOnHostRemoval: true
   metadata: {}
   name: kube_gwtest_extproc_9091
   type: EDS
@@ -25,6 +27,7 @@ clusters:
     edsConfig:
       ads: {}
       resourceApiVersion: V3
+  ignoreHealthOnHostRemoval: true
   metadata: {}
   name: kube_gwtest_reviews_8080
   type: EDS
@@ -63,11 +66,11 @@ listeners:
       typedConfig:
         '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         httpFilters:
-        - name: envoy.filters.http.jwt_authn
+        - name: jwt/gwtest/jwt-ext
           typedConfig:
             '@type': type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
             providers:
-              route-test_gwtest_my-example:
+              jwt-ext_gwtest_my-example:
                 claimToHeaders:
                 - claimName: org
                   headerName: x-org
@@ -76,10 +79,10 @@ listeners:
                 issuer: https://my.example.com
                 localJwks:
                   inlineString: '{"keys":[{"use":"sig","kty":"RSA","alg":"RS256","n":"mXtvzsvqA619Cgw_z4p-M7iz04ZRK9Kcb1l2u-_YY4GXWE2_sCANs3BgbRdnyebB3Q4xyb7w7HWHGQujd-hmV4coSHU6BZFCqCnUUY97wHMCkDJW8F_o_sNjO2kRLc1VkVDEAlYTCGWyzW1w9oyQlIsGngDW9IkV_jpd_WULsXXMxQcpVamJFNF9aqvXRkMEw_3_s5-PrK6KX2xryKx6aeBy9fUsvzIhZuI8qErpBhj0EWIsPPIkpLcF0kxm2vTAkuKO39-i4Gy1t66JqzVwxOvtWzQGnG9ahTAx3dAkxzpQW8tA0l3BhGEpK-0JjoaQEX_MVWK-IvsdbtpcBZi1Sw","e":"AQAB"}]}'
-                payloadInMetadata: route-test_gwtest_my-example
+                payloadInMetadata: payload
             requirementMap:
-              route-test_gwtest_requirements:
-                providerName: route-test_gwtest_my-example
+              jwt-ext_gwtest_requirements:
+                providerName: jwt-ext_gwtest_my-example
         - name: envoy.filters.http.router
           typedConfig:
             '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -109,6 +112,6 @@ routes:
         cluster: kube_gwtest_reviews_8080
         clusterNotFoundResponseCode: INTERNAL_SERVER_ERROR
       typedPerFilterConfig:
-        envoy.filters.http.jwt_authn:
+        jwt/gwtest/jwt-ext:
           '@type': type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig
-          requirementName: route-test_gwtest_requirements
+          requirementName: jwt-ext_gwtest_requirements

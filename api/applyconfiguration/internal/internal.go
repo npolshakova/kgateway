@@ -720,6 +720,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extProc
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ExtProcProvider
+    - name: jwtProviders
+      type:
+        map:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
     - name: rateLimit
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RateLimitProvider
@@ -1058,11 +1063,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidation
   map:
     fields:
-    - name: providers
+    - name: extensionRef
       type:
-        map:
-          elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+      default: {}
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.KubernetesProxyConfig
   map:
     fields:
