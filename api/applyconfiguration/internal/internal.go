@@ -125,6 +125,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: traceableFilter
       type:
         scalar: boolean
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AccessRule
+  map:
+    fields:
+    - name: methods
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: pathPrefixes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AgentGateway
   map:
     fields:
@@ -1000,6 +1015,20 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: local
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
+  map:
+    fields:
+    - name: matcher
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: value
+      type:
+        scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
   map:
     fields:
@@ -1011,6 +1040,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipal
+  map:
+    fields:
+    - name: claims
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
+          elementRelationship: atomic
+    - name: provider
+      type:
+        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
   map:
     fields:
@@ -1386,6 +1427,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Principal
+  map:
+    fields:
+    - name: jwt
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipal
+          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Priority
   map:
     fields:
@@ -1516,6 +1566,29 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: timeout
       type:
         scalar: string
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Rbac
+  map:
+    fields:
+    - name: action
+      type:
+        scalar: string
+    - name: rules
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RbacRule
+          elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RbacRule
+  map:
+    fields:
+    - name: access
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AccessRule
+      default: {}
+    - name: principal
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Principal
+      default: {}
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Regex
   map:
     fields:
@@ -1840,6 +1913,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: rateLimit
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RateLimit
+    - name: rbac
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Rbac
     - name: targetRefs
       type:
         list:

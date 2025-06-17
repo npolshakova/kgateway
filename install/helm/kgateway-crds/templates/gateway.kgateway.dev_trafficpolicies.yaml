@@ -652,6 +652,79 @@ spec:
                         type: object
                     type: object
                 type: object
+              rbac:
+                properties:
+                  action:
+                    default: Allow
+                    enum:
+                    - Allow
+                    - Deny
+                    type: string
+                  rules:
+                    items:
+                      properties:
+                        access:
+                          properties:
+                            methods:
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                            pathPrefixes:
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                          required:
+                          - methods
+                          - pathPrefixes
+                          type: object
+                        principal:
+                          properties:
+                            jwt:
+                              items:
+                                properties:
+                                  claims:
+                                    items:
+                                      properties:
+                                        matcher:
+                                          default: Exact
+                                          enum:
+                                          - Exact
+                                          - Boolean
+                                          - Contains
+                                          type: string
+                                        name:
+                                          maxLength: 2048
+                                          minLength: 1
+                                          type: string
+                                        value:
+                                          maxLength: 2048
+                                          minLength: 1
+                                          type: string
+                                      required:
+                                      - name
+                                      - value
+                                      type: object
+                                    maxItems: 16
+                                    minItems: 1
+                                    type: array
+                                  provider:
+                                    type: string
+                                required:
+                                - claims
+                                type: object
+                              type: array
+                          type: object
+                      required:
+                      - principal
+                      type: object
+                    maxItems: 16
+                    minItems: 1
+                    type: array
+                required:
+                - rules
+                type: object
               targetRefs:
                 items:
                   properties:

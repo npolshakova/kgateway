@@ -102,12 +102,14 @@ func convertJwtValidationConfig(krtctx krt.HandlerContext, policyName, policyNs 
 	policyNameNamespace := fmt.Sprintf("%s_%s", policyName, policyNs)
 
 	for providerName, provider := range policy.Providers {
-		providerNameForPolicy := ProviderName(policyNameNamespace, providerName)
-		jwtProvider, err := translateProvider(krtctx, provider, providerNameForPolicy, policyNs, secrets)
+		jwtProvider, err := translateProvider(krtctx, provider, providerName, policyNs, secrets)
 		if err != nil {
 			return nil, err
 		}
-		uniqProviders[providerNameForPolicy] = jwtProvider
+		if uniqProviders[providerName] != nil {
+			return nil, fmt.Errorf("provider name must be unique, found duplicate: %s", providerName)
+		}
+		uniqProviders[providerName] = jwtProvider
 	}
 
 	requirementsName := fmt.Sprintf("%s_requirements", policyNameNamespace)
@@ -124,11 +126,6 @@ func convertJwtValidationConfig(krtctx krt.HandlerContext, policyName, policyNs 
 		jwtConfig:        jwtConfig,
 		requirementsName: requirementsName,
 	}, nil
-}
-
-// ProviderName returns a unique name for a provider in the context of a route
-func ProviderName(resourceName, providerName string) string {
-	return fmt.Sprintf("%s_%s", resourceName, providerName)
 }
 
 func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider, providerNameForPolicy, policyNs string, secrets *krtcollections.SecretIndex) (*jwtauthnv3.JwtProvider, error) {

@@ -200,10 +200,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: "test-provider",
 						ClaimToHeaders: []*jwtauthnv3.JwtClaimToHeader{
 							{
 								ClaimName:  "sub",
@@ -232,10 +232,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: "test-provider",
 					},
 				},
 			},
@@ -282,15 +282,15 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_provider1": {
+					"provider1": {
 						Issuer:            "test-issuer-1",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_provider1",
+						PayloadInMetadata: "provider1",
 					},
-					"test-policy_test-ns_provider2": {
+					"provider2": {
 						Issuer:            "test-issuer-2",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_provider2",
+						PayloadInMetadata: "provider2",
 					},
 				},
 			},
@@ -313,10 +313,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         []string{"aud1", "aud2"},
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: "test-provider",
 					},
 				},
 			},
@@ -345,10 +345,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: "test-provider",
 					},
 				},
 			},
@@ -371,10 +371,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: "test-provider",
 						Forward:           false,
 					},
 				},

@@ -38,19 +38,25 @@ spec:
           extensionRef:
             group: gateway.kgateway.dev
             kind: TrafficPolicy
-            name: jwt-policy
+            name: jwt-rbac-policy
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: TrafficPolicy
 metadata:
-  name: jwt-policy
+  name: jwt-rbac-policy
 spec:
+  rbac:
+    rules:
+    - principal:
+        jwt:
+        - provider: my-example
+          claims:
+          - name: email
+            value: dev2@kgateway.io # route requires dev2
   jwt:
     providers:
       my-example:
         claimsToHeaders:
-          - name: org
-            header: x-org
           - name: email
             header: x-email
         issuer: https://dev.example.com
