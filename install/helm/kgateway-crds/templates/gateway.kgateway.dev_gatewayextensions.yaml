@@ -144,6 +144,99 @@ spec:
                 required:
                 - grpcService
                 type: object
+              jwtProviders:
+                additionalProperties:
+                  properties:
+                    audiences:
+                      items:
+                        type: string
+                      maxItems: 100
+                      minItems: 1
+                      type: array
+                    claimsToHeaders:
+                      items:
+                        properties:
+                          header:
+                            maxLength: 2048
+                            minLength: 1
+                            type: string
+                          name:
+                            maxLength: 2048
+                            minLength: 1
+                            type: string
+                        required:
+                        - header
+                        - name
+                        type: object
+                      maxItems: 100
+                      minItems: 1
+                      type: array
+                    issuer:
+                      maxLength: 2048
+                      minLength: 1
+                      type: string
+                    jwks:
+                      properties:
+                        local:
+                          properties:
+                            file:
+                              maxLength: 2048
+                              minLength: 1
+                              type: string
+                            key:
+                              maxLength: 2048
+                              minLength: 1
+                              type: string
+                            secretRef:
+                              properties:
+                                name:
+                                  default: ""
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                          x-kubernetes-validations:
+                          - message: exactly one of file, key, or secretRef must be
+                              set
+                            rule: (has(self.file) && !has(self.key) && !has(self.secretRef))
+                              || (!has(self.file) && has(self.key) && !has(self.secretRef))
+                              || (!has(self.file) && !has(self.key) && has(self.secretRef))
+                      type: object
+                    keepToken:
+                      default: Remove
+                      enum:
+                      - Forward
+                      - Remove
+                      type: string
+                    tokenSource:
+                      properties:
+                        headers:
+                          items:
+                            properties:
+                              header:
+                                maxLength: 2048
+                                minLength: 1
+                                type: string
+                              prefix:
+                                maxLength: 2048
+                                minLength: 1
+                                type: string
+                            type: object
+                          maxItems: 100
+                          minItems: 1
+                          type: array
+                        queryParams:
+                          items:
+                            type: string
+                          maxItems: 100
+                          minItems: 1
+                          type: array
+                      type: object
+                  required:
+                  - jwks
+                  type: object
+                maxProperties: 32
+                type: object
               rateLimit:
                 properties:
                   domain:
@@ -213,6 +306,7 @@ spec:
                 - ExtAuth
                 - ExtProc
                 - RateLimit
+                - JWT
                 type: string
             required:
             - type
@@ -230,6 +324,8 @@ spec:
               rule: self.type == 'ExtProc' || !has(self.extProc)
             - message: RateLimit must not be set when type is not RateLimit
               rule: self.type == 'RateLimit' || !has(self.rateLimit)
+            - message: JWT must not be set when type is not JWT
+              rule: self.type == 'JWT' || !has(self.jwtProviders)
           status:
             properties:
               conditions:

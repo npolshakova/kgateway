@@ -2,10 +2,14 @@
 
 package v1alpha1
 
+import (
+	v1 "k8s.io/api/core/v1"
+)
+
 // JWTValidationApplyConfiguration represents a declarative configuration of the JWTValidation type for use
 // with apply.
 type JWTValidationApplyConfiguration struct {
-	Providers map[string]JWTProviderApplyConfiguration `json:"providers,omitempty"`
+	ExtensionRef *v1.LocalObjectReference `json:"extensionRef,omitempty"`
 }
 
 // JWTValidationApplyConfiguration constructs a declarative configuration of the JWTValidation type for use with
@@ -14,16 +18,10 @@ func JWTValidation() *JWTValidationApplyConfiguration {
 	return &JWTValidationApplyConfiguration{}
 }
 
-// WithProviders puts the entries into the Providers field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Providers field,
-// overwriting an existing map entries in Providers field with the same key.
-func (b *JWTValidationApplyConfiguration) WithProviders(entries map[string]JWTProviderApplyConfiguration) *JWTValidationApplyConfiguration {
-	if b.Providers == nil && len(entries) > 0 {
-		b.Providers = make(map[string]JWTProviderApplyConfiguration, len(entries))
-	}
-	for k, v := range entries {
-		b.Providers[k] = v
-	}
+// WithExtensionRef sets the ExtensionRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ExtensionRef field is set to the value of the last call.
+func (b *JWTValidationApplyConfiguration) WithExtensionRef(value v1.LocalObjectReference) *JWTValidationApplyConfiguration {
+	b.ExtensionRef = &value
 	return b
 }

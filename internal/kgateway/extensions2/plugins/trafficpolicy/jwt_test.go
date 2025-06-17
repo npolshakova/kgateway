@@ -172,29 +172,27 @@ func TestTranslateJwksSecret(t *testing.T) {
 func TestConvertJwtValidationConfig(t *testing.T) {
 	tests := []struct {
 		name           string
-		policy         *v1alpha1.JWTValidation
+		providers      map[string]v1alpha1.JWTProvider
 		expectedError  bool
 		expectedConfig *jwtauthnv3.JwtAuthentication
 	}{
 		{
 			name: "basic provider with inline JWKS",
-			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
-						Issuer: "test-issuer",
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
-							},
+			providers: map[string]v1alpha1.JWTProvider{
+				"test-provider": {
+					Issuer: "test-issuer",
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
 						},
-						ClaimsToHeaders: []v1alpha1.JWTClaimToHeader{
-							{
-								Name:   "sub",
-								Header: "X-Subject",
-							},
-						},
-						KeepToken: ptr.To(v1alpha1.TokenForward),
 					},
+					ClaimsToHeaders: []v1alpha1.JWTClaimToHeader{
+						{
+							Name:   "sub",
+							Header: "X-Subject",
+						},
+					},
+					KeepToken: ptr.To(v1alpha1.TokenForward),
 				},
 			},
 			expectedError: false,
@@ -203,7 +201,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-policy_test-ns_test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 						ClaimToHeaders: []*jwtauthnv3.JwtClaimToHeader{
 							{
 								ClaimName:  "sub",
@@ -217,14 +215,12 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		},
 		{
 			name: "provider with file JWKS",
-			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
-						Issuer: "test-issuer",
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								File: ptr.To("/path/to/jwks.json"),
-							},
+			providers: map[string]v1alpha1.JWTProvider{
+				"test-provider": {
+					Issuer: "test-issuer",
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							File: ptr.To("/path/to/jwks.json"),
 						},
 					},
 				},
@@ -235,21 +231,19 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-policy_test-ns_test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
 		},
 		{
 			name: "missing inline key for inline JWKS",
-			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
-						Issuer: "test-issuer",
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								InlineKey: ptr.To("abc"),
-							},
+			providers: map[string]v1alpha1.JWTProvider{
+				"test-provider": {
+					Issuer: "test-issuer",
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							InlineKey: ptr.To("abc"),
 						},
 					},
 				},
@@ -259,22 +253,20 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		},
 		{
 			name: "multiple providers",
-			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"provider1": {
-						Issuer: "test-issuer-1",
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key-1","use":"sig","alg":"RS256","n":"test-n-1","e":"AQAB"}]}`),
-							},
+			providers: map[string]v1alpha1.JWTProvider{
+				"provider1": {
+					Issuer: "test-issuer-1",
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key-1","use":"sig","alg":"RS256","n":"test-n-1","e":"AQAB"}]}`),
 						},
 					},
-					"provider2": {
-						Issuer: "test-issuer-2",
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key-2","use":"sig","alg":"RS256","n":"test-n-2","e":"AQAB"}]}`),
-							},
+				},
+				"provider2": {
+					Issuer: "test-issuer-2",
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key-2","use":"sig","alg":"RS256","n":"test-n-2","e":"AQAB"}]}`),
 						},
 					},
 				},
@@ -285,27 +277,25 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-policy_test-ns_provider1": {
 						Issuer:            "test-issuer-1",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_provider1",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 					"test-policy_test-ns_provider2": {
 						Issuer:            "test-issuer-2",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_provider2",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
 		},
 		{
 			name: "provider with audiences",
-			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
-						Issuer:    "test-issuer",
-						Audiences: []string{"aud1", "aud2"},
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
-							},
+			providers: map[string]v1alpha1.JWTProvider{
+				"test-provider": {
+					Issuer:    "test-issuer",
+					Audiences: []string{"aud1", "aud2"},
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
 						},
 					},
 				},
@@ -316,28 +306,26 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-policy_test-ns_test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         []string{"aud1", "aud2"},
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
 		},
 		{
 			name: "provider with token source",
-			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
-						Issuer: "test-issuer",
-						TokenSource: &v1alpha1.JWTTokenSource{
-							HeaderSource: []v1alpha1.HeaderSource{
-								{
-									Header: ptr.To("Authorization"),
-								},
+			providers: map[string]v1alpha1.JWTProvider{
+				"test-provider": {
+					Issuer: "test-issuer",
+					TokenSource: &v1alpha1.JWTTokenSource{
+						HeaderSource: []v1alpha1.HeaderSource{
+							{
+								Header: ptr.To("Authorization"),
 							},
 						},
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
-							},
+					},
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
 						},
 					},
 				},
@@ -348,24 +336,22 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-policy_test-ns_test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
 		},
 		{
 			name: "provider with remove token",
-			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
-						Issuer: "test-issuer",
-						JWKS: v1alpha1.JWKS{
-							LocalJWKS: &v1alpha1.LocalJWKS{
-								InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
-							},
+			providers: map[string]v1alpha1.JWTProvider{
+				"test-provider": {
+					Issuer: "test-issuer",
+					JWKS: v1alpha1.JWKS{
+						LocalJWKS: &v1alpha1.LocalJWKS{
+							InlineKey: ptr.To(`{"keys":[{"kty":"RSA","kid":"test-key","use":"sig","alg":"RS256","n":"test-n","e":"AQAB"}]}`),
 						},
-						KeepToken: ptr.To(v1alpha1.TokenRemove),
 					},
+					KeepToken: ptr.To(v1alpha1.TokenRemove),
 				},
 			},
 			expectedError: false,
@@ -374,7 +360,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-policy_test-ns_test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 						Forward:           false,
 					},
 				},
@@ -384,21 +370,50 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, err := convertJwtValidationConfig(nil, "test-policy", "test-ns", tt.policy, nil)
+			config, err := resolveJwtProviders(nil, "test-policy", "test-ns", tt.providers)
 			if tt.expectedError {
 				assert.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, len(tt.expectedConfig.Providers), len(config.jwtConfig.Providers))
+			assert.NotNil(t, config)
+			assert.Equal(t, len(tt.expectedConfig.Providers), len(config.Providers))
 			for providerName, expectedProvider := range tt.expectedConfig.Providers {
-				actualProvider, ok := config.jwtConfig.Providers[providerName]
+				actualProvider, ok := config.Providers[providerName]
 				require.True(t, ok, "provider %s not found", providerName)
 				assert.Equal(t, expectedProvider.Issuer, actualProvider.Issuer)
 				assert.Equal(t, expectedProvider.Audiences, actualProvider.Audiences)
 				assert.Equal(t, expectedProvider.PayloadInMetadata, actualProvider.PayloadInMetadata)
 				assert.Equal(t, expectedProvider.Forward, actualProvider.Forward)
+
+				// Check claim to headers
 				assert.Equal(t, len(expectedProvider.ClaimToHeaders), len(actualProvider.ClaimToHeaders))
+				for i, expectedClaim := range expectedProvider.ClaimToHeaders {
+					actualClaim := actualProvider.ClaimToHeaders[i]
+					assert.Equal(t, expectedClaim.ClaimName, actualClaim.ClaimName)
+					assert.Equal(t, expectedClaim.HeaderName, actualClaim.HeaderName)
+				}
+
+				// Check token source
+				if expectedProvider.FromHeaders != nil {
+					assert.Equal(t, len(expectedProvider.FromHeaders), len(actualProvider.FromHeaders))
+					for i, expectedHeader := range expectedProvider.FromHeaders {
+						actualHeader := actualProvider.FromHeaders[i]
+						assert.Equal(t, expectedHeader.Name, actualHeader.Name)
+						assert.Equal(t, expectedHeader.ValuePrefix, actualHeader.ValuePrefix)
+					}
+				}
+				assert.Equal(t, expectedProvider.FromParams, actualProvider.FromParams)
+
+				// Check JWKS source
+				if expectedProvider.JwksSourceSpecifier != nil {
+					assert.NotNil(t, actualProvider.JwksSourceSpecifier)
+					expectedJwks := expectedProvider.JwksSourceSpecifier.(*jwtauthnv3.JwtProvider_LocalJwks)
+					actualJwks := actualProvider.JwksSourceSpecifier.(*jwtauthnv3.JwtProvider_LocalJwks)
+					assert.NotNil(t, expectedJwks)
+					assert.NotNil(t, actualJwks)
+					assert.NotNil(t, actualJwks.LocalJwks)
+				}
 			}
 		})
 	}

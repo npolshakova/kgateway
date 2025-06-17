@@ -93,7 +93,7 @@ func (c *TrafficPolicyConstructor) ConstructIR(
 	constructBuffer(policyCR.Spec, &outSpec)
 
 	// Construct jwt specific IR
-	if err := constructJwt(krtctx, policyCR, &outSpec, c.commoncol.Secrets); err != nil {
+	if err := constructJwt(krtctx, policyCR, &outSpec, c.FetchGatewayExtension); err != nil {
 		errors = append(errors, err)
 	}
 

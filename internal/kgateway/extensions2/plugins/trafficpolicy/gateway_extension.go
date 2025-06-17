@@ -8,6 +8,7 @@ import (
 	envoyratelimitv3 "github.com/envoyproxy/go-control-plane/envoy/config/ratelimit/v3"
 	envoy_ext_authz_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_authz/v3"
 	envoy_ext_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_proc/v3"
+	jwtauthnv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/jwt_authn/v3"
 	ratev3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ratelimit/v3"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -20,12 +21,14 @@ import (
 )
 
 type TrafficPolicyGatewayExtensionIR struct {
-	Name      string
-	ExtType   v1alpha1.GatewayExtensionType
-	ExtAuth   *envoy_ext_authz_v3.ExtAuthz
-	ExtProc   *envoy_ext_proc_v3.ExternalProcessor
-	RateLimit *ratev3.RateLimit
-	Err       error
+	Name         string
+	ExtType      v1alpha1.GatewayExtensionType
+	ExtAuth      *envoy_ext_authz_v3.ExtAuthz
+	ExtProc      *envoy_ext_proc_v3.ExternalProcessor
+	RateLimit    *ratev3.RateLimit
+	Jwt          *jwtauthnv3.JwtAuthentication
+	JwtProviders map[string]v1alpha1.JWTProvider
+	Err          error
 }
 
 // ResourceName returns the unique name for this extension.
@@ -45,6 +48,9 @@ func (e TrafficPolicyGatewayExtensionIR) Equals(other TrafficPolicyGatewayExtens
 		return false
 	}
 	if !proto.Equal(e.RateLimit, other.RateLimit) {
+		return false
+	}
+	if !proto.Equal(e.Jwt, other.Jwt) {
 		return false
 	}
 
@@ -135,9 +141,48 @@ func TranslateGatewayExtensionBuilder(commoncol *common.CommonCollections) func(
 			rateLimitConfig := resolveRateLimitService(grpcService, gExt.RateLimit)
 
 			p.RateLimit = rateLimitConfig
+
+		case v1alpha1.GatewayExtensionTypeJWTProvider:
+			if gExt.JwtProviders == nil {
+				p.Err = fmt.Errorf("jwt extension missing configuration")
+				return p
+			}
+			p.JwtProviders = gExt.JwtProviders
+
+			// Use the specialized function for jwt provider resolution
+			jwtConfig, err := resolveJwtProviders(krtctx, gExt.Name, gExt.Namespace, gExt.JwtProviders)
+			if err != nil {
+				p.Err = fmt.Errorf("jwt: %w", err)
+				return p
+			}
+			p.Jwt = jwtConfig
 		}
+
 		return p
 	}
+}
+
+func resolveJwtProviders(krtctx krt.HandlerContext, policyName, policyNamespace string, jwtProviders map[string]v1alpha1.JWTProvider) (*jwtauthnv3.JwtAuthentication, error) {
+	uniqProviders := make(map[string]*jwtauthnv3.JwtProvider)
+	policyNameNamespace := fmt.Sprintf("%s_%s", policyName, policyNamespace)
+
+	for providerName, provider := range jwtProviders {
+		providerNameForPolicy := ProviderName(policyNameNamespace, providerName)
+		jwtProvider, err := translateProvider(krtctx, provider, policyNamespace, nil)
+		if err != nil {
+			return nil, err
+		}
+		uniqProviders[providerNameForPolicy] = jwtProvider
+	}
+
+	requirementsName := fmt.Sprintf("%s_requirements", policyNameNamespace)
+	requirements := make(map[string]*jwtauthnv3.JwtRequirement)
+	requirements[requirementsName] = buildJwtRequirementFromProviders(uniqProviders)
+
+	return &jwtauthnv3.JwtAuthentication{
+		RequirementMap: requirements,
+		Providers:      uniqProviders,
+	}, nil
 }
 
 func ResolveExtGrpcService(krtctx krt.HandlerContext, backends *krtcollections.BackendIndex, disableExtensionRefValidation bool, objectSource ir.ObjectSource, grpcService *v1alpha1.ExtGrpcService) (*envoycorev3.GrpcService, error) {

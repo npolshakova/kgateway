@@ -4,16 +4,15 @@ import corev1 "k8s.io/api/core/v1"
 
 // JWTValidation defines the providers used to configure JWT validation
 type JWTValidation struct {
-	// Providers configures a map of JWT provider name to Provider.
-	// If multiple providers are specified, the providers will be `OR`-ed together and will allow validation to any of the providers.
-	// +kubebuilder:validation:MinProperties=1
-	// +kubebuilder:validation:MaxProperties=100
-	Providers map[string]JWTProvider `json:"providers"`
+	// ExtensionRef references a GatewayExtension that provides the jwt providers
+	// +required
+	ExtensionRef corev1.LocalObjectReference `json:"extensionRef"`
 
 	// TODO: add support for ValidationMode here (REQUIRE_VALID,ALLOW_MISSING,ALLOW_MISSING_OR_FAILED)
 }
 
 // JWTProvider configures the JWT Provider
+// If multiple providers are specified for a given JWT policy, the providers will be `OR`-ed together and will allow validation to any of the providers.
 type JWTProvider struct {
 	// Issuer of the JWT. the 'iss' claim of the JWT must match this.
 	// +kubebuilder:validation:MinLength=1

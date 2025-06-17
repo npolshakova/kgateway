@@ -21,18 +21,19 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
 const (
-	JwtFilterName = "envoy.filters.http.jwt_authn"
+	PayloadInMetadata string = "payload"
 )
 
 type JwtIr struct {
-	jwtConfig        *jwtauthnv3.JwtAuthentication
-	requirementsName string
+	provider    *TrafficPolicyGatewayExtensionIR
+	jwtPerRoute *jwtauthnv3.PerRouteConfig
 }
 
 func (j *JwtIr) Equals(other *JwtIr) bool {
@@ -43,32 +44,30 @@ func (j *JwtIr) Equals(other *JwtIr) bool {
 		return false
 	}
 
-	return proto.Equal(j.jwtConfig, other.jwtConfig)
+	// Compare providers
+	if (j.provider == nil) != (other.provider == nil) {
+		return false
+	}
+	if j.provider != nil && !j.provider.Equals(*other.provider) {
+		return false
+	}
+
+	return proto.Equal(j.jwtPerRoute, other.jwtPerRoute)
 }
 
 // handleJwt configures the filter JwtAuthentication and per-route JWT configuration for a specific route
 func (p *trafficPolicyPluginGwPass) handleJwt(fcn string, pCtxTypedFilterConfig *ir.TypedFilterConfigMap, jwtIr *JwtIr) {
-	if jwtIr == nil || jwtIr.jwtConfig == nil {
+	if jwtIr == nil || jwtIr.jwtPerRoute == nil {
 		return
 	}
 
-	// Add a filter to the chain. When having a jwt policy for a route we need to also have a
-	// global jwt http filter in the chain otherwise it will be ignored.
-	if p.jwtInChain == nil {
-		p.jwtInChain = make(map[string]*jwtauthnv3.JwtAuthentication)
-	}
-	if _, ok := p.jwtInChain[fcn]; !ok {
-		p.jwtInChain[fcn] = jwtIr.jwtConfig
+	providerName := jwtIr.provider.ResourceName()
+	jwtName := jwtFilterName(providerName)
+	if jwtIr.jwtPerRoute != nil {
+		pCtxTypedFilterConfig.AddTypedConfig(jwtName, jwtIr.jwtPerRoute)
 	}
 
-	perRouteConfig, err := translatePerRouteConfig(jwtIr.requirementsName)
-	if err != nil {
-		// Log error but don't fail the route configuration
-		return
-	}
-
-	// Add the per-route JWT configuration to the typed filter config
-	pCtxTypedFilterConfig.AddTypedConfig(JwtFilterName, perRouteConfig)
+	p.jwtPerProvider.Add(fcn, providerName, jwtIr.provider)
 }
 
 func translatePerRouteConfig(requirementsName string) (*jwtauthnv3.PerRouteConfig, error) {
@@ -81,16 +80,30 @@ func translatePerRouteConfig(requirementsName string) (*jwtauthnv3.PerRouteConfi
 }
 
 // constructJwt translates the jwt spec into an envoy jwt policy and stores it in the traffic policy IR
-func constructJwt(krtctx krt.HandlerContext, policy *v1alpha1.TrafficPolicy, out *trafficPolicySpecIr, secrets *krtcollections.SecretIndex) error {
+func constructJwt(krtctx krt.HandlerContext, policy *v1alpha1.TrafficPolicy, out *trafficPolicySpecIr, fetchGatewayExtension FetchGatewayExtensionFunc) error {
 	spec := policy.Spec
 	if spec.JWT == nil {
 		return nil
 	}
-	jwtIr, err := convertJwtValidationConfig(krtctx, policy.Name, policy.Namespace, spec.JWT, secrets)
+
+	provider, err := fetchGatewayExtension(krtctx, &spec.JWT.ExtensionRef, policy.GetNamespace())
+	if err != nil {
+		return fmt.Errorf("jwt: %w", err)
+	}
+	if provider.ExtType != v1alpha1.GatewayExtensionTypeJWTProvider || provider.JwtProviders == nil {
+		return pluginutils.ErrInvalidExtensionType(v1alpha1.GatewayExtensionTypeJWTProvider, provider.ExtType)
+	}
+
+	requirementsName := fmt.Sprintf("%s_%s_requirements", spec.JWT.ExtensionRef.Name, policy.Namespace)
+	perRouteConfig, err := translatePerRouteConfig(requirementsName)
 	if err != nil {
 		return err
 	}
-	out.jwt = jwtIr
+
+	out.jwt = &JwtIr{
+		provider:    provider,
+		jwtPerRoute: perRouteConfig,
+	}
 	return nil
 }
 
@@ -105,11 +118,13 @@ func (j *JwtIr) validate() error {
 	}
 
 	var errs []error
-	if j.requirementsName == "" {
-		errs = append(errs, errors.New("requirementsName is empty"))
+
+	err := j.provider.Validate()
+	if err != nil {
+		errs = append(errs, err)
 	}
 
-	err := j.jwtConfig.Validate()
+	err = j.jwtPerRoute.Validate()
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -118,44 +133,12 @@ func (j *JwtIr) validate() error {
 
 }
 
-func convertJwtValidationConfig(krtctx krt.HandlerContext, policyName, policyNs string, policy *v1alpha1.JWTValidation, secrets *krtcollections.SecretIndex) (
-	*JwtIr,
-	error,
-) {
-	uniqProviders := make(map[string]*jwtauthnv3.JwtProvider)
-	policyNameNamespace := fmt.Sprintf("%s_%s", policyName, policyNs)
-
-	for providerName, provider := range policy.Providers {
-		providerNameForPolicy := ProviderName(policyNameNamespace, providerName)
-		jwtProvider, err := translateProvider(krtctx, provider, providerNameForPolicy, policyNs, secrets)
-		if err != nil {
-			return nil, err
-		}
-		uniqProviders[providerNameForPolicy] = jwtProvider
-	}
-
-	requirementsName := fmt.Sprintf("%s_requirements", policyNameNamespace)
-	requirements := make(map[string]*jwtauthnv3.JwtRequirement)
-	requirements[requirementsName] = buildJwtRequirementFromProviders(uniqProviders)
-
-	// Note: only one stage is supported for now so we're not setting the filter state rules here
-	jwtConfig := &jwtauthnv3.JwtAuthentication{
-		RequirementMap: requirements,
-		Providers:      uniqProviders,
-	}
-
-	return &JwtIr{
-		jwtConfig:        jwtConfig,
-		requirementsName: requirementsName,
-	}, nil
-}
-
 // ProviderName returns a unique name for a provider in the context of a route
 func ProviderName(resourceName, providerName string) string {
 	return fmt.Sprintf("%s_%s", resourceName, providerName)
 }
 
-func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider, providerNameForPolicy, policyNs string, secrets *krtcollections.SecretIndex) (*jwtauthnv3.JwtProvider, error) {
+func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider, policyNs string, secrets *krtcollections.SecretIndex) (*jwtauthnv3.JwtProvider, error) {
 	var claimToHeaders []*jwtauthnv3.JwtClaimToHeader
 	for _, claim := range provider.ClaimsToHeaders {
 		claimToHeaders = append(claimToHeaders, &jwtauthnv3.JwtClaimToHeader{
@@ -170,7 +153,7 @@ func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider,
 	jwtProvider := &jwtauthnv3.JwtProvider{
 		Issuer:            provider.Issuer,
 		Audiences:         provider.Audiences,
-		PayloadInMetadata: providerNameForPolicy,
+		PayloadInMetadata: PayloadInMetadata,
 		ClaimToHeaders:    claimToHeaders,
 		Forward:           shouldForward,
 		// TODO(npolshak): Do we want to set NormalizePayload  to support https://datatracker.ietf.org/doc/html/rfc8693#name-scope-scopes-claim
@@ -393,4 +376,11 @@ func GetSecretIr(secrets *krtcollections.SecretIndex, krtctx krt.HandlerContext,
 		return nil, fmt.Errorf("failed to find secret %s: %v", secretName, err)
 	}
 	return secret, nil
+}
+
+func jwtFilterName(name string) string {
+	if name == "" {
+		return jwtFilterNamePrefix
+	}
+	return fmt.Sprintf("%s/%s", jwtFilterNamePrefix, name)
 }

@@ -81,15 +81,30 @@ ports:
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: GatewayExtension
 metadata:
-  name: extproc-ext
+  name: jwt-ext
   namespace: gwtest
 spec:
-  type: ExtProc
-  extProc:
-    grpcService:
-      backendRef:
-        name: extproc
-        port: 9091
+  type: JWT
+  jwtProviders:
+    my-example:
+      claimsToHeaders:
+        - name: org
+          header: x-org
+        - name: email
+          header: x-email
+      issuer: https://my.example.com
+      jwks:
+        local:
+          key: |
+            -----BEGIN PUBLIC KEY-----
+            MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmXtvzsvqA619Cgw/z4p+
+            M7iz04ZRK9Kcb1l2u+/YY4GXWE2/sCANs3BgbRdnyebB3Q4xyb7w7HWHGQujd+hm
+            V4coSHU6BZFCqCnUUY97wHMCkDJW8F/o/sNjO2kRLc1VkVDEAlYTCGWyzW1w9oyQ
+            lIsGngDW9IkV/jpd/WULsXXMxQcpVamJFNF9aqvXRkMEw/3/s5+PrK6KX2xryKx6
+            aeBy9fUsvzIhZuI8qErpBhj0EWIsPPIkpLcF0kxm2vTAkuKO39+i4Gy1t66JqzVw
+            xOvtWzQGnG9ahTAx3dAkxzpQW8tA0l3BhGEpK+0JjoaQEX/MVWK+IvsdbtpcBZi1
+            SwIDAQAB
+            -----END PUBLIC KEY-----
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: TrafficPolicy
@@ -102,26 +117,8 @@ spec:
       group: gateway.networking.k8s.io
       name: route
   jwt:
-    providers:
-      my-example:
-        claimsToHeaders:
-          - name: org
-            header: x-org
-          - name: email
-            header: x-email
-        issuer: https://my.example.com
-        jwks:
-          local:
-            key: |
-              -----BEGIN PUBLIC KEY-----
-              MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmXtvzsvqA619Cgw/z4p+
-              M7iz04ZRK9Kcb1l2u+/YY4GXWE2/sCANs3BgbRdnyebB3Q4xyb7w7HWHGQujd+hm
-              V4coSHU6BZFCqCnUUY97wHMCkDJW8F/o/sNjO2kRLc1VkVDEAlYTCGWyzW1w9oyQ
-              lIsGngDW9IkV/jpd/WULsXXMxQcpVamJFNF9aqvXRkMEw/3/s5+PrK6KX2xryKx6
-              aeBy9fUsvzIhZuI8qErpBhj0EWIsPPIkpLcF0kxm2vTAkuKO39+i4Gy1t66JqzVw
-              xOvtWzQGnG9ahTAx3dAkxzpQW8tA0l3BhGEpK+0JjoaQEX/MVWK+IvsdbtpcBZi1
-              SwIDAQAB
-              -----END PUBLIC KEY-----
+    extensionRef:
+      name: jwt-ext
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

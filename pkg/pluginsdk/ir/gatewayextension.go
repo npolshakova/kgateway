@@ -25,6 +25,9 @@ type GatewayExtension struct {
 	// RateLimit configuration for RateLimit extension type.
 	// This is specifically for global rate limiting that communicates with an external rate limit service.
 	RateLimit *v1alpha1.RateLimitProvider
+
+	// JwtProviders configures the jwt providers
+	JwtProviders map[string]v1alpha1.JWTProvider
 }
 
 var (

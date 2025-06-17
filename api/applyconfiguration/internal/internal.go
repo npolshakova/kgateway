@@ -1018,6 +1018,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extProc
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ExtProcProvider
+    - name: jwtProviders
+      type:
+        map:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
     - name: rateLimit
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RateLimitProvider
