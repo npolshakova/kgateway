@@ -9,10 +9,11 @@ import (
 // GatewayExtensionSpecApplyConfiguration represents a declarative configuration of the GatewayExtensionSpec type for use
 // with apply.
 type GatewayExtensionSpecApplyConfiguration struct {
-	Type      *apiv1alpha1.GatewayExtensionType    `json:"type,omitempty"`
-	ExtAuth   *ExtAuthProviderApplyConfiguration   `json:"extAuth,omitempty"`
-	ExtProc   *ExtProcProviderApplyConfiguration   `json:"extProc,omitempty"`
-	RateLimit *RateLimitProviderApplyConfiguration `json:"rateLimit,omitempty"`
+	Type         *apiv1alpha1.GatewayExtensionType        `json:"type,omitempty"`
+	ExtAuth      *ExtAuthProviderApplyConfiguration       `json:"extAuth,omitempty"`
+	ExtProc      *ExtProcProviderApplyConfiguration       `json:"extProc,omitempty"`
+	RateLimit    *RateLimitProviderApplyConfiguration     `json:"rateLimit,omitempty"`
+	JWTProviders map[string]JWTProviderApplyConfiguration `json:"jwtProviders,omitempty"`
 }
 
 // GatewayExtensionSpecApplyConfiguration constructs a declarative configuration of the GatewayExtensionSpec type for use with
@@ -50,5 +51,19 @@ func (b *GatewayExtensionSpecApplyConfiguration) WithExtProc(value *ExtProcProvi
 // If called multiple times, the RateLimit field is set to the value of the last call.
 func (b *GatewayExtensionSpecApplyConfiguration) WithRateLimit(value *RateLimitProviderApplyConfiguration) *GatewayExtensionSpecApplyConfiguration {
 	b.RateLimit = value
+	return b
+}
+
+// WithJWTProviders puts the entries into the JWTProviders field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the JWTProviders field,
+// overwriting an existing map entries in JWTProviders field with the same key.
+func (b *GatewayExtensionSpecApplyConfiguration) WithJWTProviders(entries map[string]JWTProviderApplyConfiguration) *GatewayExtensionSpecApplyConfiguration {
+	if b.JWTProviders == nil && len(entries) > 0 {
+		b.JWTProviders = make(map[string]JWTProviderApplyConfiguration, len(entries))
+	}
+	for k, v := range entries {
+		b.JWTProviders[k] = v
+	}
 	return b
 }
