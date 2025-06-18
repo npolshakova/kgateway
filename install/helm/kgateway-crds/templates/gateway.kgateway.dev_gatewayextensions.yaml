@@ -324,7 +324,7 @@ spec:
               rule: self.type == 'ExtProc' || !has(self.extProc)
             - message: RateLimit must not be set when type is not RateLimit
               rule: self.type == 'RateLimit' || !has(self.rateLimit)
-            - message: JWT must not be set when type is not JWT
+            - message: JwtProviders must not be set when type is not JWT
               rule: self.type == 'JWT' || !has(self.jwtProviders)
           status:
             properties:

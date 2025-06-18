@@ -95,7 +95,7 @@ type RateLimitProvider struct {
 // +kubebuilder:validation:XValidation:message="ExtAuth must not be set when type is not ExtAuth",rule="self.type == 'ExtAuth' || !has(self.extAuth)"
 // +kubebuilder:validation:XValidation:message="ExtProc must not be set when type is not ExtProc",rule="self.type == 'ExtProc' || !has(self.extProc)"
 // +kubebuilder:validation:XValidation:message="RateLimit must not be set when type is not RateLimit",rule="self.type == 'RateLimit' || !has(self.rateLimit)"
-// +kubebuilder:validation:XValidation:message="JWT must not be set when type is not JWT",rule="self.type == 'JWT' || !has(self.jwtProviders)"
+// +kubebuilder:validation:XValidation:message="JwtProviders must not be set when type is not JWT",rule="self.type == 'JWT' || !has(self.jwtProviders)"
 type GatewayExtensionSpec struct {
 	// Type indicates the type of the GatewayExtension to be used.
 	// +unionDiscriminator
