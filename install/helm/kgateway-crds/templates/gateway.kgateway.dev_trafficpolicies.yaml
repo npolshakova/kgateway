@@ -709,8 +709,6 @@ spec:
                                     maxItems: 16
                                     minItems: 1
                                     type: array
-                                  provider:
-                                    type: string
                                 required:
                                 - claims
                                 type: object

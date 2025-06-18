@@ -203,7 +203,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 						ClaimToHeaders: []*jwtauthnv3.JwtClaimToHeader{
 							{
 								ClaimName:  "sub",
@@ -235,7 +235,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -285,12 +285,12 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"provider1": {
 						Issuer:            "test-issuer-1",
 						Audiences:         nil,
-						PayloadInMetadata: "provider1",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 					"provider2": {
 						Issuer:            "test-issuer-2",
 						Audiences:         nil,
-						PayloadInMetadata: "provider2",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -316,7 +316,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         []string{"aud1", "aud2"},
-						PayloadInMetadata: "test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -348,7 +348,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -374,7 +374,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 					"test-provider": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 						Forward:           false,
 					},
 				},

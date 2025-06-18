@@ -5,8 +5,7 @@ package v1alpha1
 // JWTPrincipalApplyConfiguration represents a declarative configuration of the JWTPrincipal type for use
 // with apply.
 type JWTPrincipalApplyConfiguration struct {
-	Claims   []JWTClaimMatchApplyConfiguration `json:"claims,omitempty"`
-	Provider *string                           `json:"provider,omitempty"`
+	Claims []JWTClaimMatchApplyConfiguration `json:"claims,omitempty"`
 }
 
 // JWTPrincipalApplyConfiguration constructs a declarative configuration of the JWTPrincipal type for use with
@@ -25,13 +24,5 @@ func (b *JWTPrincipalApplyConfiguration) WithClaims(values ...*JWTClaimMatchAppl
 		}
 		b.Claims = append(b.Claims, *values[i])
 	}
-	return b
-}
-
-// WithProvider sets the Provider field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Provider field is set to the value of the last call.
-func (b *JWTPrincipalApplyConfiguration) WithProvider(value string) *JWTPrincipalApplyConfiguration {
-	b.Provider = &value
 	return b
 }

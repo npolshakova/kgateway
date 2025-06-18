@@ -67,10 +67,6 @@ type JWTPrincipal struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=16
 	Claims []JWTClaimMatch `json:"claims"`
-
-	// Optional: Provider that can issue the JWT (by name).
-	// If empty, any configured provider is considered valid.
-	Provider string `json:"provider,omitempty"`
 }
 
 // JWTClaimMatch configures the claim to match

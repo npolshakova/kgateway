@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	JwtFilterName = "envoy.filters.http.jwt_authn"
+	JwtFilterName     = "envoy.filters.http.jwt_authn"
+	PayloadInMetadata = "payload"
 )
 
 type JwtIr struct {
@@ -143,7 +144,7 @@ func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider,
 	jwtProvider := &jwtauthnv3.JwtProvider{
 		Issuer:            provider.Issuer,
 		Audiences:         provider.Audiences,
-		PayloadInMetadata: providerNameForPolicy,
+		PayloadInMetadata: PayloadInMetadata,
 		ClaimToHeaders:    claimToHeaders,
 		Forward:           shouldForward,
 		// TODO(npolshak): Do we want to set NormalizePayload  to support https://datatracker.ietf.org/doc/html/rfc8693#name-scope-scopes-claim

@@ -1049,9 +1049,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
           elementRelationship: atomic
-    - name: provider
-      type:
-        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
   map:
     fields:

@@ -36,7 +36,6 @@ func TestTranslateRbac(t *testing.T) {
 						Principal: v1alpha1.Principal{
 							JWTPrincipals: []v1alpha1.JWTPrincipal{
 								{
-									Provider: "test-provider",
 									Claims: []v1alpha1.JWTClaimMatch{
 										{
 											Name:    "sub",
@@ -69,7 +68,7 @@ func TestTranslateRbac(t *testing.T) {
 													Path: []*envoy_matcher_v3.MetadataMatcher_PathSegment{
 														{
 															Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-																Key: "test-provider",
+																Key: PayloadInMetadata,
 															},
 														},
 														{
@@ -188,7 +187,6 @@ func TestTranslateRbac(t *testing.T) {
 						Principal: v1alpha1.Principal{
 							JWTPrincipals: []v1alpha1.JWTPrincipal{
 								{
-									Provider: "provider1",
 									Claims: []v1alpha1.JWTClaimMatch{
 										{
 											Name:    "role",
@@ -207,7 +205,6 @@ func TestTranslateRbac(t *testing.T) {
 						Principal: v1alpha1.Principal{
 							JWTPrincipals: []v1alpha1.JWTPrincipal{
 								{
-									Provider: "provider2",
 									Claims: []v1alpha1.JWTClaimMatch{
 										{
 											Name:    "role",
@@ -239,7 +236,7 @@ func TestTranslateRbac(t *testing.T) {
 													Path: []*envoy_matcher_v3.MetadataMatcher_PathSegment{
 														{
 															Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-																Key: "provider1",
+																Key: PayloadInMetadata,
 															},
 														},
 														{
@@ -289,7 +286,7 @@ func TestTranslateRbac(t *testing.T) {
 													Path: []*envoy_matcher_v3.MetadataMatcher_PathSegment{
 														{
 															Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-																Key: "provider2",
+																Key: PayloadInMetadata,
 															},
 														},
 														{
@@ -346,7 +343,6 @@ func TestTranslateRbac(t *testing.T) {
 						Principal: v1alpha1.Principal{
 							JWTPrincipals: []v1alpha1.JWTPrincipal{
 								{
-									Provider: "test-provider",
 									Claims: []v1alpha1.JWTClaimMatch{
 										{
 											Name:    "metadata.role",
@@ -378,7 +374,7 @@ func TestTranslateRbac(t *testing.T) {
 													Path: []*envoy_matcher_v3.MetadataMatcher_PathSegment{
 														{
 															Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-																Key: "test-provider",
+																Key: PayloadInMetadata,
 															},
 														},
 														{

@@ -106,15 +106,13 @@ spec:
     rules:
       - principal:
           jwt:
-          - provider: example.com
-            claims:
+          - claims:
               - name: test
                 value: foo
                 matcher: Exact
       - principal:
           jwt:
-            - provider: secure.kgateway.io
-              claims:
+            - claims:
                 - name: request.auth.claims.groups
                   value: group1
                   matcher: Contains

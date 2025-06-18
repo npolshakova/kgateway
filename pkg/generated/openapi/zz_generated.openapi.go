@@ -3547,13 +3547,6 @@ func schema_kgateway_v2_api_v1alpha1_JWTPrincipal(ref common.ReferenceCallback) 
 							},
 						},
 					},
-					"provider": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Provider that can issue the JWT (by name). If empty, any configured provider is considered valid.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 				},
 				Required: []string{"claims"},
 			},

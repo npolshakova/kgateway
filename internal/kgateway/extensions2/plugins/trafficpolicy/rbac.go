@@ -221,10 +221,11 @@ func getPath(claim v1alpha1.JWTClaimMatch, jwtPrincipal v1alpha1.JWTPrincipal) [
 	// The claim name "sub" would only have a single [sub] segment.
 	if strings.Contains(claim.Name, nestedClaimsDelimiter) {
 		substrings := strings.Split(claim.Name, nestedClaimsDelimiter)
-		path := make([]*envoy_matcher_v3.MetadataMatcher_PathSegment, len(substrings)+1)
+		var path []*envoy_matcher_v3.MetadataMatcher_PathSegment
+		path = make([]*envoy_matcher_v3.MetadataMatcher_PathSegment, len(substrings)+1)
 		path[0] = &envoy_matcher_v3.MetadataMatcher_PathSegment{
 			Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-				Key: jwtPrincipal.Provider, // this needs to match jwt provider name
+				Key: PayloadInMetadata, // this needs to match jwt payload in metadata
 			},
 		}
 		for i, substring := range substrings {
@@ -239,7 +240,7 @@ func getPath(claim v1alpha1.JWTClaimMatch, jwtPrincipal v1alpha1.JWTPrincipal) [
 		return []*envoy_matcher_v3.MetadataMatcher_PathSegment{
 			{
 				Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-					Key: jwtPrincipal.Provider, // this needs to match jwt provider name
+					Key: PayloadInMetadata, // this needs to match jwt payload in metadata
 				},
 			},
 			{
