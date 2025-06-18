@@ -3564,10 +3564,9 @@ func schema_kgateway_v2_api_v1alpha1_JWTValidation(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"providers": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Providers configures a map of JWT provider name to Provider. If multiple providers are specified, the providers will be `OR`-ed together and will allow validation to any of the providers.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
+							Description: "Providers configures a list of JWT Providers. If multiple providers are specified, the providers will be `OR`-ed together and will allow validation to any of the providers.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},

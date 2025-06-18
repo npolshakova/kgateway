@@ -476,7 +476,7 @@ spec:
               jwt:
                 properties:
                   providers:
-                    additionalProperties:
+                    items:
                       properties:
                         audiences:
                           items:
@@ -566,9 +566,9 @@ spec:
                       required:
                       - jwks
                       type: object
-                    maxProperties: 100
-                    minProperties: 1
-                    type: object
+                    maxItems: 100
+                    minItems: 1
+                    type: array
                 required:
                 - providers
                 type: object

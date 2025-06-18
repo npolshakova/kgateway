@@ -103,8 +103,7 @@ spec:
       name: route
   jwt:
     providers:
-      my-example:
-        claimsToHeaders:
+      - claimsToHeaders:
           - name: org
             header: x-org
           - name: email

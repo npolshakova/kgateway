@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	JwtFilterName = "envoy.filters.http.jwt_authn"
+	JwtFilterName     = "envoy.filters.http.jwt_authn"
+	PayloadInMetadata = "payload"
 )
 
 type JwtIr struct {
@@ -101,8 +102,8 @@ func convertJwtValidationConfig(krtctx krt.HandlerContext, policyName, policyNs 
 	uniqProviders := make(map[string]*jwtauthnv3.JwtProvider)
 	policyNameNamespace := fmt.Sprintf("%s_%s", policyName, policyNs)
 
-	for providerName, provider := range policy.Providers {
-		providerNameForPolicy := ProviderName(policyNameNamespace, providerName)
+	for idx, provider := range policy.Providers {
+		providerNameForPolicy := ProviderName(policyNameNamespace, idx)
 		jwtProvider, err := translateProvider(krtctx, provider, providerNameForPolicy, policyNs, secrets)
 		if err != nil {
 			return nil, err
@@ -127,8 +128,8 @@ func convertJwtValidationConfig(krtctx krt.HandlerContext, policyName, policyNs 
 }
 
 // ProviderName returns a unique name for a provider in the context of a route
-func ProviderName(resourceName, providerName string) string {
-	return fmt.Sprintf("%s_%s", resourceName, providerName)
+func ProviderName(resourceName string, idx int) string {
+	return fmt.Sprintf("%s_%d", resourceName, idx)
 }
 
 func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider, providerNameForPolicy, policyNs string, secrets *krtcollections.SecretIndex) (*jwtauthnv3.JwtProvider, error) {
@@ -146,7 +147,7 @@ func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider,
 	jwtProvider := &jwtauthnv3.JwtProvider{
 		Issuer:            provider.Issuer,
 		Audiences:         provider.Audiences,
-		PayloadInMetadata: providerNameForPolicy,
+		PayloadInMetadata: PayloadInMetadata,
 		ClaimToHeaders:    claimToHeaders,
 		Forward:           shouldForward,
 		// TODO(npolshak): Do we want to set NormalizePayload  to support https://datatracker.ietf.org/doc/html/rfc8693#name-scope-scopes-claim

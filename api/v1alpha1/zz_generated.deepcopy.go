@@ -1993,9 +1993,9 @@ func (in *JWTValidation) DeepCopyInto(out *JWTValidation) {
 	*out = *in
 	if in.Providers != nil {
 		in, out := &in.Providers, &out.Providers
-		*out = make(map[string]JWTProvider, len(*in))
-		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+		*out = make([]JWTProvider, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }

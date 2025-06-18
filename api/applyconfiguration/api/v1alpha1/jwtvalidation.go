@@ -5,7 +5,7 @@ package v1alpha1
 // JWTValidationApplyConfiguration represents a declarative configuration of the JWTValidation type for use
 // with apply.
 type JWTValidationApplyConfiguration struct {
-	Providers map[string]JWTProviderApplyConfiguration `json:"providers,omitempty"`
+	Providers []JWTProviderApplyConfiguration `json:"providers,omitempty"`
 }
 
 // JWTValidationApplyConfiguration constructs a declarative configuration of the JWTValidation type for use with
@@ -14,16 +14,15 @@ func JWTValidation() *JWTValidationApplyConfiguration {
 	return &JWTValidationApplyConfiguration{}
 }
 
-// WithProviders puts the entries into the Providers field in the declarative configuration
+// WithProviders adds the given value to the Providers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Providers field,
-// overwriting an existing map entries in Providers field with the same key.
-func (b *JWTValidationApplyConfiguration) WithProviders(entries map[string]JWTProviderApplyConfiguration) *JWTValidationApplyConfiguration {
-	if b.Providers == nil && len(entries) > 0 {
-		b.Providers = make(map[string]JWTProviderApplyConfiguration, len(entries))
-	}
-	for k, v := range entries {
-		b.Providers[k] = v
+// If called multiple times, values provided by each call will be appended to the Providers field.
+func (b *JWTValidationApplyConfiguration) WithProviders(values ...*JWTProviderApplyConfiguration) *JWTValidationApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithProviders")
+		}
+		b.Providers = append(b.Providers, *values[i])
 	}
 	return b
 }

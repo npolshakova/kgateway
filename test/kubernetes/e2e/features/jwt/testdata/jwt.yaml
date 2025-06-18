@@ -47,14 +47,13 @@ metadata:
 spec:
   jwt:
     providers:
-      my-example:
-        claimsToHeaders:
+    - claimsToHeaders:
           - name: org
             header: x-org
           - name: email
             header: x-email
-        issuer: https://dev.example.com
-        jwks:
+      issuer: https://dev.example.com
+      jwks:
           local:
             key: |
               -----BEGIN PUBLIC KEY-----

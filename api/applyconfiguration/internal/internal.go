@@ -1060,9 +1060,10 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: providers
       type:
-        map:
+        list:
           elementType:
             namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
+          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.KubernetesProxyConfig
   map:
     fields:

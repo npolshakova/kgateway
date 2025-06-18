@@ -179,8 +179,8 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		{
 			name: "basic provider with inline JWKS",
 			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
+				Providers: []v1alpha1.JWTProvider{
+					{
 						Issuer: "test-issuer",
 						JWKS: v1alpha1.JWKS{
 							LocalJWKS: &v1alpha1.LocalJWKS{
@@ -200,10 +200,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-policy_test-ns_0": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 						ClaimToHeaders: []*jwtauthnv3.JwtClaimToHeader{
 							{
 								ClaimName:  "sub",
@@ -218,8 +218,8 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		{
 			name: "provider with file JWKS",
 			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
+				Providers: []v1alpha1.JWTProvider{
+					{
 						Issuer: "test-issuer",
 						JWKS: v1alpha1.JWKS{
 							LocalJWKS: &v1alpha1.LocalJWKS{
@@ -232,10 +232,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-policy_test-ns_0": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -243,8 +243,8 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		{
 			name: "missing inline key for inline JWKS",
 			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
+				Providers: []v1alpha1.JWTProvider{
+					{
 						Issuer: "test-issuer",
 						JWKS: v1alpha1.JWKS{
 							LocalJWKS: &v1alpha1.LocalJWKS{
@@ -260,8 +260,8 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		{
 			name: "multiple providers",
 			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"provider1": {
+				Providers: []v1alpha1.JWTProvider{
+					{
 						Issuer: "test-issuer-1",
 						JWKS: v1alpha1.JWKS{
 							LocalJWKS: &v1alpha1.LocalJWKS{
@@ -269,7 +269,7 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 							},
 						},
 					},
-					"provider2": {
+					{
 						Issuer: "test-issuer-2",
 						JWKS: v1alpha1.JWKS{
 							LocalJWKS: &v1alpha1.LocalJWKS{
@@ -282,15 +282,15 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_provider1": {
+					"test-policy_test-ns_0": {
 						Issuer:            "test-issuer-1",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_provider1",
+						PayloadInMetadata: PayloadInMetadata,
 					},
-					"test-policy_test-ns_provider2": {
+					"test-policy_test-ns_1": {
 						Issuer:            "test-issuer-2",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_provider2",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -298,8 +298,8 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		{
 			name: "provider with audiences",
 			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
+				Providers: []v1alpha1.JWTProvider{
+					{
 						Issuer:    "test-issuer",
 						Audiences: []string{"aud1", "aud2"},
 						JWKS: v1alpha1.JWKS{
@@ -313,10 +313,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-policy_test-ns_0": {
 						Issuer:            "test-issuer",
 						Audiences:         []string{"aud1", "aud2"},
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -324,8 +324,8 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		{
 			name: "provider with token source",
 			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
+				Providers: []v1alpha1.JWTProvider{
+					{
 						Issuer: "test-issuer",
 						TokenSource: &v1alpha1.JWTTokenSource{
 							HeaderSource: []v1alpha1.HeaderSource{
@@ -345,10 +345,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-policy_test-ns_0": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 					},
 				},
 			},
@@ -356,8 +356,8 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 		{
 			name: "provider with remove token",
 			policy: &v1alpha1.JWTValidation{
-				Providers: map[string]v1alpha1.JWTProvider{
-					"test-provider": {
+				Providers: []v1alpha1.JWTProvider{
+					{
 						Issuer: "test-issuer",
 						JWKS: v1alpha1.JWKS{
 							LocalJWKS: &v1alpha1.LocalJWKS{
@@ -371,10 +371,10 @@ func TestConvertJwtValidationConfig(t *testing.T) {
 			expectedError: false,
 			expectedConfig: &jwtauthnv3.JwtAuthentication{
 				Providers: map[string]*jwtauthnv3.JwtProvider{
-					"test-policy_test-ns_test-provider": {
+					"test-policy_test-ns_0": {
 						Issuer:            "test-issuer",
 						Audiences:         nil,
-						PayloadInMetadata: "test-policy_test-ns_test-provider",
+						PayloadInMetadata: PayloadInMetadata,
 						Forward:           false,
 					},
 				},
