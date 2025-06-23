@@ -51,12 +51,14 @@ type helmGateway struct {
 	Istio *helmIstio `json:"istio,omitempty"`
 
 	// envoy container values
-	LogLevel          *string                      `json:"logLevel,omitempty"`
-	ComponentLogLevel *string                      `json:"componentLogLevel,omitempty"`
-	Image             *helmImage                   `json:"image,omitempty"`
-	Resources         *corev1.ResourceRequirements `json:"resources,omitempty"`
-	SecurityContext   *corev1.SecurityContext      `json:"securityContext,omitempty"`
-	Env               []corev1.EnvVar              `json:"env,omitempty"`
+	LogLevel          *string `json:"logLevel,omitempty"`
+	ComponentLogLevel *string `json:"componentLogLevel,omitempty"`
+
+	// envoy or agentgateway container values
+	Image           *helmImage                   `json:"image,omitempty"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
+	SecurityContext *corev1.SecurityContext      `json:"securityContext,omitempty"`
+	Env             []corev1.EnvVar              `json:"env,omitempty"`
 
 	// xds values
 	Xds *helmXds `json:"xds,omitempty"`
@@ -169,6 +171,10 @@ type helmEndpointPickerExtension struct {
 }
 
 type helmAgentGateway struct {
-	Enabled  bool   `json:"enabled,omitempty"`
-	LogLevel string `json:"logLevel,omitempty"`
+	Enabled         bool                         `json:"enabled,omitempty"`
+	LogLevel        string                       `json:"logLevel,omitempty"`
+	Image           *helmImage                   `json:"image,omitempty"`
+	SecurityContext *corev1.SecurityContext      `json:"securityContext,omitempty"`
+	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Env             []corev1.EnvVar              `json:"env,omitempty"`
 }

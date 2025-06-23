@@ -268,7 +268,10 @@ func getAgentGatewayValues(config *v1alpha1.AgentGateway) (*helmAgentGateway, er
 	}
 
 	return &helmAgentGateway{
-		Enabled:  *config.GetEnabled(),
-		LogLevel: logLevel,
+		Enabled:         *config.GetEnabled(),
+		LogLevel:        logLevel,
+		Image:           getImageValues(config.GetImage()),
+		SecurityContext: config.GetSecurityContext(),
+		Resources:       config.GetResources(),
 	}, nil
 }
