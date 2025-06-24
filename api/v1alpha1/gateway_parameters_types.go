@@ -80,7 +80,7 @@ type KubernetesProxyConfig struct {
 	Deployment *ProxyDeployment `json:"deployment,omitempty"`
 
 	// Configuration for the container running Envoy.
-	// If AgentGateway is enabled, EnvoyContainer values are not used.
+	// If AgentGateway is enabled, the EnvoyContainer values will be ignored.
 	//
 	// +optional
 	EnvoyContainer *EnvoyContainer `json:"envoyContainer,omitempty"`
@@ -121,8 +121,8 @@ type KubernetesProxyConfig struct {
 	// +optional
 	AiExtension *AiExtension `json:"aiExtension,omitempty"`
 
-	// Configure the AgentGateway integration. If AgentGateway is enabled, the EnvoyContainer values will be used
-	// to configure the data plane proxy.
+	// Configure the AgentGateway integration. If AgentGateway is disabled, the EnvoyContainer values will be used by
+	// default to configure the data plane proxy.
 	//
 	// +optional
 	AgentGateway *AgentGateway `json:"agentGateway,omitempty"`

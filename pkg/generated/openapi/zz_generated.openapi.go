@@ -792,7 +792,7 @@ func schema_kgateway_v2_api_v1alpha1_AgentGateway(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AgentGateway configures the AgentGateway integration",
+				Description: "AgentGateway configures the AgentGateway integration. If AgentGateway is enabled, Envoy",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"enabled": {
@@ -3409,7 +3409,7 @@ func schema_kgateway_v2_api_v1alpha1_KubernetesProxyConfig(ref common.ReferenceC
 					},
 					"envoyContainer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the container running Envoy.",
+							Description: "Configuration for the container running Envoy. If AgentGateway is enabled, the EnvoyContainer values will be ignored.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.EnvoyContainer"),
 						},
 					},
@@ -3457,7 +3457,7 @@ func schema_kgateway_v2_api_v1alpha1_KubernetesProxyConfig(ref common.ReferenceC
 					},
 					"agentGateway": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configure the AgentGateway integration",
+							Description: "Configure the AgentGateway integration. If AgentGateway is disabled, the EnvoyContainer values will be used by default to configure the data plane proxy.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AgentGateway"),
 						},
 					},
