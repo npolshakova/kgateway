@@ -1303,6 +1303,74 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: istioProxyContainer
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.IstioContainer
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWKS
+  map:
+    fields:
+    - name: local
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
+  map:
+    fields:
+    - name: header
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
+  map:
+    fields:
+    - name: audiences
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: claimsToHeaders
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
+          elementRelationship: atomic
+    - name: issuer
+      type:
+        scalar: string
+      default: ""
+    - name: jwks
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWKS
+      default: {}
+    - name: keepToken
+      type:
+        scalar: string
+    - name: tokenSource
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTTokenSource
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTTokenSource
+  map:
+    fields:
+    - name: headers
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HeaderSource
+          elementRelationship: atomic
+    - name: queryParams
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidation
+  map:
+    fields:
+    - name: extensionRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+      default: {}
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.KeyAnyValue
   map:
     fields:

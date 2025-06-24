@@ -169,10 +169,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.IstioContainerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("IstioIntegration"):
 		return &apiv1alpha1.IstioIntegrationApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("KeyAnyValue"):
-		return &apiv1alpha1.KeyAnyValueApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("KeyAnyValueList"):
-		return &apiv1alpha1.KeyAnyValueListApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JWKS"):
 		return &apiv1alpha1.JWKSApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JWTClaimToHeader"):
@@ -183,6 +179,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.JWTTokenSourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JWTValidation"):
 		return &apiv1alpha1.JWTValidationApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("KeyAnyValue"):
+		return &apiv1alpha1.KeyAnyValueApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("KeyAnyValueList"):
+		return &apiv1alpha1.KeyAnyValueListApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("KubernetesProxyConfig"):
 		return &apiv1alpha1.KubernetesProxyConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LLMProvider"):
