@@ -3365,12 +3365,27 @@ func schema_kgateway_v2_api_v1alpha1_GatewayExtensionSpec(ref common.ReferenceCa
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RateLimitProvider"),
 						},
 					},
+					"jwtProviders": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JWTProviders configures a map of unique JWTProvider name to JWTProviders",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtAuthProvider", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtProcProvider", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RateLimitProvider"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtAuthProvider", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtProcProvider", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RateLimitProvider"},
 	}
 }
 
@@ -4422,7 +4437,7 @@ func schema_kgateway_v2_api_v1alpha1_JWTProvider(ref common.ReferenceCallback) c
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "JWTProvider configures the JWT Provider",
+				Description: "JWTProvider configures the JWT Provider If multiple providers are specified for a given JWT policy, the providers will be `OR`-ed together and will allow validation to any of the providers.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"issuer": {
@@ -4542,27 +4557,19 @@ func schema_kgateway_v2_api_v1alpha1_JWTValidation(ref common.ReferenceCallback)
 				Description: "JWTValidation defines the providers used to configure JWT validation",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"providers": {
+					"extensionRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Providers configures a map of JWT provider name to Provider. If multiple providers are specified, the providers will be `OR`-ed together and will allow validation to any of the providers.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider"),
-									},
-								},
-							},
+							Description: "ExtensionRef references a GatewayExtension that provides the jwt providers",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
 						},
 					},
 				},
-				Required: []string{"providers"},
+				Required: []string{"extensionRef"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider"},
+			"k8s.io/api/core/v1.LocalObjectReference"},
 	}
 }
 

@@ -1438,11 +1438,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTValidation
   map:
     fields:
-    - name: providers
+    - name: extensionRef
       type:
-        map:
-          elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+      default: {}
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.KeyAnyValue
   map:
     fields:
