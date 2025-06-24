@@ -768,11 +768,6 @@ func (in *CommonHttpProtocolOptions) DeepCopyInto(out *CommonHttpProtocolOptions
 		*out = new(metav1.Duration)
 		**out = **in
 	}
-	if in.HeadersWithUnderscoresAction != nil {
-		in, out := &in.HeadersWithUnderscoresAction, &out.HeadersWithUnderscoresAction
-		*out = new(HeadersWithUnderscoresAction)
-		**out = **in
-	}
 	if in.MaxRequestsPerConnection != nil {
 		in, out := &in.MaxRequestsPerConnection, &out.MaxRequestsPerConnection
 		*out = new(int)
@@ -1043,6 +1038,13 @@ func (in *EnvoyContainer) DeepCopyInto(out *EnvoyContainer) {
 		in, out := &in.Resources, &out.Resources
 		*out = new(v1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
