@@ -80,6 +80,7 @@ type KubernetesProxyConfig struct {
 	Deployment *ProxyDeployment `json:"deployment,omitempty"`
 
 	// Configuration for the container running Envoy.
+	// If AgentGateway is enabled, EnvoyContainer values are not used.
 	//
 	// +optional
 	EnvoyContainer *EnvoyContainer `json:"envoyContainer,omitempty"`
@@ -120,7 +121,8 @@ type KubernetesProxyConfig struct {
 	// +optional
 	AiExtension *AiExtension `json:"aiExtension,omitempty"`
 
-	// Configure the AgentGateway integration
+	// Configure the AgentGateway integration. If AgentGateway is enabled, the EnvoyContainer values will be used
+	// to configure the data plane proxy.
 	//
 	// +optional
 	AgentGateway *AgentGateway `json:"agentGateway,omitempty"`
@@ -772,7 +774,7 @@ func (in *CustomLabel) GetKeyDelimiter() *string {
 	return in.KeyDelimiter
 }
 
-// AgentGateway configures the AgentGateway integration
+// AgentGateway configures the AgentGateway integration. If AgentGateway is enabled, Envoy
 type AgentGateway struct {
 	// Whether to enable the extension.
 	//

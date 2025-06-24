@@ -171,10 +171,6 @@ type helmEndpointPickerExtension struct {
 }
 
 type helmAgentGateway struct {
-	Enabled         bool                         `json:"enabled,omitempty"`
-	LogLevel        string                       `json:"logLevel,omitempty"`
-	Image           *helmImage                   `json:"image,omitempty"`
-	SecurityContext *corev1.SecurityContext      `json:"securityContext,omitempty"`
-	Resources       *corev1.ResourceRequirements `json:"resources,omitempty"`
-	Env             []corev1.EnvVar              `json:"env,omitempty"`
+	Enabled  bool   `json:"enabled,omitempty"`
+	LogLevel string `json:"logLevel,omitempty"`
 }
