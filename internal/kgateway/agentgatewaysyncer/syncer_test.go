@@ -4,9 +4,7 @@ import (
 	"context"
 	"testing"
 
-	agentgateway "github.com/agentgateway/agentgateway/go/api"
-	"github.com/agentgateway/agentgateway/go/api/a2a"
-	"github.com/agentgateway/agentgateway/go/api/mcp"
+	"github.com/agentgateway/agentgateway/go/api"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/stretchr/testify/assert"
@@ -27,65 +25,88 @@ func dumpXDSCacheState(ctx context.Context, cache envoycache.SnapshotCache) {
 			continue
 		}
 
-		// Check for A2A targets
-		logger.Info("A2A targets version", "snapshot", snapshot.GetVersion(TargetTypeA2AUrl)) //nolint:sloglint // ignore msg-type
-		resources := snapshot.GetResources(TargetTypeA2AUrl)
-		for name := range resources {
-			logger.Info("snapshot has resources", "name", name)
-		}
-
-		// Check for MCP targets
-		logger.Info("MCP targets version", "snapshot", snapshot.GetVersion(TargetTypeMcpUrl))
-		resources = snapshot.GetResources(TargetTypeMcpUrl)
+		// Check for Resource targets
+		logger.Info("Resource targets version", "snapshot", snapshot.GetVersion(TargetTypeResourceUrl)) //nolint:sloglint // ignore msg-type
+		resources := snapshot.GetResources(TargetTypeResourceUrl)
 		for name := range resources {
 			logger.Info("snapshot has resources", "name", name)
 		}
 	}
 }
 
-// TestXDSCacheState checks that the xds cache has targets and listeners properly set
+// TestXDSCacheState checks that the xds cache has resources properly set
 func TestXDSCacheState(t *testing.T) {
 	ctx := context.Background()
 	cache := envoycache.NewSnapshotCache(false, envoycache.IDHash{}, nil)
 
-	a2aTarget := &a2a.Target{
-		Name:      "test-a2a-service",
-		Host:      "10.0.0.1",
-		Port:      8080,
-		Path:      "/api",
-		Listeners: []string{"a2a-listener"},
-	}
-	mcpTarget := &mcp.Target{
-		Name: "test-mcp-service",
-		Target: &mcp.Target_Sse{
-			Sse: &mcp.Target_SseTarget{
-				Host: "10.0.0.2",
-				Port: 8081,
-				Path: "/events",
+	// Create test resources using the new API
+	bindResource := &api.Resource{
+		Kind: &api.Resource_Bind{
+			Bind: &api.Bind{
+				Key:  "test-bind",
+				Port: 8080,
 			},
 		},
-		Listeners: []string{"mcp-listener"},
 	}
-	listener := &agentgateway.Listener{
-		Name:     "test-listener",
-		Protocol: agentgateway.Listener_A2A,
-		Listener: &agentgateway.Listener_Sse{
-			Sse: &agentgateway.SseListener{
-				Address: "[::]",
-				Port:    8080,
+
+	listenerResource := &api.Resource{
+		Kind: &api.Resource_Listener{
+			Listener: &api.Listener{
+				Key:         "test-listener",
+				Name:        "default",
+				BindKey:     "test-bind",
+				GatewayName: "test-gateway",
+				Protocol:    api.Protocol_HTTP,
+			},
+		},
+	}
+
+	routeResource := &api.Resource{
+		Kind: &api.Resource_Route{
+			Route: &api.Route{
+				Key:         "test-route",
+				ListenerKey: "test-listener",
+				RuleName:    "test-rule",
+				RouteName:   "test-route",
+				Matches: []*api.RouteMatch{
+					{
+						Path: &api.PathMatch{
+							Kind: &api.PathMatch_PathPrefix{
+								PathPrefix: "/test",
+							},
+						},
+					},
+				},
+				Backends: []*api.RouteBackend{
+					{
+						Kind: &api.RouteBackend_Service{
+							Service: "test-service",
+						},
+						Weight: 1,
+						Port:   8080,
+					},
+				},
 			},
 		},
 	}
 
 	snapshot := &agentGwSnapshot{
-		AgentGwA2AServices: envoycache.NewResources("v1", []envoytypes.Resource{
-			a2aTarget,
-		}),
-		AgentGwMcpServices: envoycache.NewResources("v1", []envoytypes.Resource{
-			mcpTarget,
-		}),
-		Listeners: envoycache.NewResources("v1", []envoytypes.Resource{
-			listener,
+		Config: envoycache.NewResources("v1", []envoytypes.Resource{
+			&envoyResourceWithCustomName{
+				Message: bindResource,
+				Name:    "test-bind",
+				version: 1,
+			},
+			&envoyResourceWithCustomName{
+				Message: listenerResource,
+				Name:    "test-listener",
+				version: 2,
+			},
+			&envoyResourceWithCustomName{
+				Message: routeResource,
+				Name:    "test-route",
+				version: 3,
+			},
 		}),
 	}
 
@@ -100,31 +121,34 @@ func TestXDSCacheState(t *testing.T) {
 	retrievedSnapshot, err := cache.GetSnapshot("test-node")
 	require.NoError(t, err)
 
-	// Verify A2A resources
-	a2aResources := retrievedSnapshot.GetResources(TargetTypeA2AUrl)
-	assert.NotNil(t, a2aResources)
-	assert.Contains(t, a2aResources, "test-a2a-service")
-	retrievedA2A := a2aResources["test-a2a-service"].(*a2a.Target)
-	assert.Equal(t, "10.0.0.1", retrievedA2A.Host)
-	assert.Equal(t, uint32(8080), retrievedA2A.Port)
-	assert.Equal(t, "/api", retrievedA2A.Path)
+	// Verify Resource resources
+	resources := retrievedSnapshot.GetResources(TargetTypeResourceUrl)
+	assert.NotNil(t, resources)
+	assert.Len(t, resources, 3)
 
-	// Verify MCP resources
-	mcpResources := retrievedSnapshot.GetResources(TargetTypeMcpUrl)
-	assert.NotNil(t, mcpResources)
-	assert.Contains(t, mcpResources, "test-mcp-service")
-	retrievedMCP := mcpResources["test-mcp-service"].(*mcp.Target)
-	assert.Equal(t, "10.0.0.2", retrievedMCP.GetSse().Host)
-	assert.Equal(t, uint32(8081), retrievedMCP.GetSse().Port)
-	assert.Equal(t, "/events", retrievedMCP.GetSse().Path)
+	// Verify bind resource
+	bindWrapper := resources["test-bind"].(*envoyResourceWithCustomName)
+	bindRes := bindWrapper.Message.(*api.Resource)
+	assert.NotNil(t, bindRes.GetBind())
+	assert.Equal(t, "test-bind", bindRes.GetBind().Key)
+	assert.Equal(t, uint32(8080), bindRes.GetBind().Port)
 
-	// Verify Listener resources
-	listenerResources := retrievedSnapshot.GetResources(TargetTypeListenerUrl)
-	assert.NotNil(t, listenerResources)
-	assert.Contains(t, listenerResources, "test-listener")
-	retrievedListener := listenerResources["test-listener"].(*agentgateway.Listener)
-	assert.Equal(t, agentgateway.Listener_A2A, retrievedListener.Protocol)
-	assert.Equal(t, uint32(8080), retrievedListener.GetSse().Port)
+	// Verify listener resource
+	listenerWrapper := resources["test-listener"].(*envoyResourceWithCustomName)
+	listenerRes := listenerWrapper.Message.(*api.Resource)
+	assert.NotNil(t, listenerRes.GetListener())
+	assert.Equal(t, "test-listener", listenerRes.GetListener().Key)
+	assert.Equal(t, "default", listenerRes.GetListener().Name)
+	assert.Equal(t, api.Protocol_HTTP, listenerRes.GetListener().Protocol)
+
+	// Verify route resource
+	routeWrapper := resources["test-route"].(*envoyResourceWithCustomName)
+	routeRes := routeWrapper.Message.(*api.Resource)
+	assert.NotNil(t, routeRes.GetRoute())
+	assert.Equal(t, "test-route", routeRes.GetRoute().Key)
+	assert.Equal(t, "test-rule", routeRes.GetRoute().RuleName)
+	assert.Len(t, routeRes.GetRoute().Matches, 1)
+	assert.Equal(t, "/test", routeRes.GetRoute().Matches[0].GetPath().GetPathPrefix())
 }
 
 // TestGetTargetName checks that the getTargetName function correctly formats target names
@@ -171,76 +195,94 @@ func TestGetTargetName(t *testing.T) {
 
 // TestAgentGwSnapshot checks that the snapshot GetVersion and GetResources methods work as expected
 func TestAgentGwSnapshot(t *testing.T) {
-	a2aTarget := &a2a.Target{
-		Name:      "test-a2a-service",
-		Host:      "10.0.0.1",
-		Port:      8080,
-		Path:      "/api",
-		Listeners: []string{"a2a-listener"},
-	}
-	mcpTarget := &mcp.Target{
-		Name: "test-mcp-service",
-		Target: &mcp.Target_Sse{
-			Sse: &mcp.Target_SseTarget{
-				Host: "10.0.0.2",
-				Port: 8081,
-				Path: "/events",
-			},
-		},
-		Listeners: []string{"mcp-listener"},
-	}
-	listener := &agentgateway.Listener{
-		Name:     "test-listener",
-		Protocol: agentgateway.Listener_A2A,
-		Listener: &agentgateway.Listener_Sse{
-			Sse: &agentgateway.SseListener{
-				Address: "[::]",
-				Port:    8080,
+	bindResource := &api.Resource{
+		Kind: &api.Resource_Bind{
+			Bind: &api.Bind{
+				Key:  "test-bind",
+				Port: 8080,
 			},
 		},
 	}
 
-	// manually build the snapshot
+	listenerResource := &api.Resource{
+		Kind: &api.Resource_Listener{
+			Listener: &api.Listener{
+				Key:         "test-listener",
+				Name:        "default",
+				BindKey:     "test-bind",
+				GatewayName: "test-gateway",
+				Protocol:    api.Protocol_HTTP,
+			},
+		},
+	}
+
+	routeResource := &api.Resource{
+		Kind: &api.Resource_Route{
+			Route: &api.Route{
+				Key:         "test-route",
+				ListenerKey: "test-listener",
+				RuleName:    "test-rule",
+				RouteName:   "test-route",
+				Matches: []*api.RouteMatch{
+					{
+						Path: &api.PathMatch{
+							Kind: &api.PathMatch_PathPrefix{
+								PathPrefix: "/test",
+							},
+						},
+					},
+				},
+				Backends: []*api.RouteBackend{
+					{
+						Kind: &api.RouteBackend_Service{
+							Service: "test-service",
+						},
+						Weight: 1,
+						Port:   8080,
+					},
+				},
+			},
+		},
+	}
+
 	snapshot := &agentGwSnapshot{
-		AgentGwA2AServices: envoycache.NewResources("v1", []envoytypes.Resource{
-			a2aTarget,
-		}),
-		AgentGwMcpServices: envoycache.NewResources("v1", []envoytypes.Resource{
-			mcpTarget,
-		}),
-		Listeners: envoycache.NewResources("v1", []envoytypes.Resource{
-			listener,
+		Config: envoycache.NewResources("v1", []envoytypes.Resource{
+			&envoyResourceWithCustomName{
+				Message: bindResource,
+				Name:    "test-bind",
+				version: 1,
+			},
+			&envoyResourceWithCustomName{
+				Message: listenerResource,
+				Name:    "test-listener",
+				version: 2,
+			},
+			&envoyResourceWithCustomName{
+				Message: routeResource,
+				Name:    "test-route",
+				version: 3,
+			},
 		}),
 	}
 
-	// Construct the version map based on the snapshot
+	// Test GetVersion
+	assert.Equal(t, "v1", snapshot.GetVersion(TargetTypeResourceUrl))
+
+	// Test GetResources
+	resources := snapshot.GetResources(TargetTypeResourceUrl)
+	assert.NotNil(t, resources)
+	assert.Len(t, resources, 3)
+
+	// Test GetVersionMap
 	err := snapshot.ConstructVersionMap()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, "v1", snapshot.GetVersion(TargetTypeA2AUrl))
-	assert.Equal(t, "v1", snapshot.GetVersion(TargetTypeMcpUrl))
-	assert.Equal(t, "v1", snapshot.GetVersion(TargetTypeListenerUrl))
-	assert.Equal(t, "", snapshot.GetVersion("invalid-type"))
-
-	a2aResources := snapshot.GetResources(TargetTypeA2AUrl)
-	assert.NotNil(t, a2aResources)
-	assert.Len(t, a2aResources, 1)
-	a2aVersionMap := snapshot.GetVersionMap(TargetTypeA2AUrl)
+	a2aVersionMap := snapshot.GetVersionMap(TargetTypeResourceUrl)
 	assert.NotNil(t, a2aVersionMap)
+	assert.Len(t, a2aVersionMap, 3)
 
-	mcpResources := snapshot.GetResources(TargetTypeMcpUrl)
-	assert.NotNil(t, mcpResources)
-	assert.Len(t, mcpResources, 1)
-	mcpVersionMap := snapshot.GetVersionMap(TargetTypeMcpUrl)
-	assert.NotNil(t, mcpVersionMap)
-
-	listenerResources := snapshot.GetResources(TargetTypeListenerUrl)
-	assert.NotNil(t, listenerResources)
-	assert.Len(t, listenerResources, 1)
-	listenerVersionMap := snapshot.GetVersionMap(TargetTypeListenerUrl)
-	assert.NotNil(t, listenerVersionMap)
-
-	err = snapshot.ConstructVersionMap()
-	assert.NoError(t, err)
-	assert.NotNil(t, snapshot.VersionMap)
+	// Verify specific resources exist
+	assert.Contains(t, a2aVersionMap, "test-bind")
+	assert.Contains(t, a2aVersionMap, "test-listener")
+	assert.Contains(t, a2aVersionMap, "test-route")
 }

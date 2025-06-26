@@ -17,9 +17,7 @@ import (
 	"testing"
 	"time"
 
-	agentgateway "github.com/agentgateway/agentgateway/go/api"
-	"github.com/agentgateway/agentgateway/go/api/a2a"
-	"github.com/agentgateway/agentgateway/go/api/mcp"
+	"github.com/agentgateway/agentgateway/go/api"
 	envoycluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoyendpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
@@ -528,7 +526,7 @@ func newAgentGatewayXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gw
 				Id: "gateway.gwtest",
 				Metadata: &structpb.Struct{
 					Fields: map[string]*structpb.Value{
-						"role": structpb.NewStringValue(fmt.Sprintf("%s~%s~%s", agentgatewaysyncer.OwnerNodeId, gwnamespace, gwname)),
+						"role": structpb.NewStringValue(fmt.Sprintf("%s~%s", gwnamespace, gwname)),
 					},
 				},
 			},
@@ -548,31 +546,23 @@ func newAgentGatewayXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gw
 }
 
 type agentGwDump struct {
-	A2ATargets []*a2a.Target
-	McpTargets []*mcp.Target
-	Listeners  []*agentgateway.Listener
+	Resources []*api.Resource
 }
 
 func (x xdsDumper) DumpAgentGateway(t *testing.T, ctx context.Context) agentGwDump {
-	// get a2a targets
-	a2aTargets := x.GetA2ATargets(t, ctx)
-	// get mcp targets
-	mcpTargets := x.GetMcpTargets(t, ctx)
-	// get listeners
-	listeners := x.GetListeners(t, ctx)
+	// get resources
+	resources := x.GetResources(t, ctx)
 
 	return agentGwDump{
-		A2ATargets: a2aTargets,
-		McpTargets: mcpTargets,
-		Listeners:  listeners,
+		Resources: resources,
 	}
 }
 
-func (x xdsDumper) GetA2ATargets(t *testing.T, ctx context.Context) []*a2a.Target {
+func (x xdsDumper) GetResources(t *testing.T, ctx context.Context) []*api.Resource {
 	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
-	dr.TypeUrl = agentgatewaysyncer.TargetTypeA2AUrl
+	dr.TypeUrl = agentgatewaysyncer.TargetTypeResourceUrl
 	x.adsClient.Send(dr)
-	var a2aTargets []*a2a.Target
+	var resources []*api.Resource
 	// run this in parallel with a 5s timeout
 	done := make(chan struct{})
 	go func() {
@@ -584,13 +574,13 @@ func (x xdsDumper) GetA2ATargets(t *testing.T, ctx context.Context) []*a2a.Targe
 				t.Errorf("failed to get response from xds server: %v", err)
 			}
 			t.Logf("got response: %s len: %d", dresp.GetTypeUrl(), len(dresp.GetResources()))
-			if dresp.GetTypeUrl() == agentgatewaysyncer.TargetTypeA2AUrl {
+			if dresp.GetTypeUrl() == agentgatewaysyncer.TargetTypeResourceUrl {
 				for _, anyResource := range dresp.GetResources() {
-					var target a2a.Target
-					if err := anyResource.UnmarshalTo(&target); err != nil {
-						t.Errorf("failed to unmarshal target: %v", err)
+					var resource api.Resource
+					if err := anyResource.UnmarshalTo(&resource); err != nil {
+						t.Errorf("failed to unmarshal resource: %v", err)
 					}
-					a2aTargets = append(a2aTargets, &target)
+					resources = append(resources, &resource)
 				}
 			}
 		}
@@ -599,99 +589,15 @@ func (x xdsDumper) GetA2ATargets(t *testing.T, ctx context.Context) []*a2a.Targe
 	case <-done:
 	case <-time.After(5 * time.Second):
 		// don't fatal yet as we want to dump the state while still connected
-		t.Error("timed out waiting for targets for a2a xds dump")
+		t.Error("timed out waiting for resources for agent gateway xds dump")
 		return nil
 	}
-	if len(a2aTargets) == 0 {
-		t.Error("no a2a targets found")
+	if len(resources) == 0 {
+		t.Error("no resources found")
 		return nil
 	}
-	t.Logf("xds: found %d a2a targets", len(a2aTargets))
-	return a2aTargets
-}
-
-func (x xdsDumper) GetMcpTargets(t *testing.T, ctx context.Context) []*mcp.Target {
-	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
-	dr.TypeUrl = agentgatewaysyncer.TargetTypeMcpUrl
-	x.adsClient.Send(dr)
-	var mcpTargets []*mcp.Target
-	// run this in parallel with a 5s timeout
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		sent := 1
-		for i := 0; i < sent; i++ {
-			dresp, err := x.adsClient.Recv()
-			if err != nil {
-				t.Errorf("failed to get response from xds server: %v", err)
-			}
-			t.Logf("got response: %s len: %d", dresp.GetTypeUrl(), len(dresp.GetResources()))
-			if dresp.GetTypeUrl() == agentgatewaysyncer.TargetTypeMcpUrl {
-				for _, anyResource := range dresp.GetResources() {
-					var target mcp.Target
-					if err := anyResource.UnmarshalTo(&target); err != nil {
-						t.Errorf("failed to unmarshal target: %v", err)
-					}
-					mcpTargets = append(mcpTargets, &target)
-				}
-			}
-		}
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		// don't fatal yet as we want to dump the state while still connected
-		t.Error("timed out waiting for targets for mcp xds dump")
-		return nil
-	}
-	if len(mcpTargets) == 0 {
-		t.Error("no mcp targets found")
-		return nil
-	}
-	t.Logf("xds: found %d mcp targets", len(mcpTargets))
-	return mcpTargets
-}
-
-func (x xdsDumper) GetListeners(t *testing.T, ctx context.Context) []*agentgateway.Listener {
-	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
-	dr.TypeUrl = agentgatewaysyncer.TargetTypeListenerUrl
-	x.adsClient.Send(dr)
-	var listeners []*agentgateway.Listener
-	// run this in parallel with a 5s timeout
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		sent := 1
-		for i := 0; i < sent; i++ {
-			dresp, err := x.adsClient.Recv()
-			if err != nil {
-				t.Errorf("failed to get response from xds server: %v", err)
-			}
-			t.Logf("got response: %s len: %d", dresp.GetTypeUrl(), len(dresp.GetResources()))
-			if dresp.GetTypeUrl() == agentgatewaysyncer.TargetTypeListenerUrl {
-				for _, anyResource := range dresp.GetResources() {
-					var listener agentgateway.Listener
-					if err := anyResource.UnmarshalTo(&listener); err != nil {
-						t.Errorf("failed to unmarshal target: %v", err)
-					}
-					listeners = append(listeners, &listener)
-				}
-			}
-		}
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		// don't fatal yet as we want to dump the state while still connected
-		t.Error("timed out waiting for listeners for xds dump")
-		return nil
-	}
-	if len(listeners) == 0 {
-		t.Error("no listeners found")
-		return nil
-	}
-	t.Logf("xds: found %d listeners", len(listeners))
-	return listeners
+	t.Logf("xds: found %d resources", len(resources))
+	return resources
 }
 
 func (x xdsDumper) Dump(t *testing.T, ctx context.Context) (xdsDump, error) {

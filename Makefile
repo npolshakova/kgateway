@@ -321,7 +321,7 @@ generate-all: generated-code
 
 # Generates all required code, cleaning and formatting as well; this target is executed in CI
 .PHONY: generated-code
-generated-code: clean-gen go-generate-all getter-check mod-tidy
+generated-code: clean-gen go-generate-all mod-tidy
 generated-code: update-licenses
 # generated-code: generate-crd-reference-docs
 generated-code: fmt

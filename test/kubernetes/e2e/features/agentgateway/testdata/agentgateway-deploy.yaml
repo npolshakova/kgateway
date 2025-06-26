@@ -6,6 +6,9 @@ spec:
   kube:
     agentGateway:
       enabled: true
+      logLevel: debug
+      image:
+        tag: 94c5ea6-dirty
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1

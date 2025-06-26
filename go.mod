@@ -615,7 +615,10 @@ require (
 	software.sslmate.com/src/go-pkcs12 v0.5.0 // indirect
 )
 
-replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
+replace (
+	github.com/agentgateway/agentgateway => github.com/solo-io/agentgateway-enterprise v0.0.0-20250625151206-94c5ea602e02
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
+)
 
 // Use a patched version of gengo to produce consistent zz_generated.openapi.go
 // Ref: https://github.com/kubernetes/gengo/issues/292

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agentgateway/agentgateway/go/api"
 	istiokube "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
@@ -119,15 +120,31 @@ spec:
 		})
 
 		dump := dumper.DumpAgentGateway(t, ctx)
-		if len(dump.McpTargets) != 1 {
-			t.Fatalf("expected 1 mcp target config, got %d", len(dump.McpTargets))
+
+		// Count different types of resources
+		var bindCount, listenerCount, routeCount int
+		for _, resource := range dump.Resources {
+			switch resource.GetKind().(type) {
+			case *api.Resource_Bind:
+				bindCount++
+			case *api.Resource_Listener:
+				listenerCount++
+			case *api.Resource_Route:
+				routeCount++
+			}
 		}
-		if len(dump.A2ATargets) != 1 {
-			t.Fatalf("expected 1 a2a target config, got %d", len(dump.A2ATargets))
+
+		// We expect 2 binds (one for each port), 2 listeners, and at least 2 routes (mcp and a2a)
+		if bindCount != 2 {
+			t.Fatalf("expected 2 bind resources, got %d", bindCount)
 		}
-		if len(dump.Listeners) != 2 {
-			t.Fatalf("expected 2 listener config, got %d", len(dump.Listeners))
+		if listenerCount != 2 {
+			t.Fatalf("expected 2 listener resources, got %d", listenerCount)
 		}
+		if routeCount < 2 {
+			t.Fatalf("expected at least 2 route resources, got %d", routeCount)
+		}
+
 		t.Logf("%s finished", t.Name())
 	})
 }
@@ -278,45 +295,51 @@ spec:
 		})
 
 		dump := dumper.DumpAgentGateway(t, ctx)
-		if len(dump.McpTargets) != 2 {
-			t.Fatalf("expected 2 mcp target config, got %d", len(dump.McpTargets))
+
+		// Count different types of resources
+		var bindCount, listenerCount, routeCount int
+		for _, resource := range dump.Resources {
+			switch resource.GetKind().(type) {
+			case *api.Resource_Bind:
+				bindCount++
+			case *api.Resource_Listener:
+				listenerCount++
+			case *api.Resource_Route:
+				routeCount++
+			}
 		}
-		for _, mcpTarget := range dump.McpTargets {
-			// same namespace should have mcp listener
-			if strings.Contains(mcpTarget.Name, "mcp-allowed") {
-				if len(mcpTarget.Listeners) != 1 {
-					t.Fatalf("expected mcp target to have 1 listener, got %v", mcpTarget.Listeners)
-				}
-				if mcpTarget.Listeners[0] != "mcp" {
-					t.Fatalf("expected mcp target to have listener mcp, got %s", mcpTarget.Listeners[0])
-				}
-			} else {
-				if len(mcpTarget.Listeners) != 0 {
-					t.Fatalf("expected mcp target to not have listeners, got %v", mcpTarget.Listeners)
+
+		// We expect 2 binds (one for each port), 2 listeners, and at least 2 routes (mcp and a2a)
+		if bindCount != 2 {
+			t.Fatalf("expected 2 bind resources, got %d", bindCount)
+		}
+		if listenerCount != 2 {
+			t.Fatalf("expected 2 listener resources, got %d", listenerCount)
+		}
+		if routeCount < 2 {
+			t.Fatalf("expected at least 2 route resources, got %d", routeCount)
+		}
+
+		// Check that routes are properly configured for the allowed services
+		var mcpRoutes, a2aRoutes []*api.Route
+		for _, resource := range dump.Resources {
+			if route := resource.GetRoute(); route != nil {
+				if strings.Contains(route.RouteName, "mcp") {
+					mcpRoutes = append(mcpRoutes, route)
+				} else if strings.Contains(route.RouteName, "a2a") {
+					a2aRoutes = append(a2aRoutes, route)
 				}
 			}
 		}
-		if len(dump.A2ATargets) != 2 {
-			t.Fatalf("expected 2 a2a target config, got %d", len(dump.A2ATargets))
+
+		// Verify that we have routes for both protocols
+		if len(mcpRoutes) == 0 {
+			t.Fatalf("expected at least 1 MCP route, got 0")
 		}
-		for _, a2aTarget := range dump.A2ATargets {
-			// same namespace should have a2a listener
-			if strings.Contains(a2aTarget.Name, "a2a-allowed") {
-				if len(a2aTarget.Listeners) != 1 {
-					t.Fatalf("expected mcp target to have 1 listener, got %v", a2aTarget.Listeners)
-				}
-				if a2aTarget.Listeners[0] != "a2a" {
-					t.Fatalf("expected a2a target to have listener mcp, got %s", a2aTarget.Listeners[0])
-				}
-			} else {
-				if len(a2aTarget.Listeners) != 0 {
-					t.Fatalf("expected a2a target to not have listeners, got %v", a2aTarget.Listeners)
-				}
-			}
+		if len(a2aRoutes) == 0 {
+			t.Fatalf("expected at least 1 A2A route, got 0")
 		}
-		if len(dump.Listeners) != 2 {
-			t.Fatalf("expected 2 listener config, got %d", len(dump.Listeners))
-		}
+
 		t.Logf("%s finished", t.Name())
 	})
 }

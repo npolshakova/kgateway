@@ -8,9 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	agentgateway "github.com/agentgateway/agentgateway/go/api"
-	"github.com/agentgateway/agentgateway/go/api/a2a"
-	"github.com/agentgateway/agentgateway/go/api/mcp"
+	"github.com/agentgateway/agentgateway/go/api"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"google.golang.org/protobuf/proto"
@@ -29,7 +27,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/xds"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 )
 
@@ -68,21 +65,19 @@ func NewAgentGwSyncer(
 type agentGwXdsResources struct {
 	types.NamespacedName
 
-	reports            reports.ReportMap
-	AgentGwA2AServices envoycache.Resources
-	AgentGwMcpServices envoycache.Resources
-	Listeners          envoycache.Resources
+	reports reports.ReportMap
+	Config  envoycache.Resources
 }
 
+// Needs to match agentgateway role configured in client.rs (https://github.com/agentgateway/agentgateway/blob/main/crates/agentgateway/src/xds/client.rs)
 func (r agentGwXdsResources) ResourceName() string {
-	return xds.OwnerNamespaceNameID(OwnerNodeId, r.Namespace, r.Name)
+	return fmt.Sprintf("%s~%s", r.Namespace, r.Name)
 }
 
 func (r agentGwXdsResources) Equals(in agentGwXdsResources) bool {
 	return r.NamespacedName == in.NamespacedName &&
 		report{r.reports}.Equals(report{in.reports}) &&
-		r.AgentGwA2AServices.Version == in.AgentGwA2AServices.Version &&
-		r.AgentGwMcpServices.Version == in.AgentGwMcpServices.Version
+		r.Config.Version == in.Config.Version
 }
 
 type envoyResourceWithName struct {
@@ -130,6 +125,10 @@ type agentGwService struct {
 
 func (r agentGwService) Equals(in agentGwService) bool {
 	return r.ip == in.ip && r.port == in.port && r.path == in.path && r.protocol == in.protocol && slices.Equal(r.allowedListeners, in.allowedListeners)
+}
+
+func (r agentGwService) ResourceName() string {
+	return fmt.Sprintf("%s/%s", r.Namespace, r.Name)
 }
 
 type report struct {
@@ -206,98 +205,200 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		}
 		return translateAgentService(s, allowedA2AListeners, allowedMCPListeners)
 	})
-	xdsA2AServices := krt.NewCollection(agentGwServices, func(kctx krt.HandlerContext, s agentGwService) *envoyResourceWithName {
-		if s.protocol != A2AProtocol {
-			return nil
-		}
-		t := &a2a.Target{
-			Name:      getTargetName(s.ResourceName()),
-			Host:      s.ip,
-			Port:      uint32(s.port),
-			Path:      s.path,
-			Listeners: s.allowedListeners,
-		}
-		return &envoyResourceWithName{inner: t, version: utils.HashProto(t)}
-	}, krtopts.ToOptions("a2a-target-xds")...)
-	xdsMcpServices := krt.NewCollection(agentGwServices, func(kctx krt.HandlerContext, s agentGwService) *envoyResourceWithName {
-		if s.protocol != MCPProtocol {
-			return nil
-		}
-		t := &mcp.Target{
-			// Note: No slashes allowed here (must match ^[a-zA-Z0-9-]+$)
-			Name: getTargetName(s.ResourceName()),
-			Target: &mcp.Target_Sse{
-				Sse: &mcp.Target_SseTarget{
-					Host: s.ip,
-					Port: uint32(s.port),
-					Path: s.path,
-				},
-			},
-			Listeners: s.allowedListeners,
-		}
-		return &envoyResourceWithName{inner: t, version: utils.HashProto(t)}
-	}, krtopts.ToOptions("mcp-target-xds")...)
 
-	// translate gateways to xds
+	// translate gateways to xds using new resources API
 	s.xDS = krt.NewCollection(gatewaysCol, func(kctx krt.HandlerContext, gw ir.Gateway) *agentGwXdsResources {
-		// listeners for the agentgateway
-		agwListeners := make([]envoytypes.Resource, 0, len(gw.Listeners))
-		var listenerVersion uint64
-		var listener *agentgateway.Listener
-		for _, gwListener := range gw.Listeners {
-			var protocol agentgateway.Listener_Protocol
-			switch string(gwListener.Protocol) {
-			case MCPProtocol:
-				protocol = agentgateway.Listener_MCP
-			case A2AProtocol:
-				protocol = agentgateway.Listener_A2A
-			default:
-				// Not a valid protocol for agentgateway
-				continue
-			}
+		// Get all services for this gateway
+		services := krt.Fetch(kctx, agentGwServices)
 
-			listener = &agentgateway.Listener{
-				Name:     string(gwListener.Name),
-				Protocol: protocol,
-				// TODO: Add support for stdio listener
-				Listener: &agentgateway.Listener_Sse{
-					Sse: &agentgateway.SseListener{
-						Address: "[::]",
-						Port:    uint32(gwListener.Port),
+		// Group services by protocol
+		a2aServices := make([]agentGwService, 0)
+		mcpServices := make([]agentGwService, 0)
+
+		for _, svc := range services {
+			switch svc.protocol {
+			case A2AProtocol:
+				a2aServices = append(a2aServices, svc)
+			case MCPProtocol:
+				mcpServices = append(mcpServices, svc)
+			}
+		}
+
+		// Create resources for the new API format
+		var resources []envoytypes.Resource
+
+		// Group listeners by port
+		portToListeners := make(map[int][]ir.Listener)
+		for _, listener := range gw.Listeners {
+			if listener.Protocol == A2AProtocol || listener.Protocol == MCPProtocol {
+				portToListeners[int(listener.Port)] = append(portToListeners[int(listener.Port)], listener)
+			}
+		}
+
+		// Create binds for each port
+		for port := range portToListeners {
+			bindKey := fmt.Sprintf("bind-%s-%d", gw.Name, port)
+
+			// Create bind resource
+			bindResource := &api.Resource{
+				Kind: &api.Resource_Bind{
+					Bind: &api.Bind{
+						Key:  bindKey,
+						Port: uint32(port),
 					},
 				},
 			}
+			resources = append(resources, &envoyResourceWithCustomName{
+				Message: bindResource,
+				Name:    bindKey,
+				version: utils.HashProto(bindResource),
+			})
 
-			// Update listenerVersion to be the result
-			listenerVersion ^= utils.HashProto(listener)
-			agwListeners = append(agwListeners, listener)
+			// Create listener resource
+			listenerKey := fmt.Sprintf("listener-%s-%d", gw.Name, port)
+			listenerResource := &api.Resource{
+				Kind: &api.Resource_Listener{
+					Listener: &api.Listener{
+						Key:         listenerKey,
+						Name:        "default",
+						BindKey:     bindKey,
+						GatewayName: gw.Name,
+						Protocol:    api.Protocol_HTTP,
+					},
+				},
+			}
+			resources = append(resources, &envoyResourceWithCustomName{
+				Message: listenerResource,
+				Name:    listenerKey,
+				version: utils.HashProto(listenerResource),
+			})
+
+			// Create routes for each protocol
+			if len(mcpServices) > 0 {
+				// Create MCP route
+				mcpRouteKey := fmt.Sprintf("route-mcp-%s-%d", gw.Name, port)
+				mcpMatches := []*api.RouteMatch{
+					{
+						Path: &api.PathMatch{
+							Kind: &api.PathMatch_PathPrefix{
+								PathPrefix: "/sse",
+							},
+						},
+					},
+					{
+						Path: &api.PathMatch{
+							Kind: &api.PathMatch_PathPrefix{
+								PathPrefix: "/mcp",
+							},
+						},
+					},
+				}
+
+				mcpBackends := make([]*api.RouteBackend, 0)
+				for _, svc := range mcpServices {
+					backend := &api.RouteBackend{
+						Kind: &api.RouteBackend_Service{
+							Service: getTargetName(svc.ResourceName()),
+						},
+						Weight: 1,
+						Port:   int32(svc.port),
+					}
+					mcpBackends = append(mcpBackends, backend)
+				}
+
+				mcpRouteResource := &api.Resource{
+					Kind: &api.Resource_Route{
+						Route: &api.Route{
+							Key:         mcpRouteKey,
+							ListenerKey: listenerKey,
+							RuleName:    "mcp",
+							RouteName:   "mcp",
+							Matches:     mcpMatches,
+							Backends:    mcpBackends,
+						},
+					},
+				}
+				resources = append(resources, &envoyResourceWithCustomName{
+					Message: mcpRouteResource,
+					Name:    mcpRouteKey,
+					version: utils.HashProto(mcpRouteResource),
+				})
+			}
+
+			// Create A2A route if we have A2A services
+			if len(a2aServices) > 0 {
+				// Create A2A route
+				a2aRouteKey := fmt.Sprintf("route-a2a-%s-%d", gw.Name, port)
+				a2aMatches := []*api.RouteMatch{
+					{
+						Path: &api.PathMatch{
+							Kind: &api.PathMatch_PathPrefix{
+								PathPrefix: "/a2a",
+							},
+						},
+					},
+				}
+
+				a2aFilters := []*api.RouteFilter{
+					{
+						Kind: &api.RouteFilter_UrlRewrite{
+							UrlRewrite: &api.UrlRewrite{
+								Path: &api.UrlRewrite_Prefix{
+									Prefix: "",
+								},
+							},
+						},
+					},
+				}
+
+				a2aBackends := make([]*api.RouteBackend, 0)
+				for _, svc := range a2aServices {
+					backend := &api.RouteBackend{
+						Kind: &api.RouteBackend_Service{
+							Service: fmt.Sprintf("%s/%s", svc.Namespace, svc.Name),
+						},
+						Weight: 1,
+						Port:   int32(svc.port),
+					}
+					a2aBackends = append(a2aBackends, backend)
+				}
+
+				a2aRouteResource := &api.Resource{
+					Kind: &api.Resource_Route{
+						Route: &api.Route{
+							Key:         a2aRouteKey,
+							ListenerKey: listenerKey,
+							RuleName:    "a2a",
+							RouteName:   "a2a",
+							Matches:     a2aMatches,
+							Filters:     a2aFilters,
+							Backends:    a2aBackends,
+						},
+					},
+				}
+				resources = append(resources, &envoyResourceWithCustomName{
+					Message: a2aRouteResource,
+					Name:    a2aRouteKey,
+					version: utils.HashProto(a2aRouteResource),
+				})
+			}
 		}
 
-		// a2a services
-		a2aServiceResources := krt.Fetch(kctx, xdsA2AServices)
-		logger.Debug("found A2A resources for gateway", "total_services", len(a2aServiceResources), "resource_ref", gw.ResourceName())
-		a2aResources := make([]envoytypes.Resource, len(a2aServiceResources))
-		var a2aVersion uint64
-		for i, res := range a2aServiceResources {
-			a2aVersion ^= res.version
-			target := res.inner.(*a2a.Target)
-			a2aResources[i] = target
+		// Create the resource wrapper
+		var version uint64
+		for _, res := range resources {
+			version ^= res.(*envoyResourceWithCustomName).version
 		}
-		// mcp services
-		mcpServiceResources := krt.Fetch(kctx, xdsMcpServices)
-		logger.Debug("found MCP resources for gateway", "total_services", len(mcpServiceResources), "resource_ref", gw.ResourceName())
-		mcpResources := make([]envoytypes.Resource, len(mcpServiceResources))
-		var mcpVersion uint64
-		for i, res := range mcpServiceResources {
-			mcpVersion ^= res.version
-			target := res.inner.(*mcp.Target)
-			mcpResources[i] = target
+
+		resource := &envoyResourceWithCustomName{
+			Message: &api.Resource{},
+			Name:    fmt.Sprintf("%s/%s", gw.Namespace, gw.Name),
+			version: version,
 		}
+
 		result := &agentGwXdsResources{
-			NamespacedName:     types.NamespacedName{Namespace: gw.Namespace, Name: gw.Name},
-			AgentGwA2AServices: envoycache.NewResources(fmt.Sprintf("%d", a2aVersion), a2aResources),
-			AgentGwMcpServices: envoycache.NewResources(fmt.Sprintf("%d", mcpVersion), mcpResources),
-			Listeners:          envoycache.NewResources(fmt.Sprintf("%d", listenerVersion), agwListeners),
+			NamespacedName: types.NamespacedName{Namespace: gw.Namespace, Name: gw.Name},
+			Config:         envoycache.NewResources(fmt.Sprintf("%d", resource.version), resources),
 		}
 		logger.Debug("created XDS resources for with ID", "gwname", gw.Name, "resourceid", result.ResourceName())
 		return result
@@ -305,8 +406,6 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
-		xdsA2AServices.HasSynced,
-		xdsMcpServices.HasSynced,
 		gatewaysCol.HasSynced,
 		agentGwServices.HasSynced,
 		s.xDS.HasSynced,
@@ -330,11 +429,10 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 				continue
 			}
 			snapshot := &agentGwSnapshot{
-				AgentGwA2AServices: r.AgentGwA2AServices,
-				AgentGwMcpServices: r.AgentGwMcpServices,
-				Listeners:          r.Listeners,
+				Config: r.Config,
 			}
 			logger.Debug("setting xds snapshot", "resourcename", r.ResourceName())
+			logger.Debug("snapshot config", "snapshot", snapshot.Config)
 			err := s.xdsCache.SetSnapshot(ctx, r.ResourceName(), snapshot)
 			if err != nil {
 				logger.Error("failed to set xds snapshot", "resourcename", r.ResourceName(), "error", err.Error())
@@ -347,10 +445,8 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 }
 
 type agentGwSnapshot struct {
-	AgentGwA2AServices envoycache.Resources
-	AgentGwMcpServices envoycache.Resources
-	Listeners          envoycache.Resources
-	VersionMap         map[string]map[string]string
+	Config     envoycache.Resources
+	VersionMap map[string]map[string]string
 }
 
 func (m *agentGwSnapshot) GetResources(typeURL string) map[string]envoytypes.Resource {
@@ -364,12 +460,8 @@ func (m *agentGwSnapshot) GetResources(typeURL string) map[string]envoytypes.Res
 
 func (m *agentGwSnapshot) GetResourcesAndTTL(typeURL string) map[string]envoytypes.ResourceWithTTL {
 	switch typeURL {
-	case TargetTypeA2AUrl:
-		return m.AgentGwA2AServices.Items
-	case TargetTypeMcpUrl:
-		return m.AgentGwMcpServices.Items
-	case TargetTypeListenerUrl:
-		return m.Listeners.Items
+	case TargetTypeResourceUrl:
+		return m.Config.Items
 	default:
 		return nil
 	}
@@ -377,12 +469,8 @@ func (m *agentGwSnapshot) GetResourcesAndTTL(typeURL string) map[string]envoytyp
 
 func (m *agentGwSnapshot) GetVersion(typeURL string) string {
 	switch typeURL {
-	case TargetTypeA2AUrl:
-		return m.AgentGwA2AServices.Version
-	case TargetTypeMcpUrl:
-		return m.AgentGwMcpServices.Version
-	case TargetTypeListenerUrl:
-		return m.Listeners.Version
+	case TargetTypeResourceUrl:
+		return m.Config.Version
 	default:
 		return ""
 	}
@@ -398,9 +486,7 @@ func (m *agentGwSnapshot) ConstructVersionMap() error {
 
 	m.VersionMap = make(map[string]map[string]string)
 	resources := map[string]map[string]envoytypes.ResourceWithTTL{
-		TargetTypeA2AUrl:      m.AgentGwA2AServices.Items,
-		TargetTypeMcpUrl:      m.AgentGwMcpServices.Items,
-		TargetTypeListenerUrl: m.Listeners.Items,
+		TargetTypeResourceUrl: m.Config.Items,
 	}
 
 	for typeUrl, items := range resources {
