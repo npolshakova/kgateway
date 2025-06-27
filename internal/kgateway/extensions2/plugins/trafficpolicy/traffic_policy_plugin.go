@@ -452,7 +452,7 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 			plugins.BeforeStage(plugins.AcceptedStage)))
 
 		// filters = append(filters, plugins.MustNewStagedFilter(setFilterStateFilterName,
-		// 	&set_filter_statev3.Config{}, plugins.AfterStage(plugins.FaultStage)))
+		// 	&set_filter_statev3.ResourcesConfig{}, plugins.AfterStage(plugins.FaultStage)))
 		filters = append(filters, plugins.MustNewStagedFilter(metadataRouteTransformation,
 			&transformationpb.FilterTransformations{},
 			plugins.AfterStage(plugins.FaultStage)))

@@ -143,7 +143,7 @@ func GenerateKubeConfiguration(t *testing.T, restconfig *rest.Config) string {
 	}
 
 	clientConfig := clientcmdapi.Config{
-		Kind:       "Config",
+		Kind:       "ResourcesConfig",
 		APIVersion: "v1",
 		Clusters:   clusters,
 		Contexts:   contexts,

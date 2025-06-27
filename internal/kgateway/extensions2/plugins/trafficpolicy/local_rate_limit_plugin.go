@@ -92,7 +92,7 @@ func toLocalRateLimitFilterConfig(t *v1alpha1.LocalRateLimitPolicy) (*localratel
 func createDisabledRateLimit() *localratelimitv3.LocalRateLimit {
 	return &localratelimitv3.LocalRateLimit{
 		StatPrefix: localRateLimitStatPrefix,
-		// Config per route requires a token bucket, so we create a minimal one
+		// ResourcesConfig per route requires a token bucket, so we create a minimal one
 		TokenBucket: &typev3.TokenBucket{
 			MaxTokens:    1,
 			FillInterval: durationpb.New(1),

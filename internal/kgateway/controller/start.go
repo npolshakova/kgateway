@@ -201,6 +201,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.Client,
 			commoncol,
 			cfg.SetupOpts.Cache,
+			cfg.Client.ClusterID().String(),
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)
 

@@ -26,14 +26,14 @@ type testManifest struct {
 var (
 	setupManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata/setup.yaml")
 
-	// Shared Resources
+	// Shared ResourcesConfig
 	svcInvalidPortAndValidTargetportManifest   = filepath.Join(fsutils.MustGetThisDir(), "testdata", "svc", "invalid-port-and-valid-targetport.yaml")
 	svcInvalidPortAndInvalidTargetportManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "svc", "invalid-port-and-invalid-targetport.yaml")
 	svcMatchPodPortWithoutTargetportManifest   = filepath.Join(fsutils.MustGetThisDir(), "testdata", "svc", "match-pod-port-without-targetport.yaml")
 	svcMatchPortandTargetportManifest          = filepath.Join(fsutils.MustGetThisDir(), "testdata", "svc", "match-port-and-targetport.yaml")
 	svcInvalidPortWithoutTargetportManifest    = filepath.Join(fsutils.MustGetThisDir(), "testdata", "svc", "invalid-port-without-targetport.yaml")
 
-	// K8s Resources
+	// K8s ResourcesConfig
 	setupK8sManifest                        = filepath.Join(fsutils.MustGetThisDir(), "testdata", "gateway.yaml")
 	invalidPortAndValidTargetportManifest   = filepath.Join(fsutils.MustGetThisDir(), "testdata", "k8s", "invalid-port-and-valid-targetport.yaml")
 	invalidPortAndInvalidTargetportManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "k8s", "invalid-port-and-invalid-targetport.yaml")

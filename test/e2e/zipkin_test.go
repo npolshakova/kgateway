@@ -188,7 +188,7 @@ var _ = Describe("Tracing config loading", Serial, func() {
 			}))
 			startCancellableTracingServer(ctx, fmt.Sprintf("%s:%d", envoyInstance.LocalAddr(), tracingCollectorPort), tracingCollectorHandler)
 
-			// Create Resources
+			// Create ResourcesConfig
 			err := testClients.WriteSnapshot(ctx, resourcesToCreate)
 			Expect(err).NotTo(HaveOccurred())
 

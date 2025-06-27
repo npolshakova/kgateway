@@ -11,6 +11,7 @@ var (
 	ConfigMapGVK      = corev1.SchemeGroupVersion.WithKind("ConfigMap")
 	ServiceGVK        = corev1.SchemeGroupVersion.WithKind("Service")
 	ServiceAccountGVK = corev1.SchemeGroupVersion.WithKind("ServiceAccount")
+	PodGVK            = corev1.SchemeGroupVersion.WithKind("Pod")
 
 	// RBAC GVKs
 	ClusterRoleBindingGVK = rbacv1.SchemeGroupVersion.WithKind("ClusterRoleBinding")

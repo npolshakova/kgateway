@@ -105,7 +105,7 @@ func (s StagedFilterList[WellKnown, FilterType]) Len() int {
 	return len(s)
 }
 
-// filters by Relative Stage, Weighting, Name, Config Type-Url, Config Value, and (to ensure stability) index.
+// filters by Relative Stage, Weighting, Name, ResourcesConfig Type-Url, ResourcesConfig Value, and (to ensure stability) index.
 // The assumption is that if two filters are in the same stage, their order doesn't matter, and we
 // just need to make sure it is stable.
 func (s StagedFilterList[WellKnown, FilterType]) Less(i, j int) bool {
@@ -153,7 +153,7 @@ func MustNewStagedFilter(name string, config proto.Message, stage FilterStage[We
 
 // NewStagedFilter creates an instance of the named filter with the desired stage.
 // Errors if the config is nil or we cannot determine the type of the config.
-// Config type determination may fail if the config is both  unknown and has no fields.
+// ResourcesConfig type determination may fail if the config is both  unknown and has no fields.
 func NewStagedFilter(name string, config proto.Message, stage FilterStage[WellKnownFilterStage]) (StagedHttpFilter, error) {
 	s := StagedHttpFilter{
 		Filter: &envoyhttp.HttpFilter{

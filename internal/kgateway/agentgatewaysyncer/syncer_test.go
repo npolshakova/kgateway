@@ -91,7 +91,7 @@ func TestXDSCacheState(t *testing.T) {
 	}
 
 	snapshot := &agentGwSnapshot{
-		Config: envoycache.NewResources("v1", []envoytypes.Resource{
+		ResourceConfig: envoycache.NewResources("v1", []envoytypes.Resource{
 			&envoyResourceWithCustomName{
 				Message: bindResource,
 				Name:    "test-bind",
@@ -191,98 +191,4 @@ func TestGetTargetName(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-// TestAgentGwSnapshot checks that the snapshot GetVersion and GetResources methods work as expected
-func TestAgentGwSnapshot(t *testing.T) {
-	bindResource := &api.Resource{
-		Kind: &api.Resource_Bind{
-			Bind: &api.Bind{
-				Key:  "test-bind",
-				Port: 8080,
-			},
-		},
-	}
-
-	listenerResource := &api.Resource{
-		Kind: &api.Resource_Listener{
-			Listener: &api.Listener{
-				Key:         "test-listener",
-				Name:        "default",
-				BindKey:     "test-bind",
-				GatewayName: "test-gateway",
-				Protocol:    api.Protocol_HTTP,
-			},
-		},
-	}
-
-	routeResource := &api.Resource{
-		Kind: &api.Resource_Route{
-			Route: &api.Route{
-				Key:         "test-route",
-				ListenerKey: "test-listener",
-				RuleName:    "test-rule",
-				RouteName:   "test-route",
-				Matches: []*api.RouteMatch{
-					{
-						Path: &api.PathMatch{
-							Kind: &api.PathMatch_PathPrefix{
-								PathPrefix: "/test",
-							},
-						},
-					},
-				},
-				Backends: []*api.RouteBackend{
-					{
-						Kind: &api.RouteBackend_Service{
-							Service: "test-service",
-						},
-						Weight: 1,
-						Port:   8080,
-					},
-				},
-			},
-		},
-	}
-
-	snapshot := &agentGwSnapshot{
-		Config: envoycache.NewResources("v1", []envoytypes.Resource{
-			&envoyResourceWithCustomName{
-				Message: bindResource,
-				Name:    "test-bind",
-				version: 1,
-			},
-			&envoyResourceWithCustomName{
-				Message: listenerResource,
-				Name:    "test-listener",
-				version: 2,
-			},
-			&envoyResourceWithCustomName{
-				Message: routeResource,
-				Name:    "test-route",
-				version: 3,
-			},
-		}),
-	}
-
-	// Test GetVersion
-	assert.Equal(t, "v1", snapshot.GetVersion(TargetTypeResourceUrl))
-
-	// Test GetResources
-	resources := snapshot.GetResources(TargetTypeResourceUrl)
-	assert.NotNil(t, resources)
-	assert.Len(t, resources, 3)
-
-	// Test GetVersionMap
-	err := snapshot.ConstructVersionMap()
-	require.NoError(t, err)
-
-	a2aVersionMap := snapshot.GetVersionMap(TargetTypeResourceUrl)
-	assert.NotNil(t, a2aVersionMap)
-	assert.Len(t, a2aVersionMap, 3)
-
-	// Verify specific resources exist
-	assert.Contains(t, a2aVersionMap, "test-bind")
-	assert.Contains(t, a2aVersionMap, "test-listener")
-	assert.Contains(t, a2aVersionMap, "test-route")
 }

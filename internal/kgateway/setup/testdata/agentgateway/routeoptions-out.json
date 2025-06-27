@@ -1,0 +1,340 @@
+{
+  "addresses": [
+    {
+      "Type": {
+        "Workload": {
+          "uid": "//Pod/reviews-1/gwtest",
+          "name": "reviews-1",
+          "namespace": "gwtest",
+          "addresses": [
+            "CvQBCw=="
+          ],
+          "service_account": "default",
+          "canonical_name": "reviews",
+          "canonical_revision": "latest",
+          "workload_type": 2,
+          "workload_name": "reviews-1",
+          "services": {
+            "default/kubernetes.default.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 443,
+                  "target_port": 50648
+                }
+              ]
+            },
+            "gwtest/http-routeoptions.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8080,
+                  "target_port": 8080
+                }
+              ]
+            },
+            "gwtest/reviews.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8000,
+                  "target_port": 8080
+                },
+                {
+                  "service_port": 9090,
+                  "target_port": 9090
+                }
+              ]
+            }
+          },
+          "status": 1
+        }
+      }
+    },
+    {
+      "Type": {
+        "Service": {
+          "name": "kubernetes",
+          "namespace": "default",
+          "hostname": "kubernetes.default.svc.cluster.local",
+          "addresses": [
+            {
+              "address": "CgAAAQ=="
+            }
+          ],
+          "ports": [
+            {
+              "service_port": 443,
+              "target_port": 50648
+            }
+          ],
+          "ip_families": 1
+        }
+      }
+    },
+    {
+      "Type": {
+        "Service": {
+          "name": "reviews",
+          "namespace": "gwtest",
+          "hostname": "reviews.gwtest.svc.cluster.local",
+          "addresses": [
+            {
+              "address": "CgAALw=="
+            }
+          ],
+          "ports": [
+            {
+              "service_port": 8000,
+              "target_port": 8080
+            },
+            {
+              "service_port": 9090,
+              "target_port": 9090
+            }
+          ],
+          "ip_families": 1
+        }
+      }
+    },
+    {
+      "Type": {
+        "Service": {
+          "name": "http-routeoptions",
+          "namespace": "gwtest",
+          "hostname": "http-routeoptions.gwtest.svc.cluster.local",
+          "addresses": [
+            {
+              "address": "CgAA5A=="
+            }
+          ],
+          "ports": [
+            {
+              "service_port": 8080,
+              "target_port": 8080
+            }
+          ],
+          "ip_families": 1
+        }
+      }
+    },
+    {
+      "Type": {
+        "Workload": {
+          "uid": "//Pod/reviews-2/gwtest",
+          "name": "reviews-2",
+          "namespace": "gwtest",
+          "addresses": [
+            "CvQCDg=="
+          ],
+          "service_account": "default",
+          "canonical_name": "reviews",
+          "canonical_revision": "latest",
+          "workload_type": 2,
+          "workload_name": "reviews-2",
+          "services": {
+            "default/kubernetes.default.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 443,
+                  "target_port": 50648
+                }
+              ]
+            },
+            "gwtest/http-routeoptions.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8080,
+                  "target_port": 8080
+                }
+              ]
+            },
+            "gwtest/reviews.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8000,
+                  "target_port": 8080
+                },
+                {
+                  "service_port": 9090,
+                  "target_port": 9090
+                }
+              ]
+            }
+          },
+          "status": 1
+        }
+      }
+    },
+    {
+      "Type": {
+        "Workload": {
+          "uid": "//Pod/reviews-3/gwtest",
+          "name": "reviews-3",
+          "namespace": "gwtest",
+          "addresses": [
+            "CvQDAw=="
+          ],
+          "service_account": "default",
+          "canonical_name": "reviews",
+          "canonical_revision": "latest",
+          "workload_type": 2,
+          "workload_name": "reviews-3",
+          "services": {
+            "default/kubernetes.default.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 443,
+                  "target_port": 50648
+                }
+              ]
+            },
+            "gwtest/http-routeoptions.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8080,
+                  "target_port": 8080
+                }
+              ]
+            },
+            "gwtest/reviews.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8000,
+                  "target_port": 8080
+                },
+                {
+                  "service_port": 9090,
+                  "target_port": 9090
+                }
+              ]
+            }
+          },
+          "status": 1
+        }
+      }
+    },
+    {
+      "Type": {
+        "Workload": {
+          "uid": "//Pod/reviews-4/gwtest",
+          "name": "reviews-4",
+          "namespace": "gwtest",
+          "addresses": [
+            "CvQEBA=="
+          ],
+          "service_account": "default",
+          "canonical_name": "reviews",
+          "canonical_revision": "latest",
+          "workload_type": 2,
+          "workload_name": "reviews-4",
+          "services": {
+            "default/kubernetes.default.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 443,
+                  "target_port": 50648
+                }
+              ]
+            },
+            "gwtest/http-routeoptions.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8080,
+                  "target_port": 8080
+                }
+              ]
+            },
+            "gwtest/reviews.gwtest.svc.cluster.local": {
+              "ports": [
+                {
+                  "service_port": 8000,
+                  "target_port": 8080
+                },
+                {
+                  "service_port": 9090,
+                  "target_port": 9090
+                }
+              ]
+            }
+          },
+          "status": 1
+        }
+      }
+    }
+  ],
+  "resources": [
+    {
+      "Kind": {
+        "Bind": {
+          "key": "bind-http-routeoptions-8080",
+          "port": 8080
+        }
+      }
+    },
+    {
+      "Kind": {
+        "Listener": {
+          "key": "listener-http-routeoptions-8080",
+          "name": "default",
+          "bind_key": "bind-http-routeoptions-8080",
+          "gateway_name": "http-routeoptions",
+          "protocol": 1
+        }
+      }
+    },
+    {
+      "Kind": {
+        "Route": {
+          "key": "route-my-route-0-0-http-routeoptions",
+          "listener_key": "listener-http-routeoptions-8080",
+          "rule_name": "rule-0",
+          "route_name": "route-0",
+          "matches": [
+            {
+              "path": {
+                "Kind": {
+                  "PathPrefix": "/myapp"
+                }
+              }
+            }
+          ],
+          "backends": [
+            {
+              "Kind": {
+                "Service": "gwtest/reviews"
+              },
+              "weight": 1,
+              "port": 8080
+            }
+          ]
+        }
+      }
+    },
+    {
+      "Kind": {
+        "Route": {
+          "key": "route-my-route2-0-0-http-routeoptions",
+          "listener_key": "listener-http-routeoptions-8080",
+          "rule_name": "rule-0",
+          "route_name": "route-0",
+          "matches": [
+            {
+              "path": {
+                "Kind": {
+                  "PathPrefix": "/"
+                }
+              }
+            }
+          ],
+          "backends": [
+            {
+              "Kind": {
+                "Service": "gwtest/reviews"
+              },
+              "weight": 1,
+              "port": 8080
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

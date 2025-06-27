@@ -547,14 +547,17 @@ func newAgentGatewayXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gw
 
 type agentGwDump struct {
 	Resources []*api.Resource
+	Addresses []*api.Address
 }
 
 func (x xdsDumper) DumpAgentGateway(t *testing.T, ctx context.Context) agentGwDump {
 	// get resources
 	resources := x.GetResources(t, ctx)
+	addresses := x.GetAddress(t, ctx)
 
 	return agentGwDump{
 		Resources: resources,
+		Addresses: addresses,
 	}
 }
 
@@ -598,6 +601,48 @@ func (x xdsDumper) GetResources(t *testing.T, ctx context.Context) []*api.Resour
 	}
 	t.Logf("xds: found %d resources", len(resources))
 	return resources
+}
+
+func (x xdsDumper) GetAddress(t *testing.T, ctx context.Context) []*api.Address {
+	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+	dr.TypeUrl = agentgatewaysyncer.TargetTypeAddressUrl
+	x.adsClient.Send(dr)
+	var address []*api.Address
+	// run this in parallel with a 5s timeout
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sent := 1
+		for i := 0; i < sent; i++ {
+			dresp, err := x.adsClient.Recv()
+			if err != nil {
+				t.Errorf("failed to get response from xds server: %v", err)
+			}
+			t.Logf("got address response: %s len: %d", dresp.GetTypeUrl(), len(dresp.GetResources()))
+			if dresp.GetTypeUrl() == agentgatewaysyncer.TargetTypeAddressUrl {
+				for _, anyResource := range dresp.GetResources() {
+					var resource api.Address
+					if err := anyResource.UnmarshalTo(&resource); err != nil {
+						t.Errorf("failed to unmarshal resource: %v", err)
+					}
+					address = append(address, &resource)
+				}
+			}
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		// don't fatal yet as we want to dump the state while still connected
+		t.Error("timed out waiting for address resources for agent gateway xds dump")
+		return nil
+	}
+	if len(address) == 0 {
+		t.Error("no address resources found")
+		return nil
+	}
+	t.Logf("xds: found %d address resources", len(address))
+	return address
 }
 
 func (x xdsDumper) Dump(t *testing.T, ctx context.Context) (xdsDump, error) {

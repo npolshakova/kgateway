@@ -164,7 +164,7 @@ func (c *TestContext) JustBeforeEach() {
 	})
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	// Create Resources
+	// Create ResourcesConfig
 	err = c.testClients.WriteSnapshot(c.ctx, c.resourcesToCreate)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 

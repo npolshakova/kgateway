@@ -35,7 +35,7 @@ func TransformConfigTemplatesWithApi(bootstrap *envoy_config_bootstrap.Bootstrap
 		return err
 	}
 
-	// Interpolate Static Resources
+	// Interpolate Static ResourcesConfig
 	for _, cluster := range bootstrap.GetStaticResources().GetClusters() {
 		for _, endpoint := range cluster.GetLoadAssignment().GetEndpoints() {
 			for _, lbEndpoint := range endpoint.GetLbEndpoints() {

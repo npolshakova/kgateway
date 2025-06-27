@@ -566,7 +566,7 @@ var _ = Describe("Gateway", func() {
 				envoyInstance = envoyFactory.NewInstance()
 
 				// Use tcp gateway instead of default
-				// Resources need to be created after the Envoy Instance because the port is dynamically allocated
+				// ResourcesConfig need to be created after the Envoy Instance because the port is dynamically allocated
 				defaultGateway := gatewaydefaults.DefaultTcpGateway(writeNamespace)
 				defaultSslGateway := gatewaydefaults.DefaultTcpSslGateway(writeNamespace)
 

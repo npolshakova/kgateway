@@ -223,7 +223,7 @@ func GetClientConfigWithContext(kubeConfigPath, kubeContext, apiServerUrl string
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides), nil
 }
 
-// Fetch rest.Config for environment in which this is invoked, override the API Server URL and current context if specified.
+// Fetch rest.ResourcesConfig for environment in which this is invoked, override the API Server URL and current context if specified.
 func GetRestConfigWithContext(kubeConfigPath, kubeContext, apiServerUrl string) (*rest.Config, error) {
 	clientConfig, err := GetClientConfigWithContext(kubeConfigPath, kubeContext, apiServerUrl)
 	if err != nil {

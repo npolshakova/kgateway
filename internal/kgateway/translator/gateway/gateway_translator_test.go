@@ -645,7 +645,7 @@ var _ = DescribeTable("Basic GatewayTranslator Tests",
 			Name:      "example-gateway",
 		},
 	}),
-	Entry("Backend Config Policy with LB Config", translatorTestCase{
+	Entry("Backend ResourcesConfig Policy with LB ResourcesConfig", translatorTestCase{
 		inputFile:  "backendconfigpolicy/lb-config.yaml",
 		outputFile: "backendconfigpolicy/lb-config.yaml",
 		gwNN: types.NamespacedName{
@@ -653,7 +653,7 @@ var _ = DescribeTable("Basic GatewayTranslator Tests",
 			Name:      "example-gateway",
 		},
 	}),
-	Entry("Backend Config Policy with Common HTTP Protocol - HTTP backend", translatorTestCase{
+	Entry("Backend ResourcesConfig Policy with Common HTTP Protocol - HTTP backend", translatorTestCase{
 		inputFile:  "backendconfigpolicy/commonhttpprotocol-httpbackend.yaml",
 		outputFile: "backendconfigpolicy/commonhttpprotocol-httpbackend.yaml",
 		gwNN: types.NamespacedName{
@@ -661,7 +661,7 @@ var _ = DescribeTable("Basic GatewayTranslator Tests",
 			Name:      "example-gateway",
 		},
 	}),
-	Entry("Backend Config Policy with Common HTTP Protocol - HTTP2 backend", translatorTestCase{
+	Entry("Backend ResourcesConfig Policy with Common HTTP Protocol - HTTP2 backend", translatorTestCase{
 		inputFile:  "backendconfigpolicy/commonhttpprotocol-http2backend.yaml",
 		outputFile: "backendconfigpolicy/commonhttpprotocol-http2backend.yaml",
 		gwNN: types.NamespacedName{

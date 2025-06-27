@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	// Resources are defined as go structs and written to yaml files in the input directory
+	// ResourcesConfig are defined as go structs and written to yaml files in the input directory
 	K8sApiRoutingGeneratedFileName         = "k8s_api.gen.yaml"
 	EdgeGatewayApiRoutingGeneratedFileName = "gloo_gateway_api.gen.yaml"
 

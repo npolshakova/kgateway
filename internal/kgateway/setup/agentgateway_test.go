@@ -2,8 +2,10 @@ package setup_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -11,335 +13,196 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	istiokube "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"istio.io/istio/pkg/test/util/retry"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/settings"
 )
 
-func TestAgentGatewaySelfManaged(t *testing.T) {
+func TestAgentGatewayScenarioDump(t *testing.T) {
 	st, err := settings.BuildSettings()
 	st.EnableAgentGateway = true
 
 	if err != nil {
 		t.Fatalf("can't get settings %v", err)
 	}
-	setupEnvTestAndRun(t, st, func(t *testing.T, ctx context.Context, kdbg *krt.DebugHandler, client istiokube.CLIClient, xdsPort int) {
-		client.Kube().CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "gwtest"}}, metav1.CreateOptions{})
 
-		err = client.ApplyYAMLContents("gwtest", `
-apiVersion: v1
-kind: Service
-metadata:
-  name: mcp
-  namespace: gwtest
-  labels:
-    app: mcp
-spec:
-  clusterIP: "10.0.0.11"
-  ports:
-    - name: http
-      port: 8080
-      targetPort: 8080
-      appProtocol: kgateway.dev/mcp
-  selector:
-    app: mcp
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: a2a
-  namespace: gwtest
-  labels:
-    app: a2a
-spec:
-  clusterIP: "10.0.0.12"
-  ports:
-    - name: http
-      port: 8081
-      targetPort: 8081
-      appProtocol: kgateway.dev/a2a
-  selector:
-    app: a2a
----
-kind: GatewayClass
-apiVersion: gateway.networking.k8s.io/v1
-metadata:
-  name: agentgateway
-spec:
-  controllerName: kgateway.dev/kgateway
-  parametersRef:
-    group: gateway.kgateway.dev
-    kind: GatewayParameters
-    name: kgateway
-    namespace: default
----
-kind: GatewayParameters
-apiVersion: gateway.kgateway.dev/v1alpha1
-metadata:
-  name: kgateway
-spec:
-  selfManaged: {}
----
-kind: Gateway
-apiVersion: gateway.networking.k8s.io/v1
-metadata:
-  name: http-gw
-  namespace: gwtest
-spec:
-  gatewayClassName: agentgateway
-  listeners:
-  - protocol: kgateway.dev/mcp
-    port: 8080
-    name: mcp
-    allowedRoutes:
-      namespaces:
-        from: All
-  - protocol: kgateway.dev/a2a
-    port: 8081
-    name: a2a
-    allowedRoutes:
-      namespaces:
-        from: All
-`)
+	// Use the runScenario approach to test agent gateway scenarios
+	runAgentGatewayScenario(t, "testdata/agentgateway", st)
+}
 
+func runAgentGatewayScenario(t *testing.T, scenarioDir string, globalSettings *settings.Settings) {
+	setupEnvTestAndRun(t, globalSettings, func(t *testing.T, ctx context.Context, kdbg *krt.DebugHandler, client istiokube.CLIClient, xdsPort int) {
+		// list all yamls in test data
+		files, err := os.ReadDir(scenarioDir)
 		if err != nil {
-			t.Fatalf("failed to apply yamls: %v", err)
+			t.Fatalf("failed to read dir: %v", err)
 		}
-
-		time.Sleep(time.Second / 2)
-
-		dumper := newAgentGatewayXdsDumper(t, ctx, xdsPort, "http-gw", "gwtest")
-		t.Cleanup(dumper.Close)
-		t.Cleanup(func() {
-			if t.Failed() {
-				logKrtState(t, fmt.Sprintf("krt state for failed test: %s", t.Name()), kdbg)
-			} else if os.Getenv("KGW_DUMP_KRT_ON_SUCCESS") == "true" {
-				logKrtState(t, fmt.Sprintf("krt state for successful test: %s", t.Name()), kdbg)
-			}
-		})
-
-		dump := dumper.DumpAgentGateway(t, ctx)
-
-		// Count different types of resources
-		var bindCount, listenerCount, routeCount int
-		for _, resource := range dump.Resources {
-			switch resource.GetKind().(type) {
-			case *api.Resource_Bind:
-				bindCount++
-			case *api.Resource_Listener:
-				listenerCount++
-			case *api.Resource_Route:
-				routeCount++
+		for _, f := range files {
+			// run tests with the yaml files (but not -out.yaml files)
+			parentT := t
+			if strings.HasSuffix(f.Name(), ".yaml") && !strings.HasSuffix(f.Name(), "-out.yaml") {
+				if os.Getenv("TEST_PREFIX") != "" && !strings.HasPrefix(f.Name(), os.Getenv("TEST_PREFIX")) {
+					continue
+				}
+				fullpath := filepath.Join(scenarioDir, f.Name())
+				t.Run(strings.TrimSuffix(f.Name(), ".yaml"), func(t *testing.T) {
+					writer.set(t)
+					t.Cleanup(func() {
+						writer.set(parentT)
+					})
+					testAgentGatewayScenario(t, ctx, kdbg, client, xdsPort, fullpath)
+				})
 			}
 		}
-
-		// We expect 2 binds (one for each port), 2 listeners, and at least 2 routes (mcp and a2a)
-		if bindCount != 2 {
-			t.Fatalf("expected 2 bind resources, got %d", bindCount)
-		}
-		if listenerCount != 2 {
-			t.Fatalf("expected 2 listener resources, got %d", listenerCount)
-		}
-		if routeCount < 2 {
-			t.Fatalf("expected at least 2 route resources, got %d", routeCount)
-		}
-
-		t.Logf("%s finished", t.Name())
 	})
 }
 
-func TestAgentGatewayAllowedRoutes(t *testing.T) {
-	st, err := settings.BuildSettings()
-	st.EnableAgentGateway = true
+func testAgentGatewayScenario(
+	t *testing.T,
+	ctx context.Context,
+	kdbg *krt.DebugHandler,
+	client istiokube.CLIClient,
+	xdsPort int,
+	f string,
+) {
+	fext := filepath.Ext(f)
+	fpre := strings.TrimSuffix(f, fext)
+	t.Logf("running agent gateway scenario for test file: %s", f)
+
+	// read the out file
+	fout := fpre + "-out" + fext
+	write := false
+	_, err := os.ReadFile(fout)
+	// if not exist
+	if os.IsNotExist(err) {
+		write = true
+		err = nil
+	}
+	if os.Getenv("REFRESH_GOLDEN") == "true" {
+		write = true
+	}
+	if err != nil {
+		t.Fatalf("failed to read file %s: %v", fout, err)
+	}
+
+	const gwname = "http-gw-for-test"
+	testgwname := "http-" + filepath.Base(fpre)
+	testyamlbytes, err := os.ReadFile(f)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	// change the gw name, so we could potentially run multiple tests in parallel (though currently
+	// it has other issues, so we don't run them in parallel)
+	testyaml := strings.ReplaceAll(string(testyamlbytes), gwname, testgwname)
+
+	yamlfile := filepath.Join(t.TempDir(), "test.yaml")
+	os.WriteFile(yamlfile, []byte(testyaml), 0o644)
+
+	err = client.ApplyYAMLFiles("", yamlfile)
+
+	t.Cleanup(func() {
+		// always delete yamls, even if there was an error applying them; to prevent test pollution.
+		err := client.DeleteYAMLFiles("", yamlfile)
+		if err != nil {
+			t.Fatalf("failed to delete yaml: %v", err)
+		}
+		t.Log("deleted yamls", t.Name())
+	})
 
 	if err != nil {
-		t.Fatalf("can't get settings %v", err)
+		t.Fatalf("failed to apply yaml: %v", err)
 	}
-	setupEnvTestAndRun(t, st, func(t *testing.T, ctx context.Context, kdbg *krt.DebugHandler, client istiokube.CLIClient, xdsPort int) {
-		client.Kube().CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "gwtest"}}, metav1.CreateOptions{})
+	t.Log("applied yamls", t.Name())
 
-		err = client.ApplyYAMLContents("", `
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: othernamespace
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mcp-other
-  namespace: othernamespace
-  labels:
-    app: mcp-other
-spec:
-  clusterIP: "10.0.0.11"
-  ports:
-    - name: http
-      port: 8080
-      targetPort: 8080
-      appProtocol: kgateway.dev/mcp
-  selector:
-    app: mcp-other
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: a2a-other
-  namespace: othernamespace
-  labels:
-    app: a2a-other
-spec:
-  clusterIP: "10.0.0.12"
-  ports:
-    - name: http
-      port: 8081
-      targetPort: 8081
-      appProtocol: kgateway.dev/a2a
-  selector:
-    app: a2a-other
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mcp-allowed
-  namespace: gwtest
-  labels:
-    app: mcp-allowed
-spec:
-  clusterIP: "10.0.0.13"
-  ports:
-    - name: http
-      port: 8080
-      targetPort: 8080
-      appProtocol: kgateway.dev/mcp
-  selector:
-    app: mcp-allowed
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: a2a-allowed
-  namespace: gwtest
-  labels:
-    app: a2a-allowed
-spec:
-  clusterIP: "10.0.0.14"
-  ports:
-    - name: http
-      port: 8081
-      targetPort: 8081
-      appProtocol: kgateway.dev/a2a
-  selector:
-    app: a2a-allowed
----
-kind: GatewayParameters
-apiVersion: gateway.kgateway.dev/v1alpha1
-metadata:
-  name: kgateway
-  namespace: gwtest
-spec:
-  kube:
-    agentGateway:
-      enabled: true
----
-kind: GatewayClass
-apiVersion: gateway.networking.k8s.io/v1
-metadata:
-  name: agentgateway
-  namespace: gwtest
-spec:
-  controllerName: kgateway.dev/kgateway
-  parametersRef:
-    group: gateway.kgateway.dev
-    kind: GatewayParameters
-    name: kgateway
-    namespace: gwtest
----
-kind: Gateway
-apiVersion: gateway.networking.k8s.io/v1
-metadata:
-  name: http-gw
-  namespace: gwtest
-spec:
-  gatewayClassName: agentgateway
-  listeners:
-  - protocol: kgateway.dev/mcp
-    port: 8080
-    name: mcp
-    allowedRoutes:
-      namespaces:
-        from: Same
-  - protocol: kgateway.dev/a2a
-    port: 8081
-    name: a2a
-    allowedRoutes:
-      namespaces:
-        from: Same
-`)
+	// wait at least a second before the first check
+	// to give the CP time to process
+	time.Sleep(time.Second)
 
-		if err != nil {
-			t.Fatalf("failed to apply yamls: %v", err)
+	t.Cleanup(func() {
+		if t.Failed() {
+			logKrtState(t, fmt.Sprintf("krt state for failed test: %s", t.Name()), kdbg)
+		} else if os.Getenv("KGW_DUMP_KRT_ON_SUCCESS") == "true" {
+			logKrtState(t, fmt.Sprintf("krt state for successful test: %s", t.Name()), kdbg)
+		}
+	})
+
+	// Use retry to wait for the agent gateway to be ready
+	retry.UntilSuccessOrFail(t, func() error {
+		dumper := newAgentGatewayXdsDumper(t, ctx, xdsPort, testgwname, "gwtest")
+		defer dumper.Close()
+		dump := dumper.DumpAgentGateway(t, ctx)
+		if len(dump.Resources) == 0 {
+			return fmt.Errorf("timed out waiting for agent gateway resources")
 		}
 
-		time.Sleep(time.Second / 2)
+		if write {
+			t.Logf("writing out file")
+			// Use proto dump instead of manual YAML writing
+			dumpProtoToJSON(t, dump, fpre)
+			return fmt.Errorf("wrote out file - nothing to test")
+		}
 
-		dumper := newAgentGatewayXdsDumper(t, ctx, xdsPort, "http-gw", "gwtest")
-		t.Cleanup(dumper.Close)
-		t.Cleanup(func() {
-			if t.Failed() {
-				logKrtState(t, fmt.Sprintf("krt state for failed test: %s", t.Name()), kdbg)
-			} else if os.Getenv("KGW_DUMP_KRT_ON_SUCCESS") == "true" {
-				logKrtState(t, fmt.Sprintf("krt state for successful test: %s", t.Name()), kdbg)
-			}
-		})
-
-		dump := dumper.DumpAgentGateway(t, ctx)
+		// Output the config dump
+		t.Logf("Agent Gateway Config Dump for %s:", testgwname)
+		t.Logf("Total resources: %d", len(dump.Resources))
 
 		// Count different types of resources
-		var bindCount, listenerCount, routeCount int
+		var bindCount, listenerCount, routeCount, worklodCount, serviceCount int
 		for _, resource := range dump.Resources {
 			switch resource.GetKind().(type) {
 			case *api.Resource_Bind:
 				bindCount++
+				t.Logf("Bind resource: %+v", resource.GetBind())
 			case *api.Resource_Listener:
 				listenerCount++
+				t.Logf("Listener resource: %+v", resource.GetListener())
 			case *api.Resource_Route:
 				routeCount++
+				t.Logf("Route resource: %+v", resource.GetRoute())
 			}
 		}
+		t.Logf("Resource counts - Binds: %d, Listeners: %d, Routes: %d", bindCount, listenerCount, routeCount)
 
-		// We expect 2 binds (one for each port), 2 listeners, and at least 2 routes (mcp and a2a)
-		if bindCount != 2 {
-			t.Fatalf("expected 2 bind resources, got %d", bindCount)
-		}
-		if listenerCount != 2 {
-			t.Fatalf("expected 2 listener resources, got %d", listenerCount)
-		}
-		if routeCount < 2 {
-			t.Fatalf("expected at least 2 route resources, got %d", routeCount)
-		}
-
-		// Check that routes are properly configured for the allowed services
-		var mcpRoutes, a2aRoutes []*api.Route
-		for _, resource := range dump.Resources {
-			if route := resource.GetRoute(); route != nil {
-				if strings.Contains(route.RouteName, "mcp") {
-					mcpRoutes = append(mcpRoutes, route)
-				} else if strings.Contains(route.RouteName, "a2a") {
-					a2aRoutes = append(a2aRoutes, route)
-				}
+		for _, resource := range dump.Addresses {
+			switch resource.Type.(type) {
+			case *api.Address_Workload:
+				worklodCount++
+				t.Logf("workload resource: %+v", resource.GetWorkload())
+			case *api.Address_Service:
+				serviceCount++
+				t.Logf("service resource: %+v", resource.GetService())
 			}
 		}
+		t.Logf("Address counts - Workload: %d, Service: %d", worklodCount, serviceCount)
 
-		// Verify that we have routes for both protocols
-		if len(mcpRoutes) == 0 {
-			t.Fatalf("expected at least 1 MCP route, got 0")
-		}
-		if len(a2aRoutes) == 0 {
-			t.Fatalf("expected at least 1 A2A route, got 0")
-		}
+		return nil
+	}, retry.Converge(2), retry.BackoffDelay(2*time.Second), retry.Timeout(10*time.Second))
 
-		t.Logf("%s finished", t.Name())
-	})
+	t.Logf("%s finished", t.Name())
+}
+
+// dumpProtoToJSON dumps the agentgateway resources to JSON format
+func dumpProtoToJSON(t *testing.T, dump agentGwDump, fpre string) {
+	jsonFile := fpre + "-out.json"
+
+	// Create a structured dump map
+	dumpMap := map[string]interface{}{
+		"resources": dump.Resources,
+		"addresses": dump.Addresses,
+	}
+
+	// Marshal to JSON using regular JSON marshaling
+	jsonData, err := json.MarshalIndent(dumpMap, "", "  ")
+	if err != nil {
+		t.Logf("failed to marshal to JSON: %v", err)
+		return
+	}
+
+	err = os.WriteFile(jsonFile, jsonData, 0o644)
+	if err != nil {
+		t.Logf("failed to write JSON file: %v", err)
+		return
+	}
+
+	t.Logf("wrote JSON dump to: %s", jsonFile)
 }
