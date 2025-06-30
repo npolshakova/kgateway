@@ -1,0 +1,35 @@
+{
+  "addresses": [
+    {
+      "Type": {
+        "Workload": {
+          "name": "8080/gwtest/http-httproute"
+        }
+      }
+    },
+    {
+      "Type": null
+    }
+  ],
+  "resources": [
+    {
+      "Kind": {
+        "Bind": {
+          "key": "8080/gwtest/http-httproute",
+          "port": 8080
+        }
+      }
+    },
+    {
+      "Kind": {
+        "Listener": {
+          "key": "gateway.networking.k8s.io/Gateway/gwtest/http-httproute",
+          "name": "http",
+          "bind_key": "8080/gwtest/http-httproute",
+          "gateway_name": "gwtest/http-httproute",
+          "protocol": 1
+        }
+      }
+    }
+  ]
+}

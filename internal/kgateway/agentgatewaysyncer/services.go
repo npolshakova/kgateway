@@ -39,7 +39,7 @@ func serviceServiceBuilder(
 			}
 		}
 
-		svc := constructService(ctx, s, domainSuffix)
+		svc := constructService(s, domainSuffix)
 		return precomputeServicePtr(&ServiceInfo{
 			Service:       svc,
 			PortNames:     portNames,
@@ -62,7 +62,6 @@ func NewSelector(l map[string]string) LabelSelector {
 }
 
 func constructService(
-	ctx krt.HandlerContext,
 	svc *corev1.Service,
 	domainSuffix string,
 ) *api.Service {
@@ -88,7 +87,7 @@ func constructService(
 	}
 
 	addresses, err := slices.MapErr(getVIPs(svc), func(e string) (*api.NetworkAddress, error) {
-		return toNetworkAddress(ctx, e)
+		return toNetworkAddress(e)
 	})
 	if err != nil {
 		logger.Error("fail to parse service", "svc", config.NamespacedName(svc), "error", err)
@@ -176,7 +175,7 @@ func serviceToAddress(s *api.Service) *api.Address {
 	}
 }
 
-func toNetworkAddress(ctx krt.HandlerContext, vip string) (*api.NetworkAddress, error) {
+func toNetworkAddress(vip string) (*api.NetworkAddress, error) {
 	ip, err := netip.ParseAddr(vip)
 	if err != nil {
 		return nil, fmt.Errorf("parse %v: %v", vip, err)

@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"google.golang.org/protobuf/proto"
 	"istio.io/istio/pkg/kube/krt"
-	"istio.io/istio/pkg/slices"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 )
 
@@ -20,7 +20,6 @@ var routeLogger = logging.New("agentgateway/route-collection")
 type AgentRouteResource struct {
 	types.NamespacedName
 	Route *api.Route
-	Valid bool
 }
 
 func (r AgentRouteResource) ResourceName() string {
@@ -28,7 +27,7 @@ func (r AgentRouteResource) ResourceName() string {
 }
 
 func (r AgentRouteResource) Equals(other AgentRouteResource) bool {
-	if r.NamespacedName != other.NamespacedName || r.Valid != other.Valid {
+	if r.NamespacedName != other.NamespacedName {
 		return false
 	}
 	if r.Route == nil && other.Route != nil || r.Route != nil && other.Route == nil {
@@ -42,183 +41,31 @@ func (r AgentRouteResource) Equals(other AgentRouteResource) bool {
 
 // RouteContext defines the context for route processing
 type RouteContext struct {
-	Krt                  krt.HandlerContext
-	AgentGatewayResource krt.Collection[AgentGatewayResource]
-	Services             krt.Collection[ServiceInfo]
-	Workloads            krt.Collection[WorkloadInfo]
-	DomainSuffix         string
+	Krt           krt.HandlerContext
+	RouteParents  RouteParents
+	DomainSuffix  string
+	Services      krt.Collection[*corev1.Service]
+	ServicesIndex krt.Index[string, *corev1.Service]
+	Namespaces    krt.Collection[krtcollections.NamespaceMetadata]
 }
 
 // RouteContextInputs defines the inputs needed for route processing
 type RouteContextInputs struct {
-	AgentGatewayResource krt.Collection[AgentGatewayResource]
-	Services             krt.Collection[ServiceInfo]
-	Workloads            krt.Collection[WorkloadInfo]
-	DomainSuffix         string
+	RouteParents  RouteParents
+	DomainSuffix  string
+	Services      krt.Collection[*corev1.Service]
+	ServicesIndex krt.Index[string, *corev1.Service]
+	Namespaces    krt.Collection[krtcollections.NamespaceMetadata]
 }
 
 func (i RouteContextInputs) WithCtx(krtctx krt.HandlerContext) RouteContext {
 	return RouteContext{
-		Krt:                  krtctx,
-		AgentGatewayResource: i.AgentGatewayResource,
-		Services:             i.Services,
-		Workloads:            i.Workloads,
-		DomainSuffix:         i.DomainSuffix,
-	}
-}
-
-// RouteResult holds the result of a route collection
-type RouteResult[T any] struct {
-	Routes krt.Collection[AgentRouteResource]
-	Input  krt.Collection[T]
-}
-
-// AgentHTTPRouteCollection creates a collection that translates HTTPRoute resources to agentgateway routes
-func AgentHTTPRouteCollection(
-	httpRoutes krt.Collection[*gwv1.HTTPRoute],
-	inputs RouteContextInputs,
-	krtopts krtutil.KrtOptions,
-) RouteResult[*gwv1.HTTPRoute] {
-	routes := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []AgentRouteResource {
-		ctx := inputs.WithCtx(krtctx)
-		route := obj.Spec
-
-		var result []AgentRouteResource
-
-		// Get all gateways that this route can attach to
-		gateways := krt.Fetch(ctx.Krt, ctx.AgentGatewayResource)
-		for _, gw := range gateways {
-			if !gw.Valid {
-				continue
-			}
-
-			// Check if this route can attach to this gateway
-			if !canRouteAttachToGateway(obj, gw) {
-				continue
-			}
-
-			// Process each rule in the route
-			for ruleIndex, rule := range route.Rules {
-				// Split rules by matches to ensure each rule has at most one match
-				matches := slices.Reference(rule.Matches)
-				if len(matches) == 0 {
-					matches = append(matches, nil)
-				}
-
-				for matchIndex, match := range matches {
-					// Create a route for each match
-					agentRoute := convertHTTPRouteToAgentRoute(ctx, rule, obj, ruleIndex, matchIndex, match, gw)
-					if agentRoute != nil {
-						result = append(result, *agentRoute)
-					}
-				}
-			}
-		}
-
-		return result
-	}, krtopts.ToOptions("agentgateway-http-route")...)
-
-	return RouteResult[*gwv1.HTTPRoute]{
-		Routes: routes,
-		Input:  httpRoutes,
-	}
-}
-
-// canRouteAttachToGateway checks if a route can attach to a specific gateway
-func canRouteAttachToGateway(route *gwv1.HTTPRoute, gateway AgentGatewayResource) bool {
-	// Check if the route references this gateway
-	for _, parentRef := range route.Spec.ParentRefs {
-		if parentRef.Name == gwv1.ObjectName(gateway.Name) {
-			// Check namespace
-			if parentRef.Namespace != nil && *parentRef.Namespace != gwv1.Namespace(gateway.Namespace) {
-				continue
-			}
-			// Check gateway class
-			if parentRef.SectionName != nil {
-				// TODO: implement section name matching
-				continue
-			}
-			return true
-		}
-	}
-	return false
-}
-
-// convertHTTPRouteToAgentRoute converts an HTTPRoute rule to an agentgateway route
-func convertHTTPRouteToAgentRoute(
-	ctx RouteContext,
-	rule gwv1.HTTPRouteRule,
-	route *gwv1.HTTPRoute,
-	ruleIndex int,
-	matchIndex int,
-	match *gwv1.HTTPRouteMatch,
-	gateway AgentGatewayResource,
-) *AgentRouteResource {
-
-	// Create route key
-	routeKey := fmt.Sprintf("route-%s-%d-%d-%s", route.Name, ruleIndex, matchIndex, gateway.Name)
-
-	// Create path matches
-	var matches []*api.RouteMatch
-	if match != nil && match.Path != nil {
-		pathMatch := convertPathMatch(match.Path)
-		if pathMatch != nil {
-			matches = append(matches, pathMatch)
-		}
-	} else {
-		// Default match for all paths
-		matches = append(matches, &api.RouteMatch{
-			Path: &api.PathMatch{
-				Kind: &api.PathMatch_PathPrefix{
-					PathPrefix: "/",
-				},
-			},
-		})
-	}
-
-	// Create header matches
-	if match != nil && len(match.Headers) > 0 {
-		for _, header := range match.Headers {
-			headerMatch := convertHeaderMatch(header)
-			if headerMatch != nil {
-				matches = append(matches, headerMatch)
-			}
-		}
-	}
-
-	// Create backends
-	backends := make([]*api.RouteBackend, 0)
-	for _, backend := range rule.BackendRefs {
-		backendRoutes := convertBackendRef(ctx, backend, route.Namespace)
-		backends = append(backends, backendRoutes...)
-	}
-
-	// Create filters
-	var filters []*api.RouteFilter
-	if len(rule.Filters) > 0 {
-		for _, filter := range rule.Filters {
-			routeFilter := convertHTTPFilter(filter)
-			if routeFilter != nil {
-				filters = append(filters, routeFilter)
-			}
-		}
-	}
-
-	// Create the route
-	agentRoute := &api.Route{
-		Key:         routeKey,
-		ListenerKey: gateway.Listener.Key,
-		RuleName:    fmt.Sprintf("rule-%d", ruleIndex),
-		RouteName:   fmt.Sprintf("route-%d", matchIndex),
-		Matches:     matches,
-		Filters:     filters,
-		Backends:    backends,
-	}
-
-	return &AgentRouteResource{
-		NamespacedName: types.NamespacedName{Namespace: route.Namespace, Name: route.Name},
-		Route:          agentRoute,
-		Valid:          true,
+		Krt:           krtctx,
+		RouteParents:  i.RouteParents,
+		Services:      i.Services,
+		ServicesIndex: i.ServicesIndex,
+		Namespaces:    i.Namespaces,
+		DomainSuffix:  i.DomainSuffix,
 	}
 }
 
@@ -265,68 +112,6 @@ func convertHeaderMatch(header gwv1.HTTPHeaderMatch) *api.RouteMatch {
 	// TODO: implement header matching when agentgateway API supports it
 	routeLogger.Debug("header matching not yet implemented")
 	return nil
-}
-
-// convertBackendRef converts a Gateway API backend reference to a list of agentgateway backends
-func convertBackendRef(ctx RouteContext, backend gwv1.HTTPBackendRef, routeNamespace string) []*api.RouteBackend {
-	var result []*api.RouteBackend
-
-	// Get the service name and namespace
-	serviceName := string(backend.Name)
-	serviceNamespace := routeNamespace
-	if backend.Namespace != nil {
-		serviceNamespace = string(*backend.Namespace)
-	}
-
-	// Find the service
-	services := krt.Fetch(ctx.Krt, ctx.Services)
-	var targetService *ServiceInfo
-	for _, svc := range services {
-		if svc.Service.Name == serviceName && svc.Service.Namespace == serviceNamespace {
-			targetService = &svc
-			break
-		}
-	}
-
-	if targetService == nil {
-		routeLogger.Debug("service not found for backend", "service", fmt.Sprintf("%s/%s", serviceNamespace, serviceName))
-		return nil
-	}
-
-	// Determine weight
-	weight := int32(1)
-	if backend.Weight != nil {
-		weight = *backend.Weight
-	}
-
-	svcNamespacedName := targetService.ResourceName()
-
-	// Determine port(s)
-	var port int32
-	if backend.Port != nil {
-		port = int32(*backend.Port)
-		result = append(result, &api.RouteBackend{
-			Kind: &api.RouteBackend_Service{
-				Service: svcNamespacedName,
-			},
-			Weight: weight,
-			Port:   port,
-		})
-	} else {
-		for _, svcPort := range targetService.Service.Ports {
-			if svcPort != nil {
-				result = append(result, &api.RouteBackend{
-					Kind: &api.RouteBackend_Service{
-						Service: svcNamespacedName,
-					},
-					Weight: weight,
-					Port:   int32(svcPort.ServicePort),
-				})
-			}
-		}
-	}
-
-	return result
 }
 
 // convertHTTPFilter converts a Gateway API HTTP filter to agentgateway filter

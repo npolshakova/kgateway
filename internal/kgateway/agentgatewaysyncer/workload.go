@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"google.golang.org/protobuf/types/known/anypb"
 	"istio.io/istio/pilot/pkg/serviceregistry/kube"
@@ -22,17 +21,7 @@ import (
 	"istio.io/istio/pkg/util/sets"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
-)
-
-// Local tunnel protocol constants to avoid protobuf namespace conflict
-const (
-	TunnelProtocolNone  = 0
-	TunnelProtocolHBone = 1
 )
 
 // WorkloadConfig represents the configuration for creating a workload
@@ -61,85 +50,6 @@ type ServicePortConfig struct {
 // generatePodUID generates a UID for a pod following the Istio pattern
 func generatePodUID(clusterID string, namespace, name string) string {
 	return clusterID + "//" + "Pod/" + namespace + "/" + name
-}
-
-// generatePodUIDFromPod generates a UID for a pod following the Istio pattern
-func generatePodUIDFromPod(clusterID string, p *corev1.Pod) string {
-	return generatePodUID(clusterID, p.Namespace, p.Name)
-}
-
-// getWorkloadStatus determines the health status of a workload
-func getWorkloadStatus(ready bool, deletionTimestamp *metav1.Time) api.WorkloadStatus {
-	if !ready || deletionTimestamp != nil {
-		return api.WorkloadStatus_UNHEALTHY
-	}
-	return api.WorkloadStatus_HEALTHY
-}
-
-// createWorkloadResource creates a single workload resource from configuration
-func createWorkloadResource(config WorkloadConfig) envoytypes.Resource {
-	fmt.Printf("DEBUG: createWorkloadResource called with config %+v\n", config)
-
-	// Convert service configurations to PortList
-	services := make(map[string]*api.PortList)
-	for serviceKey, portConfig := range config.Services {
-		services[serviceKey] = &api.PortList{
-			Ports: []*api.Port{
-				{
-					ServicePort: portConfig.ServicePort,
-					TargetPort:  portConfig.TargetPort,
-					AppProtocol: portConfig.AppProtocol,
-				},
-			},
-		}
-	}
-
-	workload := &api.Workload{
-		Uid:            config.UID,
-		Name:           config.Name,
-		Namespace:      config.Namespace,
-		ServiceAccount: config.ServiceAccount,
-		// Addresses:      addresses, // Temporarily removed to fix parsing error
-		TunnelProtocol: api.TunnelProtocol(config.TunnelProtocol),
-		Node:           config.Node,
-		Network:        config.Network,
-		WorkloadType:   config.WorkloadType,
-		Status:         config.Status,
-		NetworkMode:    config.NetworkMode,
-		Services:       services,
-		ClusterId:      "cluster1",      // TODO: make configurable
-		TrustDomain:    "cluster.local", // TODO: make configurable
-	}
-
-	addressResource := &api.Address{
-		Type: &api.Address_Workload{
-			Workload: workload,
-		},
-	}
-
-	result := &envoyResourceWithCustomName{
-		Message: addressResource,
-		Name:    config.UID,
-		version: utils.HashProto(addressResource),
-	}
-
-	fmt.Printf("DEBUG: Successfully created workload resource with name %s\n", result.Name)
-	return result
-}
-
-// selectedWorkload adds the following to LocalityPod:
-// * fields specific to workload entry (portMapping, network, weight)
-// Usable with FilterSelect
-type selectedWorkload struct {
-	// the workload that is selected
-	krtcollections.LocalityPod
-
-	// workload entry has workload-level port mappings
-	portMapping map[string]uint32
-	// network id (istio concept of network)
-	network string
-	// weight from workloadentry
-	weight uint32
 }
 
 // TargetRef is a subset of the Kubernetes ObjectReference which has some fields we don't care about

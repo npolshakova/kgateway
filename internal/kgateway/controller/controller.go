@@ -108,7 +108,7 @@ func NewBaseInferencePoolController(ctx context.Context, poolCfg *InferencePoolC
 	log := log.FromContext(ctx)
 	log.V(5).Info("starting inferencepool controller", "controllerName", poolCfg.ControllerName)
 
-	// TODO [danehans]: Make GatewayConfig optional since Gateway and InferencePool are independent controllers.
+	// TODO [danehans]: Make ResourceConfig optional since Gateway and InferencePool are independent controllers.
 	controllerBuilder := &controllerBuilder{
 		cfg:     *gwCfg,
 		poolCfg: poolCfg,

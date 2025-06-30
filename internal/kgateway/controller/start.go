@@ -9,6 +9,7 @@ import (
 
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	istiokube "istio.io/istio/pkg/kube"
+	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
 	istiolog "istio.io/istio/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	v1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
@@ -194,6 +196,12 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	proxySyncer.Init(ctx, cfg.KrtOptions)
 
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
+		httprouteClient := kclient.NewFiltered[*v1.HTTPRoute](
+			cfg.Client,
+			kclient.Filter{ObjectFilter: cfg.Client.ObjectFilter()},
+		)
+		httprouteCol := krt.WrapClient(httprouteClient, cfg.KrtOptions.ToOptions("HTTPRoute")...)
+
 		agentGatewaySyncer := agentgatewaysyncer.NewAgentGwSyncer(
 			ctx,
 			cfg.ControllerName,
@@ -202,6 +210,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			commoncol,
 			cfg.SetupOpts.Cache,
 			cfg.Client.ClusterID().String(),
+			httprouteCol,
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)
 
