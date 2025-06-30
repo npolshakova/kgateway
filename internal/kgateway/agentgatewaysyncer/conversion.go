@@ -1,7 +1,6 @@
 package agentgatewaysyncer
 
 import (
-	"cmp"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -24,7 +23,6 @@ import (
 
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/api/annotation"
-	"istio.io/api/label"
 	istio "istio.io/api/networking/v1alpha3"
 	kubecreds "istio.io/istio/pilot/pkg/credentials/kube"
 	"istio.io/istio/pilot/pkg/features"
@@ -47,18 +45,6 @@ import (
 const (
 	gatewayTLSTerminateModeKey = "gateway.agentgateway.io/tls-terminate-mode"
 )
-
-func sortRoutesByCreationTime(configs []RouteWithKey) {
-	sort.Slice(configs, func(i, j int) bool {
-		if r := configs[i].CreationTimestamp.Compare(configs[j].CreationTimestamp); r != 0 {
-			return r == -1 // -1 means i is less than j, so return true
-		}
-		if r := cmp.Compare(configs[i].Namespace, configs[j].Namespace); r != 0 {
-			return r == -1
-		}
-		return cmp.Compare(configs[i].Name, configs[j].Name) == -1
-	})
-}
 
 func convertHTTPRouteToADP(ctx RouteContext, r k8s.HTTPRouteRule,
 	obj *k8sbeta.HTTPRoute, pos int, matchPos int,
@@ -292,304 +278,6 @@ func buildADPDestination(
 	return rb, invalidBackendErr
 }
 
-func convertHTTPRoute(ctx RouteContext, r k8s.HTTPRouteRule,
-	obj *k8sbeta.HTTPRoute, pos int,
-) (*istio.HTTPRoute, *ConfigError) {
-	vs := &istio.HTTPRoute{}
-	if r.Name != nil {
-		vs.Name = string(*r.Name)
-	} else {
-		// Auto-name the route. If upstream defines an explicit name, will use it instead
-		// The position within the route is unique
-		vs.Name = obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) // format: %s.%s.%d
-	}
-
-	for _, match := range r.Matches {
-		uri, err := createURIMatch(match)
-		if err != nil {
-			return nil, err
-		}
-		headers, err := createHeadersMatch(match)
-		if err != nil {
-			return nil, err
-		}
-		qp, err := createQueryParamsMatch(match)
-		if err != nil {
-			return nil, err
-		}
-		method, err := createMethodMatch(match)
-		if err != nil {
-			return nil, err
-		}
-		vs.Match = append(vs.GetMatch(), &istio.HTTPMatchRequest{
-			Uri:         uri,
-			Headers:     headers,
-			QueryParams: qp,
-			Method:      method,
-		})
-	}
-	var mirrorBackendErr *ConfigError
-	for _, filter := range r.Filters {
-		switch filter.Type {
-		case k8s.HTTPRouteFilterRequestHeaderModifier:
-			h := createHeadersFilter(filter.RequestHeaderModifier)
-			if h == nil {
-				continue
-			}
-			if vs.GetHeaders() == nil {
-				vs.Headers = &istio.Headers{}
-			}
-			vs.GetHeaders().Request = h
-		case k8s.HTTPRouteFilterResponseHeaderModifier:
-			h := createHeadersFilter(filter.ResponseHeaderModifier)
-			if h == nil {
-				continue
-			}
-			if vs.GetHeaders() == nil {
-				vs.Headers = &istio.Headers{}
-			}
-			vs.GetHeaders().Response = h
-		case k8s.HTTPRouteFilterRequestRedirect:
-			vs.Redirect = createRedirectFilter(filter.RequestRedirect)
-		case k8s.HTTPRouteFilterRequestMirror:
-			mirror, err := createMirrorFilter(ctx, filter.RequestMirror, obj.Namespace, wellknown.HTTPRouteGVK)
-			if err != nil {
-				mirrorBackendErr = err
-			} else {
-				vs.Mirrors = append(vs.GetMirrors(), mirror)
-			}
-		case k8s.HTTPRouteFilterURLRewrite:
-			vs.Rewrite = createRewriteFilter(filter.URLRewrite)
-		case k8s.HTTPRouteFilterCORS:
-			vs.CorsPolicy = createCorsFilter(filter.CORS)
-		default:
-			return nil, &ConfigError{
-				Reason:  InvalidFilter,
-				Message: fmt.Sprintf("unsupported filter type %q", filter.Type),
-			}
-		}
-	}
-
-	if r.Retry != nil {
-		// "Implementations SHOULD retry on connection errors (disconnect, reset, timeout,
-		// TCP failure) if a retry stanza is configured."
-		retryOn := []string{"connect-failure", "refused-stream", "unavailable", "cancelled"}
-		for _, codes := range r.Retry.Codes {
-			retryOn = append(retryOn, strconv.Itoa(int(codes)))
-		}
-		vs.Retries = &istio.HTTPRetry{
-			// If unset, default is implementation specific.
-			// VirtualService.retry has no default when set -- users are expected to set it if they customize `retry`.
-			// However, the default retry if none are set is "2", so we use that as the default.
-			Attempts:      int32(ptr.OrDefault(r.Retry.Attempts, 2)),
-			PerTryTimeout: nil,
-			RetryOn:       strings.Join(retryOn, ","),
-		}
-		if vs.GetRetries().GetAttempts() == 0 {
-			// Invalid to set this when there are no attempts
-			vs.GetRetries().RetryOn = ""
-		}
-		//if r.Retry.Backoff != nil {
-		//	retrybackOff, _ := time.ParseDuration(string(*r.Retry.Backoff))
-		//	vs.Retries.Backoff = durationpb.New(retrybackOff)
-		//}
-	}
-
-	if r.Timeouts != nil {
-		if r.Timeouts.Request != nil {
-			request, _ := time.ParseDuration(string(*r.Timeouts.Request))
-			if request != 0 {
-				vs.Timeout = durationpb.New(request)
-			}
-		}
-		if r.Timeouts.BackendRequest != nil {
-			backendRequest, _ := time.ParseDuration(string(*r.Timeouts.BackendRequest))
-			if backendRequest != 0 {
-				timeout := durationpb.New(backendRequest)
-				if vs.GetRetries() != nil {
-					vs.GetRetries().PerTryTimeout = timeout
-				} else {
-					vs.Timeout = timeout
-				}
-			}
-		}
-	}
-	if weightSum(r.BackendRefs) == 0 && vs.GetRedirect() == nil {
-		// The spec requires us to return 500 when there are no >0 weight backends
-		vs.DirectResponse = &istio.HTTPDirectResponse{
-			Status: 500,
-		}
-	} else {
-		route, backendErr, err := buildHTTPDestination(ctx, r.BackendRefs, obj.Namespace)
-		if err != nil {
-			return nil, err
-		}
-		vs.Route = route
-		return vs, joinErrors(backendErr, mirrorBackendErr)
-	}
-
-	return vs, mirrorBackendErr
-}
-
-func joinErrors(a *ConfigError, b *ConfigError) *ConfigError {
-	if b == nil {
-		return a
-	}
-	if a == nil {
-		return b
-	}
-	a.Message += "; " + b.Message
-	return a
-}
-
-func convertGRPCRoute(ctx RouteContext, r k8s.GRPCRouteRule,
-	obj *k8s.GRPCRoute, pos int,
-) (*istio.HTTPRoute, *ConfigError) {
-	vs := &istio.HTTPRoute{}
-	if r.Name != nil {
-		vs.Name = string(*r.Name)
-	} else {
-		// Auto-name the route. If upstream defines an explicit name, will use it instead
-		// The position within the route is unique
-		vs.Name = obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) // format:%s.%s.%d
-	}
-
-	for _, match := range r.Matches {
-		uri, err := createGRPCURIMatch(match)
-		if err != nil {
-			return nil, err
-		}
-		headers, err := createGRPCHeadersMatch(match)
-		if err != nil {
-			return nil, err
-		}
-		vs.Match = append(vs.GetMatch(), &istio.HTTPMatchRequest{
-			Uri:     uri,
-			Headers: headers,
-		})
-	}
-	for _, filter := range r.Filters {
-		switch filter.Type {
-		case k8s.GRPCRouteFilterRequestHeaderModifier:
-			h := createHeadersFilter(filter.RequestHeaderModifier)
-			if h == nil {
-				continue
-			}
-			if vs.GetHeaders() == nil {
-				vs.Headers = &istio.Headers{}
-			}
-			vs.GetHeaders().Request = h
-		case k8s.GRPCRouteFilterResponseHeaderModifier:
-			h := createHeadersFilter(filter.ResponseHeaderModifier)
-			if h == nil {
-				continue
-			}
-			if vs.GetHeaders() == nil {
-				vs.Headers = &istio.Headers{}
-			}
-			vs.GetHeaders().Response = h
-		case k8s.GRPCRouteFilterRequestMirror:
-			mirror, err := createMirrorFilter(ctx, filter.RequestMirror, obj.Namespace, wellknown.GRPCRouteGVK)
-			if err != nil {
-				return nil, err
-			}
-			vs.Mirrors = append(vs.GetMirrors(), mirror)
-		default:
-			return nil, &ConfigError{
-				Reason:  InvalidFilter,
-				Message: fmt.Sprintf("unsupported filter type %q", filter.Type),
-			}
-		}
-	}
-
-	if grpcWeightSum(r.BackendRefs) == 0 && vs.GetRedirect() == nil {
-		// The spec requires us to return 500 when there are no >0 weight backends
-		vs.DirectResponse = &istio.HTTPDirectResponse{
-			Status: 500,
-		}
-	} else {
-		route, backendErr, err := buildGRPCDestination(ctx, r.BackendRefs, obj.Namespace)
-		if err != nil {
-			return nil, err
-		}
-		vs.Route = route
-		return vs, backendErr
-	}
-
-	return vs, nil
-}
-
-func routeMeta(obj controllers.Object) map[string]string {
-	m := parentMeta(obj, nil)
-	m[constants.InternalRouteSemantics] = constants.RouteSemanticsGateway
-	return m
-}
-
-// sortHTTPRoutes sorts generated vs routes to meet gateway-api requirements
-// see https://gateway-api.sigs.k8s.io/v1alpha2/references/spec/#gateway.networking.k8s.io/v1alpha2.HTTPRouteRule
-func sortHTTPRoutes(routes []*istio.HTTPRoute) {
-	sort.SliceStable(routes, func(i, j int) bool {
-		if len(routes[i].GetMatch()) == 0 {
-			return false
-		} else if len(routes[j].GetMatch()) == 0 {
-			return true
-		}
-		// Only look at match[0], we always generate only one match
-		m1, m2 := routes[i].GetMatch()[0], routes[j].GetMatch()[0]
-		r1, r2 := getURIRank(m1), getURIRank(m2)
-		len1, len2 := getURILength(m1), getURILength(m2)
-		switch {
-		// 1: Exact/Prefix/Regex
-		case r1 != r2:
-			return r1 > r2
-		case len1 != len2:
-			return len1 > len2
-			// 2: method math
-		case (m1.GetMethod() == nil) != (m2.GetMethod() == nil):
-			return m1.GetMethod() != nil
-			// 3: number of header matches
-		case len(m1.GetHeaders()) != len(m2.GetHeaders()):
-			return len(m1.GetHeaders()) > len(m2.GetHeaders())
-			// 4: number of query matches
-		default:
-			return len(m1.GetQueryParams()) > len(m2.GetQueryParams())
-		}
-	})
-}
-
-// getURIRank ranks a URI match type. Exact > Prefix > Regex
-func getURIRank(match *istio.HTTPMatchRequest) int {
-	if match.GetUri() == nil {
-		return -1
-	}
-	switch match.GetUri().GetMatchType().(type) {
-	case *istio.StringMatch_Exact:
-		return 3
-	case *istio.StringMatch_Prefix:
-		return 2
-	case *istio.StringMatch_Regex:
-		return 1
-	}
-	// should not happen
-	return -1
-}
-
-func getURILength(match *istio.HTTPMatchRequest) int {
-	if match.GetUri() == nil {
-		return 0
-	}
-	switch match.GetUri().GetMatchType().(type) {
-	case *istio.StringMatch_Prefix:
-		return len(match.GetUri().GetPrefix())
-	case *istio.StringMatch_Exact:
-		return len(match.GetUri().GetExact())
-	case *istio.StringMatch_Regex:
-		return len(match.GetUri().GetRegex())
-	}
-	// should not happen
-	return -1
-}
-
 func parentMeta(obj controllers.Object, sectionName *k8s.SectionName) map[string]string {
 	name := fmt.Sprintf("%s/%s.%s", schematypes.GvkFromObject(obj).Kind, obj.GetName(), obj.GetNamespace())
 	if sectionName != nil {
@@ -598,16 +286,6 @@ func parentMeta(obj controllers.Object, sectionName *k8s.SectionName) map[string
 	return map[string]string{
 		constants.InternalParentNames: name,
 	}
-}
-
-func hostnameToStringList(h []k8s.Hostname) []string {
-	// In the Istio API, empty hostname is not allowed. In the Kubernetes API hosts means "any"
-	if len(h) == 0 {
-		return []string{"*"}
-	}
-	return slices.Map(h, func(e k8s.Hostname) string {
-		return string(e)
-	})
 }
 
 var allowedParentReferences = sets.New(
@@ -650,14 +328,6 @@ func toInternalParentReference(p k8s.ParentReference, localNamespace string) (pa
 		// Unset namespace means "same namespace"
 		Namespace: defaultString(p.Namespace, localNamespace),
 	}, nil
-}
-
-// waypointConfigured returns true if a waypoint is configured via expected label's key-value pair.
-func waypointConfigured(labels map[string]string) bool {
-	if val, ok := labels[label.IoIstioUseWaypoint.Name]; ok && len(val) > 0 && !strings.EqualFold(val, "none") {
-		return true
-	}
-	return false
 }
 
 func referenceAllowed(
@@ -2020,5 +1690,5 @@ func routeGroupKindEqual(rgk1, rgk2 k8s.RouteGroupKind) bool {
 }
 
 func getGroup(rgk k8s.RouteGroupKind) k8s.Group {
-	return ptr.OrDefault(rgk.Group, k8s.Group(wellknown.GatewayGroup))
+	return ptr.OrDefault(rgk.Group, wellknown.GatewayGroup)
 }

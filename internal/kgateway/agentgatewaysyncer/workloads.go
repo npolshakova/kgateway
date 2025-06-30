@@ -701,7 +701,7 @@ func setTunnelProtocol(labels, annotations map[string]string, w *api.Workload) {
 		w.NativeTunnel = true
 	}
 	if w.TunnelProtocol == api.TunnelProtocol_NONE &&
-		GetTLSModeFromEndpointLabels(labels) == IstioMutualTLSModeLabel {
+		GetTLSModeFromEndpointLabels(labels) == MutualTLSModeLabel {
 		w.TunnelProtocol = api.TunnelProtocol_LEGACY_ISTIO_MTLS
 	}
 }

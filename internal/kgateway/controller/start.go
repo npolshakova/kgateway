@@ -32,7 +32,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/proxy_syncer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
-	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
@@ -213,11 +212,9 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
 		domainSuffix := "cluster.local" // TODO: don't hard code
 		agentGatewaySyncer := agentgatewaysyncer.NewAgentGwSyncer(
-			ctx,
 			cfg.ControllerName,
-			cfg.AgentGatewayClassName,
-			mgr,
 			cfg.Client,
+			cfg.UniqueClients,
 			commoncol,
 			cfg.SetupOpts.Cache,
 			domainSuffix,

@@ -31,7 +31,6 @@ import (
 	"istio.io/istio/pkg/config/visibility"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/maps"
-	pm "istio.io/istio/pkg/model"
 	"istio.io/istio/pkg/slices"
 	"istio.io/istio/pkg/util/protomarshal"
 	"istio.io/istio/pkg/util/sets"
@@ -370,7 +369,7 @@ const (
 	//   negotiation for QUIC vs TCP.
 	// Users should appropriately parse the full list rather than doing a string literal check to
 	// ensure future-proofing against new protocols being added.
-	TunnelLabel = "networking.istio.io/tunnel"
+	TunnelLabel = "networking.agentgateway.io/tunnel"
 	// TunnelLabelShortName is a short name for TunnelLabel to be used in optimized scenarios.
 	TunnelLabelShortName = "tunnel"
 	// TunnelHTTP indicates tunneling over HTTP over TCP. HTTP/2 vs HTTP/1.1 may be supported by ALPN
@@ -380,14 +379,11 @@ const (
 )
 
 const (
-	// TLSModeLabelShortname name used for determining endpoint level tls transport socket configuration
-	TLSModeLabelShortname = "tlsMode"
-
 	// DisabledTLSModeLabel implies that this endpoint should receive traffic as is (mostly plaintext)
 	DisabledTLSModeLabel = "disabled"
 
-	// IstioMutualTLSModeLabel implies that the endpoint is ready to receive Istio mTLS connections.
-	IstioMutualTLSModeLabel = "istio"
+	// MutualTLSModeLabel implies that the endpoint is ready to receive agent mTLS connections.
+	MutualTLSModeLabel = "mtls"
 )
 
 func SupportsTunnel(labels map[string]string, tunnelType string) bool {
@@ -427,23 +423,6 @@ func (p Port) String() string {
 // PortList is a set of ports
 type PortList []*Port
 
-// TrafficDirection defines whether traffic exists a service instance or enters a service instance
-type TrafficDirection string
-
-const (
-	// TrafficDirectionInbound indicates inbound traffic
-	TrafficDirectionInbound TrafficDirection = "inbound"
-	// TrafficDirectionInboundVIP indicates inbound traffic for vip
-	TrafficDirectionInboundVIP TrafficDirection = "inbound-vip"
-	// TrafficDirectionOutbound indicates outbound traffic
-	TrafficDirectionOutbound TrafficDirection = "outbound"
-
-	// trafficDirectionOutboundSrvPrefix the prefix for a DNS SRV type subset key
-	trafficDirectionOutboundSrvPrefix = string(TrafficDirectionOutbound) + "_"
-	// trafficDirectionInboundSrvPrefix the prefix for a DNS SRV type subset key
-	trafficDirectionInboundSrvPrefix = string(TrafficDirectionInbound) + "_"
-)
-
 // ServiceTarget includes a Service object, along with a specific service port
 // and target port. This is basically a smaller version of ServiceInstance,
 // intended to avoid the need to have the full object when only port information
@@ -481,21 +460,6 @@ func (k workloadKind) String() string {
 		return "WorkloadEntry"
 	}
 	return ""
-}
-
-// GetLocalityLabel returns the locality from the supplied label. Because Kubernetes
-// labels don't support `/`, we replace "." with "/" in the supplied label as a workaround.
-func GetLocalityLabel(label string) string {
-	return pm.GetLocalityLabel(label)
-}
-
-// Locality information for an IstioEndpoint
-type Locality struct {
-	// Label for locality on the endpoint. This is a "/" separated string.
-	Label string
-
-	// ClusterID where the endpoint is located
-	ClusterID cluster.ID
 }
 
 // ServiceAttributes represents a group of custom attributes of the service.
