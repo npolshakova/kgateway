@@ -1,4 +1,4 @@
-package agentgatewaysyncer
+package gateway
 
 import (
 	"context"

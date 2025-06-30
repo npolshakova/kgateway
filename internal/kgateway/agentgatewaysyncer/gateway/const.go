@@ -1,4 +1,4 @@
-package agentgatewaysyncer
+package gateway
 
 const (
 	TargetTypeResourceUrl = "type.googleapis.com/istio.adp.Resource"

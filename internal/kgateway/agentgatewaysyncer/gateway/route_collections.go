@@ -1,17 +1,3 @@
-// Copyright Istio Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package gateway
 
 import (
@@ -19,7 +5,10 @@ import (
 	"iter"
 	"strings"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -42,9 +31,9 @@ import (
 func HTTPRouteCollection(
 	httpRoutes krt.Collection[*gateway.HTTPRoute],
 	inputs RouteContextInputs,
-	opts krt.OptionsBuilder,
+	krtopts krtutil.KrtOptions,
 ) RouteResult[*gateway.HTTPRoute, gateway.HTTPRouteStatus] {
-	routeCount := gatewayRouteAttachmentCountCollection(inputs, httpRoutes, gvk.HTTPRoute, opts)
+	routeCount := gatewayRouteAttachmentCountCollection(inputs, httpRoutes, wellknown.HTTPRouteGVK, krtopts)
 	baseVirtualServices := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gateway.HTTPRoute) []RouteWithKey {
 		ctx := inputs.WithCtx(krtctx)
 		route := obj.Spec
@@ -110,9 +99,9 @@ func HTTPRouteCollection(
 			}
 		}
 		return virtualServices
-	}, opts.WithName("HTTPRoute")...)
+	}, krtopts.ToOptions("HTTPRoute")...)
 
-	finalVirtualServices := mergeHTTPRoutes(baseVirtualServices, opts.WithName("HTTPRouteMerged")...)
+	finalVirtualServices := mergeHTTPRoutes(baseVirtualServices, krtopts.ToOptions("HTTPRouteMerged")...)
 	return RouteResult[*gateway.HTTPRoute, gateway.HTTPRouteStatus]{
 		VirtualServices:  finalVirtualServices,
 		RouteAttachments: routeCount,
@@ -122,7 +111,7 @@ func HTTPRouteCollection(
 func ADPRouteCollection(
 	httpRoutes krt.Collection[*gateway.HTTPRoute],
 	inputs RouteContextInputs,
-	opts krt.OptionsBuilder,
+	krtopts krtutil.KrtOptions,
 ) krt.Collection[ADPResource] {
 	routes := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gateway.HTTPRoute) []ADPResource {
 		ctx := inputs.WithCtx(krtctx)
@@ -169,7 +158,7 @@ func ADPRouteCollection(
 			})...)
 		}
 		return res
-	}, opts.WithName("ADPRoutes")...)
+	}, krtopts.ToOptions("ADPRoutes")...)
 
 	return routes
 }
@@ -485,8 +474,8 @@ func (r *RouteAttachment) Equals(other RouteAttachment) bool {
 func gatewayRouteAttachmentCountCollection[T controllers.Object](
 	inputs RouteContextInputs,
 	col krt.Collection[T],
-	kind config.GroupVersionKind,
-	opts krt.OptionsBuilder,
+	kind schema.GroupVersionKind,
+	krtopts krtutil.KrtOptions,
 ) krt.Collection[*RouteAttachment] {
 	return krt.NewManyCollection(col, func(krtctx krt.HandlerContext, obj T) []*RouteAttachment {
 		ctx := inputs.WithCtx(krtctx)
@@ -497,7 +486,7 @@ func gatewayRouteAttachmentCountCollection[T controllers.Object](
 
 		parentRefs := extractParentReferenceInfo(ctx, inputs.RouteParents, obj)
 		return slices.MapFilter(filteredReferences(parentRefs), func(e routeParentReference) **RouteAttachment {
-			if e.ParentKey.Kind != gvk.KubernetesGateway {
+			if e.ParentKey.Kind != wellknown.GatewayGVK {
 				return nil
 			}
 			return ptr.Of(&RouteAttachment{
@@ -509,7 +498,7 @@ func gatewayRouteAttachmentCountCollection[T controllers.Object](
 				ListenerName: string(e.ParentSection),
 			})
 		})
-	}, opts.WithName(kind.Kind+"/count")...)
+	}, krtopts.ToOptions(kind.Kind+"/count")...)
 }
 
 // mergeHTTPRoutes merges HTTProutes by key. Gateway API has semantics for the ordering of `match` rules, that merges across resource.

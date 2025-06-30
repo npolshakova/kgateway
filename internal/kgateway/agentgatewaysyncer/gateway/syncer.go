@@ -1,25 +1,22 @@
-package agentgatewaysyncer
+package gateway
 
 import (
 	"context"
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/gateway"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"google.golang.org/protobuf/proto"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pilot/pkg/features"
-	"istio.io/istio/pkg/config/schema/gvr"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/kclient"
@@ -27,10 +24,13 @@ import (
 	"istio.io/istio/pkg/kube/kubetypes"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayalpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -40,9 +40,10 @@ var logger = logging.New("agentgateway/syncer")
 type AgentGwSyncer struct {
 	commonCols     *common.CommonCollections
 	controllerName string
-	xDS            krt.Collection[agentGwXdsResources]
+	xDS            krt.Collection[ADPResource]
 	xdsCache       envoycache.SnapshotCache
-	istioClient    kube.Client
+	client         kube.Client
+	domainSuffix   string
 
 	waitForSync []cache.InformerSynced
 }
@@ -61,7 +62,7 @@ func NewAgentGwSyncer(
 		controllerName: controllerName,
 		xdsCache:       xdsCache,
 		// mgr:            mgr,
-		istioClient: client,
+		client: client,
 	}
 }
 
@@ -146,41 +147,59 @@ func (r report) Equals(in report) bool {
 		maps.Equal(r.reportMap.TCPRoutes, in.reportMap.TCPRoutes)
 }
 
+type Inputs struct {
+	Namespaces krt.Collection[*corev1.Namespace]
+
+	Services krt.Collection[*corev1.Service]
+	Secrets  krt.Collection[*corev1.Secret]
+
+	GatewayClasses  krt.Collection[*gateway.GatewayClass]
+	Gateways        krt.Collection[*gateway.Gateway]
+	HTTPRoutes      krt.Collection[*gateway.HTTPRoute]
+	GRPCRoutes      krt.Collection[*gatewayv1.GRPCRoute]
+	TCPRoutes       krt.Collection[*gatewayalpha.TCPRoute]
+	TLSRoutes       krt.Collection[*gatewayalpha.TLSRoute]
+	ReferenceGrants krt.Collection[*gateway.ReferenceGrant]
+	ServiceEntries  krt.Collection[*networkingclient.ServiceEntry]
+	InferencePools  krt.Collection[*inf.InferencePool]
+}
+
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	logger.Debug("init agentgateway Syncer", "controllername", s.controllerName)
 
-	inputs := gateway.Inputs{
-		Namespaces: krt.NewInformer[*corev1.Namespace](s.istioClient),
+	inputs := Inputs{
+		Namespaces: krt.NewInformer[*corev1.Namespace](s.client),
 		Secrets: krt.WrapClient[*corev1.Secret](
-			kclient.NewFiltered[*corev1.Secret](s.istioClient, kubetypes.Filter{
+			kclient.NewFiltered[*corev1.Secret](s.client, kubetypes.Filter{
 				//FieldSelector: kubesecrets.SecretsFieldSelector,
-				ObjectFilter: s.istioClient.ObjectFilter(),
+				ObjectFilter: s.client.ObjectFilter(),
 			}),
 		),
 		Services: krt.WrapClient[*corev1.Service](
-			kclient.NewFiltered[*corev1.Service](s.istioClient, kubetypes.Filter{ObjectFilter: s.istioClient.ObjectFilter()}),
+			kclient.NewFiltered[*corev1.Service](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}),
 		),
-		GatewayClasses: buildClient[*gateway.GatewayClass](c, kc, gvr.GatewayClass, opts, "informer/GatewayClasses"),
-		Gateways:       buildClient[*gateway.Gateway](c, kc, gvr.KubernetesGateway, opts, "informer/Gateways"),
-		HTTPRoutes:     buildClient[*gateway.HTTPRoute](c, kc, gvr.HTTPRoute, opts, "informer/HTTPRoutes"),
-		GRPCRoutes:     buildClient[*gatewayv1.GRPCRoute](c, kc, gvr.GRPCRoute, opts, "informer/GRPCRoutes"),
 
-		ReferenceGrants: buildClient[*gateway.ReferenceGrant](c, kc, gvr.ReferenceGrant, opts, "informer/ReferenceGrants"),
-		ServiceEntries:  buildClient[*networkingclient.ServiceEntry](c, kc, gvr.ServiceEntry, opts, "informer/ServiceEntries"),
-		//InferencePools:  buildClient[*inf.InferencePool](c, kc, gvr.InferencePool, opts, "informer/InferencePools"),
+		GatewayClasses: krt.WrapClient(kclient.New[*gateway.GatewayClass](s.client), krtopts.ToOptions("informer/GatewayClasses")...),
+		Gateways:       krt.WrapClient(kclient.New[*gateway.Gateway](s.client), krtopts.ToOptions("informer/Gateways")...),
+		HTTPRoutes:     krt.WrapClient(kclient.New[*gateway.HTTPRoute](s.client), krtopts.ToOptions("informer/HTTPRoutes")...),
+		GRPCRoutes:     krt.WrapClient(kclient.New[*gatewayv1.GRPCRoute](s.client), krtopts.ToOptions("informer/GRPCRoutes")...),
+
+		ReferenceGrants: krt.WrapClient(kclient.New[*gateway.ReferenceGrant](s.client), krtopts.ToOptions("informer/ReferenceGrants")...),
+		ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
+		InferencePools:  krt.WrapClient(kclient.New[*inf.InferencePool](s.client), krtopts.ToOptions("informer/InferencePools")...),
 	}
 	if features.EnableAlphaGatewayAPI {
-		inputs.TCPRoutes = buildClient[*gatewayalpha.TCPRoute](c, kc, gvr.TCPRoute, opts, "informer/TCPRoutes")
-		inputs.TLSRoutes = buildClient[*gatewayalpha.TLSRoute](c, kc, gvr.TLSRoute, opts, "informer/TLSRoutes")
+		inputs.TCPRoutes = krt.WrapClient(kclient.New[*gatewayalpha.TCPRoute](s.client), krtopts.ToOptions("informer/TCPRoutes")...)
+		inputs.TLSRoutes = krt.WrapClient(kclient.New[*gatewayalpha.TLSRoute](s.client), krtopts.ToOptions("informer/TLSRoutes")...)
 	} else {
 		// If disabled, still build a collection but make it always empty
-		inputs.TCPRoutes = krt.NewStaticCollection[*gatewayalpha.TCPRoute](nil, opts.WithName("disable/TCPRoutes")...)
-		inputs.TLSRoutes = krt.NewStaticCollection[*gatewayalpha.TLSRoute](nil, opts.WithName("disable/TLSRoutes")...)
+		inputs.TCPRoutes = krt.NewStaticCollection[*gatewayalpha.TCPRoute](nil, krtopts.ToOptions("disable/TCPRoutes")...)
+		inputs.TLSRoutes = krt.NewStaticCollection[*gatewayalpha.TLSRoute](nil, krtopts.ToOptions("disable/TLSRoutes")...)
 	}
 
-	GatewayClasses := gateway.GatewayClassesCollection(inputs.GatewayClasses, opts)
+	GatewayClasses := GatewayClassesCollection(inputs.GatewayClasses, krtopts)
 
-	RefGrants := BuildReferenceGrants(ReferenceGrantsCollection(inputs.ReferenceGrants, opts))
+	RefGrants := BuildReferenceGrants(ReferenceGrantsCollection(inputs.ReferenceGrants, krtopts))
 
 	// Note: not fully complete until its join with route attachments to report attachedRoutes.
 	// Do not register yet.
@@ -190,8 +209,8 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		inputs.Namespaces,
 		RefGrants,
 		inputs.Secrets,
-		options.DomainSuffix,
-		opts,
+		s.domainSuffix,
+		krtopts,
 	)
 	ports := krt.NewCollection(Gateways, func(ctx krt.HandlerContext, obj Gateway) *IndexObject[string, Gateway] {
 		port := fmt.Sprint(obj.parentInfo.Port)
@@ -199,7 +218,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 			Key:     port,
 			Objects: []Gateway{obj},
 		}
-	}, opts.WithName("ports")...)
+	}, krtopts.ToOptions("ports")...)
 
 	Binds := krt.NewManyCollection(ports, func(ctx krt.HandlerContext, object IndexObject[string, Gateway]) []ADPResource {
 		port, _ := strconv.Atoi(object.Key)
@@ -210,18 +229,20 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 				Name:      gw.parent.Name,
 			})
 		}
-		return slices.Map(uniq.UnsortedList(), func(e types.NamespacedName) ADPResource {
+		var binds []ADPResource
+		for _, obj := range uniq.UnsortedList() {
 			bind := Bind{
 				Bind: &api.Bind{
-					Key:  object.Key + "/" + e.String(),
+					Key:  object.Key + "/" + obj.String(),
 					Port: uint32(port),
 				},
 			}
-			return toResource(e, bind)
-		})
-	}, opts.WithName("Binds")...)
+			binds = append(binds, toResource(obj, bind))
+		}
+		return binds
+	}, krtopts.ToOptions("Binds")...)
 
-	Listeners := krt.NewCollection(Gateways, func(ctx krt.HandlerContext, obj gateway.Gateway) *gateway.ADPResource {
+	Listeners := krt.NewCollection(Gateways, func(ctx krt.HandlerContext, obj Gateway) *ADPResource {
 		l := &api.Listener{
 			Key:         obj.ResourceName(),
 			Name:        string(obj.parentInfo.SectionName),
@@ -259,29 +280,41 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		return toResourcep(types.NamespacedName{
 			Namespace: obj.parent.Namespace,
 			Name:      obj.parent.Name,
-		}, gateway.ADPListener{l})
-	}, krtopts.WithName("Listeners")...)
+		}, ADPListener{l})
+	}, krtopts.ToOptions("Listeners")...)
 
-	routeParents := gateway.BuildRouteParents(Gateways)
+	routeParents := BuildRouteParents(Gateways)
 
-	routeInputs := gateway.RouteContextInputs{
+	routeInputs := RouteContextInputs{
 		Grants:         RefGrants,
 		RouteParents:   routeParents,
-		DomainSuffix:   options.DomainSuffix,
+		DomainSuffix:   s.domainSuffix,
 		Services:       inputs.Services,
 		Namespaces:     inputs.Namespaces,
 		ServiceEntries: inputs.ServiceEntries,
 		InferencePools: inputs.InferencePools,
 	}
-	ADPRoutes := gateway.ADPRouteCollection(
+	ADPRoutes := ADPRouteCollection(
 		inputs.HTTPRoutes,
 		routeInputs,
-		opts,
+		krtopts,
 	)
+	//httpRoutes := HTTPRouteCollection(
+	//	inputs.HTTPRoutes,
+	//	routeInputs,
+	//	krtopts,
+	//)
+
+	// TODO: inference pool
+
+	resources = krt.JoinCollection([]krt.Collection[ADPResource]{Binds, Listeners, ADPRoutes}, krtopts.ToOptions("ADPResources")...)
+	s.xDS = krt.NewCollection([]krt.Collection[envoycache.Resources])
 
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
-		gatewaysCol.HasSynced,
+		Binds.HasSynced,
+		Listeners.HasSynced,
+		ADPRoutes.HasSynced,
 		s.xDS.HasSynced,
 	}
 }
@@ -295,7 +328,7 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 		return fmt.Errorf("agentgateway syncer waiting for cache to sync failed")
 	}
 
-	s.xDS.RegisterBatch(func(events []krt.Event[agentGwXdsResources], _ bool) {
+	s.xDS.RegisterBatch(func(events []krt.Event[ADPResource], _ bool) {
 		for _, e := range events {
 			r := e.Latest()
 			if e.Event == controllers.EventDelete {

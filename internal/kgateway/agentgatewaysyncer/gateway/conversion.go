@@ -1,17 +1,3 @@
-// Copyright Istio Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package gateway
 
 import (
@@ -25,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"google.golang.org/protobuf/types/known/durationpb"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8s "sigs.k8s.io/gateway-api/apis/v1"
 	k8salpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	k8sbeta "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -48,7 +36,6 @@ import (
 	"istio.io/istio/pkg/config/constants"
 	"istio.io/istio/pkg/config/host"
 	"istio.io/istio/pkg/config/protocol"
-	"istio.io/istio/pkg/config/schema/collections"
 	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/config/schema/kind"
 	schematypes "istio.io/istio/pkg/config/schema/kubetypes"
@@ -216,9 +203,9 @@ func buildADPHTTPDestination(
 	var invalidBackendErr *ConfigError
 	var res []*api.RouteBackend
 	for _, fwd := range forwardTo {
-		dst, err := buildADPDestination(ctx, fwd, ns, gvk.HTTPRoute)
+		dst, err := buildADPDestination(ctx, fwd, ns, wellknown.HTTPRouteGVK)
 		if err != nil {
-			log.Errorf("howardjohn: adp error: %v", err)
+			logger.Error("erroring building agent gateway destination", "error", err)
 			if isInvalidBackend(err) {
 				invalidBackendErr = err
 				// keep going, we will gracefully drop invalid backends
@@ -242,7 +229,7 @@ func buildADPDestination(
 	ctx RouteContext,
 	to k8s.HTTPBackendRef,
 	ns string,
-	k config.GroupVersionKind,
+	ref schema.GroupVersionKind,
 ) (*api.RouteBackend, *ConfigError) {
 	// check if the reference is allowed
 	if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
@@ -254,12 +241,18 @@ func buildADPDestination(
 		}
 	}
 
-	namespace := ptr.OrDefault((*string)(to.Namespace), ns)
+	namespace := ns // use default
+	if to.Namespace != nil {
+		namespace = string(*to.Namespace)
+	}
 	var invalidBackendErr *ConfigError
 	var hostname string
-	ref := normalizeReference(to.Group, to.Kind, gvk.Service)
+	weight := int32(1) // default
+	if to.Weight != nil {
+		weight = *to.Weight
+	}
 	rb := &api.RouteBackend{
-		Weight: ptr.OrDefault(to.Weight, 1),
+		Weight: weight,
 	}
 	var port *k8s.PortNumber
 	switch ref {
@@ -277,7 +270,7 @@ func buildADPDestination(
 	//		port = ptr.Of(k8s.PortNumber(svc.Spec.TargetPortNumber))
 	//	}
 	//	rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
-	case gvk.Service:
+	case wellknown.ServiceGVK:
 		port = to.Port
 		if strings.Contains(string(to.Name), ".") {
 			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
@@ -1573,7 +1566,7 @@ func createGRPCURIMatch(match k8s.GRPCRouteMatch) (*istio.StringMatch, *ConfigEr
 // parentKey holds info about a parentRef (eg route binding to a Gateway). This is a mirror of
 // k8s.ParentReference in a form that can be stored in a map
 type parentKey struct {
-	Kind config.GroupVersionKind
+	Kind schema.GroupVersionKind
 	// Name is the original name of the resource (eg Kubernetes Gateway name)
 	Name string
 	// Namespace is the namespace of the resource
@@ -1691,10 +1684,7 @@ func filteredReferences(parents []routeParentReference) []routeParentReference {
 	return ret
 }
 
-func getDefaultName(name string, kgw *k8s.GatewaySpec, disableNameSuffix bool) string {
-	if disableNameSuffix {
-		return name
-	}
+func getDefaultName(name string, kgw *k8s.GatewaySpec) string {
 	return fmt.Sprintf("%v-%v", name, kgw.GatewayClassName)
 }
 
@@ -1895,9 +1885,9 @@ func IsManaged(gw *k8s.GatewaySpec) bool {
 	return false
 }
 
-func extractGatewayServices(domainSuffix string, kgw *k8sbeta.Gateway, info classInfo) ([]string, *ConfigError) {
+func extractGatewayServices(domainSuffix string, kgw *k8sbeta.Gateway) ([]string, *ConfigError) {
 	if IsManaged(&kgw.Spec) {
-		name := model.GetOrDefault(kgw.Annotations[annotation.GatewayNameOverride.Name], getDefaultName(kgw.Name, &kgw.Spec, info.disableNameSuffix))
+		name := model.GetOrDefault(kgw.Annotations[annotation.GatewayNameOverride.Name], getDefaultName(kgw.Name, &kgw.Spec))
 		return []string{fmt.Sprintf("%s.%s.svc.%v", name, kgw.Namespace, domainSuffix)}, nil
 	}
 	gatewayServices := []string{}
@@ -2291,28 +2281,6 @@ func GetCommonRouteStateParents(spec any) []k8s.RouteParentStatus {
 	}
 }
 
-// normalizeReference takes a generic Group/Kind (the API uses a few variations) and converts to a known GroupVersionKind.
-// Defaults for the group/kind are also passed.
-func normalizeReference[G ~string, K ~string](group *G, kind *K, def config.GroupVersionKind) config.GroupVersionKind {
-	k := def.Kind
-	if kind != nil {
-		k = string(*kind)
-	}
-	g := def.Group
-	if group != nil {
-		g = string(*group)
-	}
-	gk := config.GroupVersionKind{
-		Group: g,
-		Kind:  k,
-	}
-	s, f := collections.All.FindByGroupKind(gk)
-	if f {
-		return s.GroupVersionKind()
-	}
-	return gk
-}
-
 func defaultString[T ~string](s *T, def string) string {
 	if s == nil {
 		return def
@@ -2329,5 +2297,5 @@ func routeGroupKindEqual(rgk1, rgk2 k8s.RouteGroupKind) bool {
 }
 
 func getGroup(rgk k8s.RouteGroupKind) k8s.Group {
-	return ptr.OrDefault(rgk.Group, k8s.Group(gvk.KubernetesGateway.Group))
+	return ptr.OrDefault(rgk.Group, k8s.Group(wellknown.GatewayGroup))
 }

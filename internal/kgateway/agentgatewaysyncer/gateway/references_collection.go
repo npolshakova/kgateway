@@ -17,6 +17,7 @@ package gateway
 import (
 	"fmt"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"k8s.io/apimachinery/pkg/types"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -49,7 +50,7 @@ type ReferenceGrants struct {
 	index      krt.Index[ReferencePair, ReferenceGrant]
 }
 
-func ReferenceGrantsCollection(referenceGrants krt.Collection[*gateway.ReferenceGrant], opts krt.OptionsBuilder) krt.Collection[ReferenceGrant] {
+func ReferenceGrantsCollection(referenceGrants krt.Collection[*gateway.ReferenceGrant], krtopts krtutil.KrtOptions) krt.Collection[ReferenceGrant] {
 	return krt.NewManyCollection(referenceGrants, func(ctx krt.HandlerContext, obj *gateway.ReferenceGrant) []ReferenceGrant {
 		rp := obj.Spec
 		results := make([]ReferenceGrant, 0, len(rp.From)*len(rp.To))
@@ -99,7 +100,7 @@ func ReferenceGrantsCollection(referenceGrants krt.Collection[*gateway.Reference
 			}
 		}
 		return results
-	}, opts.WithName("ReferenceGrants")...)
+	}, krtopts.ToOptions("ReferenceGrants")...)
 }
 
 func BuildReferenceGrants(collection krt.Collection[ReferenceGrant]) ReferenceGrants {
@@ -130,7 +131,7 @@ func (g ReferenceGrant) ResourceName() string {
 func (refs ReferenceGrants) SecretAllowed(ctx krt.HandlerContext, resourceName string, namespace string) bool {
 	p, err := creds.ParseResourceName(resourceName, "", "", "")
 	if err != nil {
-		log.Warnf("failed to parse resource name %q: %v", resourceName, err)
+		logger.Warn("failed to parse resource name", "resourceName", resourceName, "error", err)
 		return false
 	}
 	from := Reference{Kind: gvk.KubernetesGateway, Namespace: gateway.Namespace(namespace)}

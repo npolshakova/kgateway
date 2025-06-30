@@ -11,16 +11,6 @@ import (
 	"istio.io/istio/pkg/slices"
 )
 
-// RouteParentResult holds the result of a route for a specific parent
-type RouteParentResult struct {
-	// OriginalReference contains the original reference
-	OriginalReference k8s.ParentReference
-	// DeniedReason, if present, indicates why the reference was not valid
-	DeniedReason *ParentError
-	// RouteError, if present, indicates why the reference was not valid
-	RouteError *ConfigError
-}
-
 type ParentErrorReason string
 
 const (

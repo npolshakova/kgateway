@@ -5,11 +5,8 @@ import (
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"istio.io/istio/pkg/config"
-	k8s "sigs.k8s.io/gateway-api/apis/v1"
-
-	"istio.io/istio/pkg/ptr"
 	"istio.io/istio/pkg/slices"
+	k8s "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func createADPMethodMatch(match k8s.HTTPRouteMatch) (*api.MethodMatch, *ConfigError) {
@@ -146,8 +143,13 @@ func createADPRewriteFilter(filter *k8s.HTTPURLRewriteFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
+
+	var hostname string
+	if filter.Hostname != nil {
+		hostname = string(*filter.Hostname)
+	}
 	ff := &api.UrlRewrite{
-		Host: string(ptr.OrEmpty(filter.Hostname)),
+		Host: hostname,
 	}
 	if filter.Path != nil {
 		switch filter.Path.Type {
@@ -168,7 +170,7 @@ func createADPMirrorFilter(
 	ctx RouteContext,
 	filter *k8s.HTTPRequestMirrorFilter,
 	ns string,
-	k config.GroupVersionKind,
+	k GroupVersionKind,
 ) (*api.RouteFilter, *ConfigError) {
 	if filter == nil {
 		return nil, nil
@@ -185,7 +187,11 @@ func createADPMirrorFilter(
 	}
 	var percent float64
 	if f := filter.Fraction; f != nil {
-		percent = (100 * float64(f.Numerator)) / float64(ptr.OrDefault(f.Denominator, int32(100)))
+		denominator := float64(100)
+		if f.Denominator != nil {
+			denominator = float64(*f.Denominator)
+		}
+		percent = (100 * float64(f.Numerator)) / denominator
 	} else if p := filter.Percent; p != nil {
 		percent = float64(*p)
 	} else {
@@ -212,11 +218,26 @@ func createADPRedirectFilter(filter *k8s.HTTPRequestRedirectFilter) *api.RouteFi
 	if filter == nil {
 		return nil
 	}
+	var scheme, host string
+	var port, statusCode uint32
+	if filter.Scheme != nil {
+		scheme = *filter.Scheme
+	}
+	if filter.Hostname != nil {
+		host = string(*filter.Hostname)
+	}
+	if filter.Port != nil {
+		port = uint32(*filter.Port)
+	}
+	if filter.StatusCode != nil {
+		statusCode = uint32(*filter.StatusCode)
+	}
+
 	ff := &api.RequestRedirect{
-		Scheme: ptr.OrEmpty(filter.Scheme),
-		Host:   string(ptr.OrEmpty(filter.Hostname)),
-		Port:   uint32(ptr.OrEmpty(filter.Port)),
-		Status: uint32(ptr.OrEmpty(filter.StatusCode)),
+		Scheme: scheme,
+		Host:   host,
+		Port:   port,
+		Status: statusCode,
 	}
 	if filter.Path != nil {
 		switch filter.Path.Type {

@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"istio.io/istio/pkg/config/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -102,7 +103,7 @@ func (g PortBindings) ResourceName() string {
 
 func (g PortBindings) Equals(other PortBindings) bool {
 	return g.Gateway.Equals(other.Gateway) &&
-		g.port == other.port
+		g.Port == other.Port
 }
 
 type Gateway struct {
@@ -129,7 +130,7 @@ func GatewayCollection(
 	grants ReferenceGrants,
 	secrets krt.Collection[*corev1.Secret],
 	domainSuffix string,
-	opts krt.OptionsBuilder,
+	krtopts krtutil.KrtOptions,
 ) krt.Collection[Gateway] {
 	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gateway.Gateway) []Gateway {
 		var result []Gateway
@@ -140,19 +141,10 @@ func GatewayCollection(
 			return nil
 		}
 		controllerName := class.Controller
-		classInfo, f := classInfos[controllerName]
-		if !f {
-			return nil
-		}
-		if classInfo.disableRouteGeneration {
-			// We found it, but don't want to handle this class
-			// TODO: log
-			return nil
-		}
 		var servers []*istio.Server
 
 		// Extract the addresses. A gateway will bind to a specific Service
-		gatewayServices, err := extractGatewayServices(domainSuffix, obj, classInfo)
+		gatewayServices, err := extractGatewayServices(domainSuffix, obj)
 		if len(gatewayServices) == 0 && err != nil {
 			// Short circuit if its a hard failure
 			// TODO: log
@@ -206,7 +198,7 @@ func GatewayCollection(
 		}
 
 		return result
-	}, opts.WithName("KubernetesGateway")...)
+	}, krtopts.ToOptions("KubernetesGateway")...)
 
 	return gw
 }
