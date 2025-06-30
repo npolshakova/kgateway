@@ -306,7 +306,7 @@ spec:
                 - ExtAuth
                 - ExtProc
                 - RateLimit
-                - JWT
+                - JWTProviders
                 type: string
             required:
             - type
@@ -325,7 +325,7 @@ spec:
             - message: RateLimit must not be set when type is not RateLimit
               rule: self.type == 'RateLimit' || !has(self.rateLimit)
             - message: JwtProviders must not be set when type is not JWT
-              rule: self.type == 'JWT' || !has(self.jwtProviders)
+              rule: self.type == 'JWTProviders' || !has(self.jwtProviders)
           status:
             properties:
               conditions:

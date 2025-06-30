@@ -14,7 +14,6 @@ import (
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	jwtauthnv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/jwt_authn/v3"
 	"github.com/go-jose/go-jose/v3"
-	"github.com/hashicorp/go-multierror"
 	"google.golang.org/protobuf/proto"
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
@@ -259,7 +258,7 @@ func TranslateKey(key string) (*jose.JSONWebKeySet, error) {
 	if err == nil {
 		return ks, nil
 	}
-	multierr = multierror.Append(multierr, fmt.Errorf("PEM %v", err))
+	multierr = errors.Join(multierr, fmt.Errorf("PEM %v", err))
 
 	ks, err = parseKeySet(key)
 	if err == nil {
@@ -268,13 +267,13 @@ func TranslateKey(key string) (*jose.JSONWebKeySet, error) {
 		}
 		err = errors.New("no keys in set")
 	}
-	multierr = multierror.Append(multierr, fmt.Errorf("JWKS %v", err))
+	multierr = errors.Join(multierr, fmt.Errorf("JWKS %v", err))
 
 	ks, err = parseKey(key)
 	if err == nil {
 		return ks, nil
 	}
-	multierr = multierror.Append(multierr, fmt.Errorf("JWK %v", err))
+	multierr = errors.Join(multierr, fmt.Errorf("JWK %v", err))
 
 	return nil, fmt.Errorf("cannot parse local jwks: %v", multierr)
 }

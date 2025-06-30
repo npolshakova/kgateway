@@ -84,7 +84,7 @@ metadata:
   name: jwt-ext
   namespace: gwtest
 spec:
-  type: JWT
+  type: JWTProviders
   jwtProviders:
     my-example:
       claimsToHeaders:
