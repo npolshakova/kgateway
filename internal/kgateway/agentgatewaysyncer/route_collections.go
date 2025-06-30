@@ -1,12 +1,10 @@
-package gateway
+package agentgatewaysyncer
 
 import (
 	"fmt"
 	"iter"
 	"strings"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,12 +13,13 @@ import (
 	gatewayalpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+
 	istio "istio.io/api/networking/v1alpha3"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
-	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/config/constants"
-	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
@@ -74,7 +73,7 @@ func HTTPRouteCollection(
 					// TODO: standardize a status message for this upstream and report
 					continue
 				}
-				name := fmt.Sprintf("%s-%d-%s", obj.Name, count, constants.KubernetesGatewayName)
+				name := fmt.Sprintf("%s-%d-%s", obj.Name, count, AgentgatewayName)
 				sortHTTPRoutes(routes)
 				cfg := &Config{
 					Meta: Meta{
@@ -153,7 +152,7 @@ func ADPRouteCollection(
 				inner := protomarshal.Clone(e.Route)
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
-				inner.Key = inner.Key + "." + string(parent.ParentSection)
+				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
 				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
@@ -168,12 +167,18 @@ type conversionResult[O any] struct {
 	routes []O
 }
 
+// IsNil works around comparing generic types
+func IsNil[O comparable](o O) bool {
+	var t O
+	return o == t
+}
+
 func GRPCRouteCollection(
 	grpcRoutes krt.Collection[*gatewayv1.GRPCRoute],
 	inputs RouteContextInputs,
-	opts krt.OptionsBuilder,
+	krtopts krtutil.KrtOptions,
 ) RouteResult[*gatewayv1.GRPCRoute, gatewayv1.GRPCRouteStatus] {
-	routeCount := gatewayRouteAttachmentCountCollection(inputs, grpcRoutes, gvk.GRPCRoute, opts)
+	routeCount := gatewayRouteAttachmentCountCollection(inputs, grpcRoutes, wellknown.GRPCRouteGVK, krtopts)
 	baseVirtualServices := krt.NewManyCollection(grpcRoutes, func(krtctx krt.HandlerContext, obj *gatewayv1.GRPCRoute) []RouteWithKey {
 		ctx := inputs.WithCtx(krtctx)
 		route := obj.Spec
@@ -214,7 +219,7 @@ func GRPCRouteCollection(
 					// TODO: standardize a status message for this upstream and report
 					continue
 				}
-				name := fmt.Sprintf("%s-%d-%s", obj.Name, count, constants.KubernetesGatewayName)
+				name := fmt.Sprintf("%s-%d-%s", obj.Name, count, AgentgatewayName)
 				sortHTTPRoutes(routes)
 				cfg := &Config{
 					Meta: Meta{
@@ -239,9 +244,9 @@ func GRPCRouteCollection(
 			}
 		}
 		return virtualServices
-	}, opts.WithName("GRPCRoute")...)
+	}, krtopts.ToOptions("GRPCRoute")...)
 
-	finalVirtualServices := mergeHTTPRoutes(baseVirtualServices, opts.WithName("GRPCRouteMerged")...)
+	finalVirtualServices := mergeHTTPRoutes(baseVirtualServices, krtopts.ToOptions("GRPCRouteMerged")...)
 	return RouteResult[*gatewayv1.GRPCRoute, gatewayv1.GRPCRouteStatus]{
 		VirtualServices:  finalVirtualServices,
 		RouteAttachments: routeCount,
@@ -251,9 +256,9 @@ func GRPCRouteCollection(
 func TCPRouteCollection(
 	tcpRoutes krt.Collection[*gatewayalpha.TCPRoute],
 	inputs RouteContextInputs,
-	opts krt.OptionsBuilder,
+	krtopts krtutil.KrtOptions,
 ) RouteResult[*gatewayalpha.TCPRoute, gatewayalpha.TCPRouteStatus] {
-	routeCount := gatewayRouteAttachmentCountCollection(inputs, tcpRoutes, gvk.TCPRoute, opts)
+	routeCount := gatewayRouteAttachmentCountCollection(inputs, tcpRoutes, wellknown.TCPRouteGVK, krtopts)
 	virtualServices := krt.NewManyCollection(tcpRoutes, func(krtctx krt.HandlerContext, obj *gatewayalpha.TCPRoute) []*Config {
 		ctx := inputs.WithCtx(krtctx)
 		route := obj.Spec
@@ -273,7 +278,7 @@ func TCPRouteCollection(
 			routes := gwResult.routes
 			vsHosts := []string{"*"}
 			for i, host := range vsHosts {
-				name := fmt.Sprintf("%s-tcp-%d-%s", obj.Name, i, constants.KubernetesGatewayName)
+				name := fmt.Sprintf("%s-tcp-%d-%s", obj.Name, i, AgentgatewayName)
 				// Create one VS per hostname with a single hostname.
 				// This ensures we can treat each hostname independently, as the spec requires
 				vs = append(vs, &Config{
@@ -296,7 +301,7 @@ func TCPRouteCollection(
 			}
 		}
 		return vs
-	}, opts.WithName("TCPRoute")...)
+	}, krtopts.ToOptions("TCPRoute")...)
 
 	return RouteResult[*gatewayalpha.TCPRoute, gatewayalpha.TCPRouteStatus]{
 		VirtualServices:  virtualServices,
@@ -307,9 +312,9 @@ func TCPRouteCollection(
 func TLSRouteCollection(
 	tlsRoutes krt.Collection[*gatewayalpha.TLSRoute],
 	inputs RouteContextInputs,
-	opts krt.OptionsBuilder,
+	krtopts krtutil.KrtOptions,
 ) RouteResult[*gatewayalpha.TLSRoute, gatewayalpha.TLSRouteStatus] {
-	routeCount := gatewayRouteAttachmentCountCollection(inputs, tlsRoutes, gvk.TLSRoute, opts)
+	routeCount := gatewayRouteAttachmentCountCollection(inputs, tlsRoutes, wellknown.TLSRouteGVK, krtopts)
 	virtualServices := krt.NewManyCollection(tlsRoutes, func(krtctx krt.HandlerContext, obj *gatewayalpha.TLSRoute) []*Config {
 		ctx := inputs.WithCtx(krtctx)
 		route := obj.Spec
@@ -329,7 +334,7 @@ func TLSRouteCollection(
 			routes := gwResult.routes
 			vsHosts := hostnameToStringList(route.Hostnames)
 			for i, host := range vsHosts {
-				name := fmt.Sprintf("%s-tls-%d-%s", obj.Name, i, constants.KubernetesGatewayName)
+				name := fmt.Sprintf("%s-tls-%d-%s", obj.Name, i, AgentgatewayName)
 				filteredRoutes := routes
 				// Create one VS per hostname with a single hostname.
 				// This ensures we can treat each hostname independently, as the spec requires
@@ -369,7 +374,7 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 		res := conversionResult[O]{}
 		for vs, err := range translator(obj) {
 			// This was a hard error
-			if vs == nil {
+			if IsNil(vs) {
 				res.error = err
 				return conversionResult[O]{error: err}
 			}
@@ -381,7 +386,7 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 		}
 		return res
 	}
-	gwResult := buildMeshAndGatewayRoutes(parentRefs, convertRules)
+	gwResult := buildGatewayRoutes(parentRefs, convertRules)
 
 	return parentRefs, gwResult
 }
@@ -392,13 +397,6 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 type RouteContext struct {
 	Krt krt.HandlerContext
 	RouteContextInputs
-}
-
-func (r RouteContext) LookupHostname(hostname string, namespace string) *model.Service {
-	if c := r.internalContext.Get(r.Krt).Load(); c != nil {
-		return c.GetService(hostname, namespace)
-	}
-	return nil
 }
 
 type RouteContextInputs struct {
@@ -431,8 +429,8 @@ func (r RouteWithKey) Equals(o RouteWithKey) bool {
 	return r.Config.Equals(o.Config)
 }
 
-// buildMeshAndGatewayRoutes contains common logic to build a set of routes with gateway semantics
-func buildMeshAndGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
+// buildGatewayRoutes contains common logic to build a set of routes with gateway semantics
+func buildGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
 	return convertRules()
 }
 
@@ -520,12 +518,12 @@ func mergeHTTPRoutes(baseVirtualServices krt.Collection[RouteWithKey], opts ...k
 		baseVS := base.Spec.(*istio.VirtualService)
 		for _, config := range configs[1:] {
 			thisVS := config.Spec.(*istio.VirtualService)
-			baseVS.Http = append(baseVS.Http, thisVS.Http...)
+			baseVS.Http = append(baseVS.GetHttp(), thisVS.GetHttp()...)
 			// append parents
 			base.Annotations[constants.InternalParentNames] = fmt.Sprintf("%s,%s",
 				base.Annotations[constants.InternalParentNames], config.Annotations[constants.InternalParentNames])
 		}
-		sortHTTPRoutes(baseVS.Http)
+		sortHTTPRoutes(baseVS.GetHttp())
 		return ptr.Of(&base)
 	}, opts...)
 	return finalVirtualServices

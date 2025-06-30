@@ -1,4 +1,4 @@
-package gateway
+package agentgatewaysyncer
 
 import (
 	"bytes"
@@ -93,10 +93,6 @@ type Service struct {
 	// or use the passthrough model (i.e. proxy will forward the traffic to the network endpoint requested
 	// by the caller)
 	Resolution Resolution
-
-	// MeshExternal (if true) indicates that the service is external to the mesh.
-	// These services are defined using Istio's ServiceEntry spec.
-	MeshExternal bool
 
 	// ResourceVersion represents the internal version of this object.
 	ResourceVersion string
@@ -655,8 +651,6 @@ type ServiceAttributes struct {
 	// ClusterExternalPorts is a mapping between a cluster name and the service port
 	// to node port mappings for a given service. When accessing the service via
 	// node port IPs, we need to use the kubernetes assigned node ports of the service
-	// The port that the user provides in the meshNetworks config is the service port.
-	// We translate that to the appropriate node port here.
 	ClusterExternalPorts map[cluster.ID]map[uint32]uint32
 
 	PassthroughTargetPorts map[uint32]uint32
@@ -790,18 +784,18 @@ func (i AddressInfo) Equals(other AddressInfo) bool {
 func (i AddressInfo) Aliases() []string {
 	switch addr := i.Type.(type) {
 	case *api.Address_Workload:
-		aliases := make([]string, 0, len(addr.Workload.Addresses))
-		network := addr.Workload.Network
-		for _, workloadAddr := range addr.Workload.Addresses {
+		aliases := make([]string, 0, len(addr.Workload.GetAddresses()))
+		network := addr.Workload.GetNetwork()
+		for _, workloadAddr := range addr.Workload.GetAddresses() {
 			ip, _ := netip.AddrFromSlice(workloadAddr)
 			aliases = append(aliases, network+"/"+ip.String())
 		}
 		return aliases
 	case *api.Address_Service:
-		aliases := make([]string, 0, len(addr.Service.Addresses))
-		for _, networkAddr := range addr.Service.Addresses {
-			ip, _ := netip.AddrFromSlice(networkAddr.Address)
-			aliases = append(aliases, networkAddr.Network+"/"+ip.String())
+		aliases := make([]string, 0, len(addr.Service.GetAddresses()))
+		for _, networkAddr := range addr.Service.GetAddresses() {
+			ip, _ := netip.AddrFromSlice(networkAddr.GetAddress())
+			aliases = append(aliases, networkAddr.GetNetwork()+"/"+ip.String())
 		}
 		return aliases
 	}
@@ -859,11 +853,11 @@ type StatusMessage struct {
 }
 
 func (i ServiceInfo) NamespacedName() types.NamespacedName {
-	return types.NamespacedName{Name: i.Service.Name, Namespace: i.Service.Namespace}
+	return types.NamespacedName{Name: i.Service.GetName(), Namespace: i.Service.GetNamespace()}
 }
 
 func (i ServiceInfo) GetNamespace() string {
-	return i.Service.Namespace
+	return i.Service.GetNamespace()
 }
 
 func (i ServiceInfo) Equals(other ServiceInfo) bool {
@@ -878,7 +872,7 @@ func (i ServiceInfo) ResourceName() string {
 }
 
 func serviceResourceName(s *api.Service) string {
-	return s.Namespace + "/" + s.Hostname
+	return s.GetNamespace() + "/" + s.GetHostname()
 }
 
 type WorkloadInfo struct {
@@ -905,7 +899,7 @@ func (i WorkloadInfo) Equals(other WorkloadInfo) bool {
 }
 
 func workloadResourceName(w *api.Workload) string {
-	return w.Uid
+	return w.GetUid()
 }
 
 func (i *WorkloadInfo) Clone() *WorkloadInfo {
@@ -947,7 +941,7 @@ func ExtractWorkloadsFromAddresses(addrs []AddressInfo) []WorkloadInfo {
 func SortWorkloadsByCreationTime(workloads []WorkloadInfo) []WorkloadInfo {
 	sort.SliceStable(workloads, func(i, j int) bool {
 		if workloads[i].CreationTime.Equal(workloads[j].CreationTime) {
-			return workloads[i].Workload.Uid < workloads[j].Workload.Uid
+			return workloads[i].Workload.GetUid() < workloads[j].Workload.GetUid()
 		}
 		return workloads[i].CreationTime.Before(workloads[j].CreationTime)
 	})
@@ -1030,11 +1024,6 @@ func (ports PortList) String() string {
 		sp = append(sp, p.String())
 	}
 	return strings.Join(sp, ", ")
-}
-
-// External predicate checks whether the service is external
-func (s *Service) External() bool {
-	return s.MeshExternal
 }
 
 // BuildSubsetKey generates a unique string referencing service instances for a given service name, a subset and a port.
@@ -1243,7 +1232,7 @@ func (s *Service) Equals(other *Service) bool {
 
 	return s.DefaultAddress == other.DefaultAddress && s.AutoAllocatedIPv4Address == other.AutoAllocatedIPv4Address &&
 		s.AutoAllocatedIPv6Address == other.AutoAllocatedIPv6Address && s.Hostname == other.Hostname &&
-		s.Resolution == other.Resolution && s.MeshExternal == other.MeshExternal
+		s.Resolution == other.Resolution
 }
 
 // DeepCopy creates a clone of IstioEndpoint.
@@ -1309,7 +1298,7 @@ func (ep *IstioEndpoint) Equals(other *IstioEndpoint) bool {
 func equalUsingPremarshaled[T proto.Message](a T, am *anypb.Any, b T, bm *anypb.Any) bool {
 	// If they are both pre-marshaled, use the marshaled representation. This is orders of magnitude faster
 	if am != nil && bm != nil {
-		return bytes.Equal(am.Value, bm.Value)
+		return bytes.Equal(am.GetValue(), bm.GetValue())
 	}
 
 	// Fallback to equals

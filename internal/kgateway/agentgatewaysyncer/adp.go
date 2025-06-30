@@ -1,4 +1,4 @@
-package gateway
+package agentgatewaysyncer
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/istio/pkg/slices"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8s "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -170,7 +171,7 @@ func createADPMirrorFilter(
 	ctx RouteContext,
 	filter *k8s.HTTPRequestMirrorFilter,
 	ns string,
-	k GroupVersionKind,
+	k schema.GroupVersionKind,
 ) (*api.RouteFilter, *ConfigError) {
 	if filter == nil {
 		return nil, nil
@@ -203,9 +204,9 @@ func createADPMirrorFilter(
 	rm := &api.RequestMirror{
 		Kind:       nil,
 		Percentage: percent,
-		Port:       dst.Port,
+		Port:       dst.GetPort(),
 	}
-	switch dk := dst.Kind.(type) {
+	switch dk := dst.GetKind().(type) {
 	case *api.RouteBackend_Service:
 		rm.Kind = &api.RequestMirror_Service{
 			Service: dk.Service,

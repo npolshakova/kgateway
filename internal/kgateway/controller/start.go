@@ -21,7 +21,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/gateway"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/inferenceextension/endpointpicker"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
@@ -210,7 +211,8 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	proxySyncer.Init(ctx, cfg.KrtOptions)
 
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
-		agentGatewaySyncer := gateway.NewAgentGwSyncer(
+		domainSuffix := "cluster.local" // TODO: don't hard code
+		agentGatewaySyncer := agentgatewaysyncer.NewAgentGwSyncer(
 			ctx,
 			cfg.ControllerName,
 			cfg.AgentGatewayClassName,
@@ -218,6 +220,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.Client,
 			commoncol,
 			cfg.SetupOpts.Cache,
+			domainSuffix,
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)
 

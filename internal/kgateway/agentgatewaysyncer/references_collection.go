@@ -1,35 +1,23 @@
-// Copyright Istio Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package gateway
+package agentgatewaysyncer
 
 import (
 	"fmt"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+
 	creds "istio.io/istio/pilot/pkg/model/credentials"
 	"istio.io/istio/pkg/config"
-	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/kube/krt"
 )
 
 // Reference stores a reference to a namespaced GVK, as used by ReferencePolicy
 type Reference struct {
-	Kind      config.GroupVersionKind
+	Kind      schema.GroupVersionKind
 	Namespace gateway.Namespace
 }
 
@@ -58,16 +46,16 @@ func ReferenceGrantsCollection(referenceGrants krt.Collection[*gateway.Reference
 			fromKey := Reference{
 				Namespace: from.Namespace,
 			}
-			if string(from.Group) == gvk.KubernetesGateway.Group && string(from.Kind) == gvk.KubernetesGateway.Kind {
-				fromKey.Kind = gvk.KubernetesGateway
-			} else if string(from.Group) == gvk.HTTPRoute.Group && string(from.Kind) == gvk.HTTPRoute.Kind {
-				fromKey.Kind = gvk.HTTPRoute
-			} else if string(from.Group) == gvk.GRPCRoute.Group && string(from.Kind) == gvk.GRPCRoute.Kind {
-				fromKey.Kind = gvk.GRPCRoute
-			} else if string(from.Group) == gvk.TLSRoute.Group && string(from.Kind) == gvk.TLSRoute.Kind {
-				fromKey.Kind = gvk.TLSRoute
-			} else if string(from.Group) == gvk.TCPRoute.Group && string(from.Kind) == gvk.TCPRoute.Kind {
-				fromKey.Kind = gvk.TCPRoute
+			if string(from.Group) == wellknown.GatewayGVK.Group && string(from.Kind) == wellknown.GatewayKind {
+				fromKey.Kind = wellknown.GatewayGVK
+			} else if string(from.Group) == wellknown.HTTPRouteGVK.Group && string(from.Kind) == wellknown.HTTPRouteKind {
+				fromKey.Kind = wellknown.HTTPRouteGVK
+			} else if string(from.Group) == wellknown.GRPCRouteGVK.Group && string(from.Kind) == wellknown.GRPCRouteKind {
+				fromKey.Kind = wellknown.GRPCRouteGVK
+			} else if string(from.Group) == wellknown.TLSRouteGVK.Group && string(from.Kind) == wellknown.TLSRouteKind {
+				fromKey.Kind = wellknown.TLSRouteGVK
+			} else if string(from.Group) == wellknown.TCPRouteGVK.Group && string(from.Kind) == wellknown.TCPRouteKind {
+				fromKey.Kind = wellknown.TCPRouteGVK
 			} else {
 				// Not supported type. Not an error; may be for another controller
 				continue
@@ -76,10 +64,10 @@ func ReferenceGrantsCollection(referenceGrants krt.Collection[*gateway.Reference
 				toKey := Reference{
 					Namespace: gateway.Namespace(obj.Namespace),
 				}
-				if to.Group == "" && string(to.Kind) == gvk.Secret.Kind {
-					toKey.Kind = gvk.Secret
-				} else if to.Group == "" && string(to.Kind) == gvk.Service.Kind {
-					toKey.Kind = gvk.Service
+				if to.Group == "" && string(to.Kind) == wellknown.SecretGVK.Kind {
+					toKey.Kind = wellknown.SecretGVK
+				} else if to.Group == "" && string(to.Kind) == wellknown.ServiceKind {
+					toKey.Kind = wellknown.ServiceGVK
 				} else {
 					// Not supported type. Not an error; may be for another controller
 					continue
@@ -134,8 +122,8 @@ func (refs ReferenceGrants) SecretAllowed(ctx krt.HandlerContext, resourceName s
 		logger.Warn("failed to parse resource name", "resourceName", resourceName, "error", err)
 		return false
 	}
-	from := Reference{Kind: gvk.KubernetesGateway, Namespace: gateway.Namespace(namespace)}
-	to := Reference{Kind: gvk.Secret, Namespace: gateway.Namespace(p.Namespace)}
+	from := Reference{Kind: wellknown.GatewayGVK, Namespace: gateway.Namespace(namespace)}
+	to := Reference{Kind: wellknown.SecretGVK, Namespace: gateway.Namespace(p.Namespace)}
 	pair := ReferencePair{From: from, To: to}
 	grants := krt.Fetch(ctx, refs.collection, krt.FilterIndex(refs.index, pair))
 	for _, g := range grants {
@@ -147,13 +135,13 @@ func (refs ReferenceGrants) SecretAllowed(ctx krt.HandlerContext, resourceName s
 }
 
 func (refs ReferenceGrants) BackendAllowed(ctx krt.HandlerContext,
-	k config.GroupVersionKind,
+	k schema.GroupVersionKind,
 	backendName gateway.ObjectName,
 	backendNamespace gateway.Namespace,
 	routeNamespace string,
 ) bool {
 	from := Reference{Kind: k, Namespace: gateway.Namespace(routeNamespace)}
-	to := Reference{Kind: gvk.Service, Namespace: backendNamespace}
+	to := Reference{Kind: wellknown.SecretGVK, Namespace: backendNamespace}
 	pair := ReferencePair{From: from, To: to}
 	grants := krt.Fetch(ctx, refs.collection, krt.FilterIndex(refs.index, pair))
 	for _, g := range grants {

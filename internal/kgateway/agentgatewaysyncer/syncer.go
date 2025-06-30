@@ -1,19 +1,14 @@
-package gateway
+package agentgatewaysyncer
 
 import (
 	"context"
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"google.golang.org/protobuf/proto"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pilot/pkg/features"
@@ -31,6 +26,12 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayalpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -40,7 +41,7 @@ var logger = logging.New("agentgateway/syncer")
 type AgentGwSyncer struct {
 	commonCols     *common.CommonCollections
 	controllerName string
-	xDS            krt.Collection[ADPResource]
+	xDS            krt.Collection[ADPCacheResource]
 	xdsCache       envoycache.SnapshotCache
 	client         kube.Client
 	domainSuffix   string
@@ -55,6 +56,7 @@ func NewAgentGwSyncer(
 	client kube.Client,
 	commonCols *common.CommonCollections,
 	xdsCache envoycache.SnapshotCache,
+	domainSuffix string,
 ) *AgentGwSyncer {
 	// TODO: register types (auth, policy, etc.) if necessary
 	return &AgentGwSyncer{
@@ -62,27 +64,9 @@ func NewAgentGwSyncer(
 		controllerName: controllerName,
 		xdsCache:       xdsCache,
 		// mgr:            mgr,
-		client: client,
+		client:       client,
+		domainSuffix: domainSuffix,
 	}
-}
-
-type agentGwXdsResources struct {
-	types.NamespacedName
-
-	reports   reports.ReportMap
-	Resources envoycache.Resources
-	Addresses envoycache.Resources
-}
-
-func (r agentGwXdsResources) ResourceName() string {
-	return fmt.Sprintf("%s~%s", r.Namespace, r.Name)
-}
-
-func (r agentGwXdsResources) Equals(in agentGwXdsResources) bool {
-	return r.NamespacedName == in.NamespacedName &&
-		report{r.reports}.Equals(report{in.reports}) &&
-		r.Resources.Version == in.Resources.Version &&
-		r.Addresses.Version == in.Addresses.Version
 }
 
 type envoyResourceWithName struct {
@@ -117,20 +101,6 @@ func (r envoyResourceWithCustomName) Equals(in envoyResourceWithCustomName) bool
 }
 
 var _ envoytypes.ResourceWithName = envoyResourceWithCustomName{}
-
-type agentGwService struct {
-	krt.Named
-	ip       string
-	port     int
-	path     string
-	protocol string // currently only A2A and MCP
-	// The listeners which are allowed to connect to the target.
-	allowedListeners []string
-}
-
-func (r agentGwService) Equals(in agentGwService) bool {
-	return r.ip == in.ip && r.port == in.port && r.path == in.path && r.protocol == in.protocol && slices.Equal(r.allowedListeners, in.allowedListeners)
-}
 
 type report struct {
 	// lower case so krt doesn't error in debug handler
@@ -177,7 +147,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		),
 		Services: krt.WrapClient[*corev1.Service](
 			kclient.NewFiltered[*corev1.Service](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}),
-		),
+			krtopts.ToOptions("informer/Services")...),
 
 		GatewayClasses: krt.WrapClient(kclient.New[*gateway.GatewayClass](s.client), krtopts.ToOptions("informer/GatewayClasses")...),
 		Gateways:       krt.WrapClient(kclient.New[*gateway.Gateway](s.client), krtopts.ToOptions("informer/Gateways")...),
@@ -186,7 +156,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 
 		ReferenceGrants: krt.WrapClient(kclient.New[*gateway.ReferenceGrant](s.client), krtopts.ToOptions("informer/ReferenceGrants")...),
 		ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
-		InferencePools:  krt.WrapClient(kclient.New[*inf.InferencePool](s.client), krtopts.ToOptions("informer/InferencePools")...),
+		//InferencePools:  krt.WrapClient(kclient.New[*inf.InferencePool](s.client), krtopts.ToOptions("informer/InferencePools")...),
 	}
 	if features.EnableAlphaGatewayAPI {
 		inputs.TCPRoutes = krt.WrapClient(kclient.New[*gatewayalpha.TCPRoute](s.client), krtopts.ToOptions("informer/TCPRoutes")...)
@@ -307,8 +277,28 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 
 	// TODO: inference pool
 
-	resources = krt.JoinCollection([]krt.Collection[ADPResource]{Binds, Listeners, ADPRoutes}, krtopts.ToOptions("ADPResources")...)
-	s.xDS = krt.NewCollection([]krt.Collection[envoycache.Resources])
+	resources := krt.JoinCollection([]krt.Collection[ADPResource]{Binds, Listeners, ADPRoutes}, krtopts.ToOptions("ADPResources")...)
+	s.xDS = krt.NewCollection(resources, func(ctx krt.HandlerContext, obj ADPResource) *ADPCacheResource {
+		var cacheResources []envoytypes.Resource
+		cacheResources = append(cacheResources, &envoyResourceWithCustomName{
+			Message: obj.Resource,
+			Name:    obj.ResourceName(),
+			version: utils.HashProto(obj.Resource),
+		})
+
+		// Create the resource wrappers
+		var resourceVersion uint64
+		for _, res := range cacheResources {
+			resourceVersion ^= res.(*envoyResourceWithCustomName).version
+		}
+
+		result := &ADPCacheResource{
+			Gateway:   obj.Gateway,
+			Resources: envoycache.NewResources(fmt.Sprintf("%d", resourceVersion), cacheResources),
+		}
+		logger.Debug("created XDS resources for gateway with ID", "gwname", fmt.Sprintf("%s,%s", obj.Gateway.Name, obj.Gateway.Namespace), "resourceid", result.ResourceName())
+		return result
+	})
 
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
@@ -328,7 +318,7 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 		return fmt.Errorf("agentgateway syncer waiting for cache to sync failed")
 	}
 
-	s.xDS.RegisterBatch(func(events []krt.Event[ADPResource], _ bool) {
+	s.xDS.RegisterBatch(func(events []krt.Event[ADPCacheResource], _ bool) {
 		for _, e := range events {
 			r := e.Latest()
 			if e.Event == controllers.EventDelete {

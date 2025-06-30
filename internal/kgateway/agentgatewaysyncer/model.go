@@ -1,4 +1,4 @@
-package gateway
+package agentgatewaysyncer
 
 import (
 	"cmp"
@@ -8,26 +8,23 @@ import (
 	"reflect"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	udpa "github.com/cncf/xds/go/udpa/type/v1"
+	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	gogoproto "github.com/gogo/protobuf/proto"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/known/structpb"
-	"istio.io/istio/pkg/config/host"
 	"istio.io/istio/pkg/config/schema/kind"
-	pm "istio.io/istio/pkg/model"
 	"istio.io/istio/pkg/util/hash"
-	netutil "istio.io/istio/pkg/util/net"
 	"istio.io/istio/pkg/util/protomarshal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 )
 
 // Statically link protobuf descriptors from UDPA
@@ -58,116 +55,6 @@ func (key ConfigKey) String() string {
 	return key.Kind.String() + "/" + key.Namespace + "/" + key.Name
 }
 
-// ResolveShortnameToFQDN uses metadata information to resolve a reference
-// to shortname of the service to FQDN
-func ResolveShortnameToFQDN(hostname string, meta Meta) host.Name {
-	if len(hostname) == 0 {
-		// only happens when the gateway-api BackendRef is invalid
-		return ""
-	}
-	out := hostname
-	// Treat the wildcard hostname as fully qualified. Any other variant of a wildcard hostname will contain a `.` too,
-	// and skip the next if, so we only need to check for the literal wildcard itself.
-	if hostname == "*" {
-		return host.Name(out)
-	}
-
-	// if the hostname is a valid ipv4 or ipv6 address, do not append domain or namespace
-	if netutil.IsValidIPAddress(hostname) {
-		return host.Name(out)
-	}
-
-	// if FQDN is specified, do not append domain or namespace to hostname
-	if !strings.Contains(hostname, ".") {
-		if meta.Namespace != "" {
-			out = out + "." + meta.Namespace
-		}
-
-		// FIXME this is a gross hack to hardcode a service's domain name in kubernetes
-		// BUG this will break non kubernetes environments if they use shortnames in the
-		// rules.
-		if meta.Domain != "" {
-			out = out + ".svc." + meta.Domain
-		}
-	}
-
-	return host.Name(out)
-}
-
-// resolveGatewayName uses metadata information to resolve a reference
-// to shortname of the gateway to FQDN
-func resolveGatewayName(gwname string, meta Meta) string {
-	out := gwname
-
-	// New way of binding to a gateway in remote namespace
-	// is ns/name. Old way is either FQDN or short name
-	if !strings.Contains(gwname, "/") {
-		if !strings.Contains(gwname, ".") {
-			// we have a short name. Resolve to a gateway in same namespace
-			out = meta.Namespace + "/" + gwname
-		} else {
-			// parse namespace from FQDN. This is very hacky, but meant for backward compatibility only
-			// This is a legacy FQDN format. Transform name.ns.svc.cluster.local -> ns/name
-			i := strings.Index(gwname, ".")
-			fqdn := strings.Index(gwname[i+1:], ".")
-			if fqdn == -1 {
-				out = gwname[i+1:] + "/" + gwname[:i]
-			} else {
-				out = gwname[i+1:i+1+fqdn] + "/" + gwname[:i]
-			}
-		}
-	} else {
-		// remove the . from ./gateway and substitute it with the namespace name
-		i := strings.Index(gwname, "/")
-		if gwname[:i] == "." {
-			out = meta.Namespace + "/" + gwname[i+1:]
-		}
-	}
-	return out
-}
-
-// MostSpecificHostMatch compares the maps of specific and wildcard hosts to the needle, and returns the longest element
-// matching the needle, and it's value, or false if no element in the maps matches the needle.
-func MostSpecificHostMatch[V any](needle host.Name, specific map[host.Name]V, wildcard map[host.Name]V) (host.Name, V, bool) {
-	if needle.IsWildCarded() {
-		// exact match first
-		if v, ok := wildcard[needle]; ok {
-			return needle, v, true
-		}
-
-		return mostSpecificHostWildcardMatch(string(needle[1:]), wildcard)
-	}
-
-	// exact match first
-	if v, ok := specific[needle]; ok {
-		return needle, v, true
-	}
-
-	// check wildcard
-	return mostSpecificHostWildcardMatch(string(needle), wildcard)
-}
-
-func mostSpecificHostWildcardMatch[V any](needle string, wildcard map[host.Name]V) (host.Name, V, bool) {
-	found := false
-	var matchHost host.Name
-	var matchValue V
-
-	for h, v := range wildcard {
-		if strings.HasSuffix(needle, string(h[1:])) {
-			if !found {
-				matchHost = h
-				matchValue = wildcard[h]
-				found = true
-			} else if host.MoreSpecific(h, matchHost) {
-				matchHost = h
-				matchValue = v
-			}
-		}
-	}
-
-	return matchHost, matchValue, found
-}
-
 // sortConfigByCreationTime sorts the list of config objects in ascending order by their creation time (if available)
 func sortConfigByCreationTime(configs []Config) []Config {
 	sort.Slice(configs, func(i, j int) bool {
@@ -185,107 +72,42 @@ func sortConfigByCreationTime(configs []Config) []Config {
 	return configs
 }
 
-type (
-	Node                    = pm.Node
-	NodeMetadata            = pm.NodeMetadata
-	NodeMetaProxyConfig     = pm.NodeMetaProxyConfig
-	NodeType                = pm.NodeType
-	BootstrapNodeMetadata   = pm.BootstrapNodeMetadata
-	TrafficInterceptionMode = pm.TrafficInterceptionMode
-	PodPort                 = pm.PodPort
-	StringBool              = pm.StringBool
-	IPMode                  = pm.IPMode
-)
+type ADPCacheResource struct {
+	Gateway types.NamespacedName `json:"gateway"`
+	reports reports.ReportMap
 
-const (
-	SidecarProxy = pm.SidecarProxy
-	Router       = pm.Router
-	Waypoint     = pm.Waypoint
-	Ztunnel      = pm.Ztunnel
+	Resources envoycache.Resources
+	Addresses envoycache.Resources
 
-	IPv4 = pm.IPv4
-	IPv6 = pm.IPv6
-	Dual = pm.Dual
-)
-
-// ParseMetadata parses the opaque Metadata from an Envoy Node into string key-value pairs.
-// Any non-string values are ignored.
-func ParseMetadata(metadata *structpb.Struct) (*NodeMetadata, error) {
-	if metadata == nil {
-		return &NodeMetadata{}, nil
-	}
-
-	bootstrapNodeMeta, err := ParseBootstrapNodeMetadata(metadata)
-	if err != nil {
-		return nil, err
-	}
-	return &bootstrapNodeMeta.NodeMetadata, nil
+	VersionMap map[string]map[string]string
 }
 
-// ParseBootstrapNodeMetadata parses the opaque Metadata from an Envoy Node into string key-value pairs.
-func ParseBootstrapNodeMetadata(metadata *structpb.Struct) (*BootstrapNodeMetadata, error) {
-	if metadata == nil {
-		return &BootstrapNodeMetadata{}, nil
-	}
-
-	b, err := protomarshal.MarshalProtoNames(metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read node metadata %v: %v", metadata, err)
-	}
-	meta := &BootstrapNodeMetadata{}
-	if err := json.Unmarshal(b, meta); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal node metadata (%v): %v", string(b), err)
-	}
-	return meta, nil
+func (r ADPCacheResource) ResourceName() string {
+	return fmt.Sprintf("%s~%s", r.Gateway.Namespace, r.Gateway.Name)
 }
 
-const (
-	serviceNodeSeparator = "~"
-)
-
-// hasValidIPAddresses returns true if the input ips are all valid, otherwise returns false.
-func hasValidIPAddresses(ipAddresses []string) bool {
-	if len(ipAddresses) == 0 {
-		return false
-	}
-	for _, ipAddress := range ipAddresses {
-		if !netutil.IsValidIPAddress(ipAddress) {
-			return false
-		}
-	}
-	return true
+func (r ADPCacheResource) Equals(in ADPCacheResource) bool {
+	return r.Gateway == in.Gateway &&
+		report{r.reports}.Equals(report{in.reports}) &&
+		r.Resources.Version == in.Resources.Version &&
+		r.Addresses.Version == in.Addresses.Version
 }
-
-const (
-	// InterceptionNone indicates that the workload is not using IPtables for traffic interception
-	InterceptionNone TrafficInterceptionMode = "NONE"
-
-	// InterceptionTproxy implies traffic intercepted by IPtables with TPROXY mode
-	InterceptionTproxy TrafficInterceptionMode = "TPROXY"
-
-	// InterceptionRedirect implies traffic intercepted by IPtables with REDIRECT mode
-	// This is our default mode
-	InterceptionRedirect TrafficInterceptionMode = "REDIRECT"
-)
 
 type ADPResource struct {
 	Resource *api.Resource        `json:"resource"`
 	Gateway  types.NamespacedName `json:"gateway"`
 
-	// TODO: separate addresses?
-	Address *api.Address `json:"address"`
-
 	reports reports.ReportMap
 }
 
 func (g ADPResource) ResourceName() string {
-	switch t := g.Resource.Kind.(type) {
+	switch t := g.Resource.GetKind().(type) {
 	case *api.Resource_Bind:
-		return "bind/" + t.Bind.Key
+		return "bind/" + t.Bind.GetKey()
 	case *api.Resource_Listener:
-		return "listener/" + t.Listener.Key
+		return "listener/" + t.Listener.GetKey()
 	case *api.Resource_Route:
-		return "route/" + t.Route.Key
+		return "route/" + t.Route.GetKey()
 	}
 	panic("unknown resource kind")
 }
@@ -300,7 +122,7 @@ func (g ADPResource) Equals(other ADPResource) bool {
 type Meta struct {
 	// GroupVersionKind is a short configuration name that matches the content message type
 	// (e.g. "route-rule")
-	GroupVersionKind GroupVersionKind `json:"type,omitempty"`
+	GroupVersionKind schema.GroupVersionKind `json:"type,omitempty"`
 
 	// UID
 	UID string `json:"uid,omitempty"`
@@ -361,21 +183,9 @@ type Config struct {
 	Status Status
 }
 
-type Namer interface {
-	GetName() string
-	GetNamespace() string
-}
-
 type TypedResource struct {
 	Kind schema.GroupVersionKind
 	Name types.NamespacedName
-}
-
-func NamespacedName[T Namer](o T) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: o.GetNamespace(),
-		Name:      o.GetName(),
-	}
 }
 
 // Spec defines the spec for the  In order to use below helper methods,
@@ -560,56 +370,6 @@ func (c Config) NamespacedName() types.NamespacedName {
 		Namespace: c.Namespace,
 		Name:      c.Name,
 	}
-}
-
-var _ fmt.Stringer = GroupVersionKind{}
-
-type GroupVersionKind struct {
-	Group   string `json:"group"`
-	Version string `json:"version"`
-	Kind    string `json:"kind"`
-}
-
-func (g GroupVersionKind) String() string {
-	return g.CanonicalGroup() + "/" + g.Version + "/" + g.Kind
-}
-
-// GroupVersion returns the group/version similar to what would be found in the apiVersion field of a Kubernetes resource.
-func (g GroupVersionKind) GroupVersion() string {
-	if g.Group == "" {
-		return g.Version
-	}
-	return g.Group + "/" + g.Version
-}
-
-func FromKubernetesGVK(gvk schema.GroupVersionKind) GroupVersionKind {
-	return GroupVersionKind{
-		Group:   gvk.Group,
-		Version: gvk.Version,
-		Kind:    gvk.Kind,
-	}
-}
-
-// Kubernetes returns the same GVK, using the Kubernetes object type
-func (g GroupVersionKind) Kubernetes() schema.GroupVersionKind {
-	return schema.GroupVersionKind{
-		Group:   g.Group,
-		Version: g.Version,
-		Kind:    g.Kind,
-	}
-}
-
-func CanonicalGroup(group string) string {
-	if group != "" {
-		return group
-	}
-	return "core"
-}
-
-// CanonicalGroup returns the group with defaulting applied. This means an empty group will
-// be treated as "core", following Kubernetes API standards
-func (g GroupVersionKind) CanonicalGroup() string {
-	return CanonicalGroup(g.Group)
 }
 
 type Index[K comparable, O any] interface {

@@ -1,33 +1,19 @@
-// Copyright Istio Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package gateway
+package agentgatewaysyncer
 
 import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-	"istio.io/istio/pkg/config/constants"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+
 	istio "istio.io/api/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/util/protoconv"
-	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
 	"istio.io/istio/pkg/slices"
@@ -160,7 +146,7 @@ func GatewayCollection(
 			gatewayConfig := Config{
 				Meta: Meta{
 					CreationTimestamp: obj.CreationTimestamp.Time,
-					GroupVersionKind:  GroupVersionKind{Group: wellknown.GatewayGroup, Kind: wellknown.GatewayKind},
+					GroupVersionKind:  schema.GroupVersionKind{Group: wellknown.GatewayGroup, Kind: wellknown.GatewayKind},
 					Name:              InternalGatewayName(obj.Name, string(l.Name)),
 					Annotations:       meta,
 					Namespace:         obj.Namespace,
@@ -173,14 +159,14 @@ func GatewayCollection(
 
 			allowed, _ := generateSupportedKinds(l)
 			ref := parentKey{
-				Kind:      gvk.KubernetesGateway,
+				Kind:      wellknown.GatewayGVK,
 				Name:      obj.Name,
 				Namespace: obj.Namespace,
 			}
 			pri := parentInfo{
 				InternalName:     obj.Namespace + "/" + gatewayConfig.Name,
 				AllowedKinds:     allowed,
-				Hostnames:        server.Hosts,
+				Hostnames:        server.GetHosts(),
 				OriginalHostname: string(ptr.OrEmpty(l.Hostname)),
 				SectionName:      l.Name,
 				Port:             l.Port,
@@ -210,21 +196,6 @@ type RouteParents struct {
 }
 
 func (p RouteParents) fetch(ctx krt.HandlerContext, pk parentKey) []*parentInfo {
-	if pk == meshParentKey {
-		// Special case
-		return []*parentInfo{
-			{
-				InternalName: "mesh",
-				// Mesh has no configurable AllowedKinds, so allow all supported
-				AllowedKinds: []gateway.RouteGroupKind{
-					{Group: (*gateway.Group)(ptr.Of(gvk.HTTPRoute.Group)), Kind: gateway.Kind(gvk.HTTPRoute.Kind)},
-					{Group: (*gateway.Group)(ptr.Of(gvk.GRPCRoute.Group)), Kind: gateway.Kind(gvk.GRPCRoute.Kind)},
-					{Group: (*gateway.Group)(ptr.Of(gvk.TCPRoute.Group)), Kind: gateway.Kind(gvk.TCPRoute.Kind)},
-					{Group: (*gateway.Group)(ptr.Of(gvk.TLSRoute.Group)), Kind: gateway.Kind(gvk.TLSRoute.Kind)},
-				},
-			},
-		}
-	}
 	return slices.Map(krt.Fetch(ctx, p.gateways, krt.FilterIndex(p.gatewayIndex, pk)), func(gw Gateway) *parentInfo {
 		return &gw.parentInfo
 	})
@@ -245,5 +216,5 @@ func BuildRouteParents(
 // InternalGatewayName returns the name of the internal Istio Gateway corresponding to the
 // specified gateway-api gateway and listener.
 func InternalGatewayName(gwName, lName string) string {
-	return fmt.Sprintf("%s-%s-%s", gwName, constants.KubernetesGatewayName, lName)
+	return fmt.Sprintf("%s-%s-%s", gwName, AgentgatewayName, lName)
 }

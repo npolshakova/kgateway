@@ -1,12 +1,13 @@
-package gateway
+package agentgatewaysyncer
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8s "sigs.k8s.io/gateway-api/apis/v1"
 	k8sbeta "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+
 	"istio.io/istio/pilot/pkg/model/kstatus"
-	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/maps"
 	"istio.io/istio/pkg/slices"
 )
@@ -42,14 +43,6 @@ const (
 	// InvalidConfiguration indicates a generic error for all other invalid configurations
 	InvalidConfiguration ConfigErrorReason = "InvalidConfiguration"
 	DeprecateFieldUsage  ConfigErrorReason = "DeprecatedField"
-)
-
-const (
-	// This condition indicates whether a route's parent reference has
-	// a waypoint configured by resolving the "istio.io/use-waypoint" label
-	// on either the referenced parent or the parent's namespace.
-	RouteConditionResolvedWaypoints k8s.RouteConditionType   = "ResolvedWaypoints"
-	RouteReasonResolvedWaypoints    k8s.RouteConditionReason = "ResolvedWaypoints"
 )
 
 // ParentError represents that a parent could not be referenced
@@ -153,16 +146,16 @@ func generateSupportedKinds(l k8s.Listener) ([]k8s.RouteGroupKind, bool) {
 	case k8s.HTTPProtocolType, k8s.HTTPSProtocolType:
 		// Only terminate allowed, so its always HTTP
 		supported = []k8s.RouteGroupKind{
-			toRouteKind(gvk.HTTPRoute),
-			toRouteKind(gvk.GRPCRoute),
+			toRouteKind(wellknown.HTTPRouteGVK),
+			toRouteKind(wellknown.GRPCRouteGVK),
 		}
 	case k8s.TCPProtocolType:
-		supported = []k8s.RouteGroupKind{toRouteKind(gvk.TCPRoute)}
+		supported = []k8s.RouteGroupKind{toRouteKind(wellknown.TCPRouteGVK)}
 	case k8s.TLSProtocolType:
 		if l.TLS != nil && l.TLS.Mode != nil && *l.TLS.Mode == k8s.TLSModePassthrough {
-			supported = []k8s.RouteGroupKind{toRouteKind(gvk.TLSRoute)}
+			supported = []k8s.RouteGroupKind{toRouteKind(wellknown.TLSRouteGVK)}
 		} else {
-			supported = []k8s.RouteGroupKind{toRouteKind(gvk.TCPRoute)}
+			supported = []k8s.RouteGroupKind{toRouteKind(wellknown.TCPRouteGVK)}
 		}
 		// UDP route not support
 	}
