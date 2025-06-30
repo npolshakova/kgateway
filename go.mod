@@ -624,7 +624,7 @@ require (
 )
 
 replace (
-	github.com/agentgateway/agentgateway => github.com/solo-io/agentgateway-enterprise v0.0.0-20250625151206-94c5ea602e02
+	github.com/agentgateway/agentgateway => github.com/solo-io/agentgateway-enterprise v0.0.0-20250626235044-bb6ced925fc3
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
 )
 

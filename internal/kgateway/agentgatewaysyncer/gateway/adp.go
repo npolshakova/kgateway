@@ -10,20 +10,19 @@ import (
 
 	"istio.io/istio/pkg/ptr"
 	"istio.io/istio/pkg/slices"
-	"istio.io/istio/pkg/workloadapi"
 )
 
 func createADPMethodMatch(match k8s.HTTPRouteMatch) (*api.MethodMatch, *ConfigError) {
 	if match.Method == nil {
 		return nil, nil
 	}
-	return &workloadapi.MethodMatch{
+	return &api.MethodMatch{
 		Exact: string(*match.Method),
 	}, nil
 }
 
-func createADPQueryMatch(match k8s.HTTPRouteMatch) ([]*workloadapi.QueryMatch, *ConfigError) {
-	res := []*workloadapi.QueryMatch{}
+func createADPQueryMatch(match k8s.HTTPRouteMatch) ([]*api.QueryMatch, *ConfigError) {
+	res := []*api.QueryMatch{}
 	for _, header := range match.QueryParams {
 		tp := k8s.QueryParamMatchExact
 		if header.Type != nil {
@@ -31,14 +30,14 @@ func createADPQueryMatch(match k8s.HTTPRouteMatch) ([]*workloadapi.QueryMatch, *
 		}
 		switch tp {
 		case k8s.QueryParamMatchExact:
-			res = append(res, &workloadapi.QueryMatch{
+			res = append(res, &api.QueryMatch{
 				Name:  string(header.Name),
-				Value: &workloadapi.QueryMatch_Exact{Exact: header.Value},
+				Value: &api.QueryMatch_Exact{Exact: header.Value},
 			})
 		case k8s.QueryParamMatchRegularExpression:
-			res = append(res, &workloadapi.QueryMatch{
+			res = append(res, &api.QueryMatch{
 				Name:  string(header.Name),
-				Value: &workloadapi.QueryMatch_Regex{Regex: header.Value},
+				Value: &api.QueryMatch_Regex{Regex: header.Value},
 			})
 		default:
 			// Should never happen, unless a new field is added
@@ -51,7 +50,7 @@ func createADPQueryMatch(match k8s.HTTPRouteMatch) ([]*workloadapi.QueryMatch, *
 	return res, nil
 }
 
-func createADPPathMatch(match k8s.HTTPRouteMatch) (*workloadapi.PathMatch, *ConfigError) {
+func createADPPathMatch(match k8s.HTTPRouteMatch) (*api.PathMatch, *ConfigError) {
 	tp := k8s.PathMatchPathPrefix
 	if match.Path.Type != nil {
 		tp = *match.Path.Type
@@ -66,15 +65,15 @@ func createADPPathMatch(match k8s.HTTPRouteMatch) (*workloadapi.PathMatch, *Conf
 		if dest != "/" {
 			dest = strings.TrimSuffix(dest, "/")
 		}
-		return &workloadapi.PathMatch{Kind: &workloadapi.PathMatch_PathPrefix{
+		return &api.PathMatch{Kind: &api.PathMatch_PathPrefix{
 			PathPrefix: dest,
 		}}, nil
 	case k8s.PathMatchExact:
-		return &workloadapi.PathMatch{Kind: &workloadapi.PathMatch_Exact{
+		return &api.PathMatch{Kind: &api.PathMatch_Exact{
 			Exact: dest,
 		}}, nil
 	case k8s.PathMatchRegularExpression:
-		return &workloadapi.PathMatch{Kind: &workloadapi.PathMatch_Regex{
+		return &api.PathMatch{Kind: &api.PathMatch_Regex{
 			Regex: dest,
 		}}, nil
 	default:
@@ -83,8 +82,8 @@ func createADPPathMatch(match k8s.HTTPRouteMatch) (*workloadapi.PathMatch, *Conf
 	}
 }
 
-func createADPHeadersMatch(match k8s.HTTPRouteMatch) ([]*workloadapi.HeaderMatch, *ConfigError) {
-	res := []*workloadapi.HeaderMatch{}
+func createADPHeadersMatch(match k8s.HTTPRouteMatch) ([]*api.HeaderMatch, *ConfigError) {
+	res := []*api.HeaderMatch{}
 	for _, header := range match.Headers {
 		tp := k8s.HeaderMatchExact
 		if header.Type != nil {
@@ -92,14 +91,14 @@ func createADPHeadersMatch(match k8s.HTTPRouteMatch) ([]*workloadapi.HeaderMatch
 		}
 		switch tp {
 		case k8s.HeaderMatchExact:
-			res = append(res, &workloadapi.HeaderMatch{
+			res = append(res, &api.HeaderMatch{
 				Name:  string(header.Name),
-				Value: &workloadapi.HeaderMatch_Exact{Exact: header.Value},
+				Value: &api.HeaderMatch_Exact{Exact: header.Value},
 			})
 		case k8s.HeaderMatchRegularExpression:
-			res = append(res, &workloadapi.HeaderMatch{
+			res = append(res, &api.HeaderMatch{
 				Name:  string(header.Name),
-				Value: &workloadapi.HeaderMatch_Regex{Regex: header.Value},
+				Value: &api.HeaderMatch_Regex{Regex: header.Value},
 			})
 		default:
 			// Should never happen, unless a new field is added
@@ -113,13 +112,13 @@ func createADPHeadersMatch(match k8s.HTTPRouteMatch) ([]*workloadapi.HeaderMatch
 	return res, nil
 }
 
-func createADPHeadersFilter(filter *k8s.HTTPHeaderFilter) *workloadapi.RouteFilter {
+func createADPHeadersFilter(filter *k8s.HTTPHeaderFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
-	return &workloadapi.RouteFilter{
-		Kind: &workloadapi.RouteFilter_RequestHeaderModifier{
-			RequestHeaderModifier: &workloadapi.HeaderModifier{
+	return &api.RouteFilter{
+		Kind: &api.RouteFilter_RequestHeaderModifier{
+			RequestHeaderModifier: &api.HeaderModifier{
 				Add:    headerListToADP(filter.Add),
 				Set:    headerListToADP(filter.Set),
 				Remove: filter.Remove,
@@ -128,13 +127,13 @@ func createADPHeadersFilter(filter *k8s.HTTPHeaderFilter) *workloadapi.RouteFilt
 	}
 }
 
-func createADPResponseHeadersFilter(filter *k8s.HTTPHeaderFilter) *workloadapi.RouteFilter {
+func createADPResponseHeadersFilter(filter *k8s.HTTPHeaderFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
-	return &workloadapi.RouteFilter{
-		Kind: &workloadapi.RouteFilter_ResponseHeaderModifier{
-			ResponseHeaderModifier: &workloadapi.HeaderModifier{
+	return &api.RouteFilter{
+		Kind: &api.RouteFilter_ResponseHeaderModifier{
+			ResponseHeaderModifier: &api.HeaderModifier{
 				Add:    headerListToADP(filter.Add),
 				Set:    headerListToADP(filter.Set),
 				Remove: filter.Remove,
@@ -143,23 +142,23 @@ func createADPResponseHeadersFilter(filter *k8s.HTTPHeaderFilter) *workloadapi.R
 	}
 }
 
-func createADPRewriteFilter(filter *k8s.HTTPURLRewriteFilter) *workloadapi.RouteFilter {
+func createADPRewriteFilter(filter *k8s.HTTPURLRewriteFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
-	ff := &workloadapi.UrlRewrite{
+	ff := &api.UrlRewrite{
 		Host: string(ptr.OrEmpty(filter.Hostname)),
 	}
 	if filter.Path != nil {
 		switch filter.Path.Type {
 		case k8s.PrefixMatchHTTPPathModifier:
-			ff.Path = &workloadapi.UrlRewrite_Prefix{Prefix: strings.TrimSuffix(*filter.Path.ReplacePrefixMatch, "/")}
+			ff.Path = &api.UrlRewrite_Prefix{Prefix: strings.TrimSuffix(*filter.Path.ReplacePrefixMatch, "/")}
 		case k8s.FullPathHTTPPathModifier:
-			ff.Path = &workloadapi.UrlRewrite_Full{Full: strings.TrimSuffix(*filter.Path.ReplaceFullPath, "/")}
+			ff.Path = &api.UrlRewrite_Full{Full: strings.TrimSuffix(*filter.Path.ReplaceFullPath, "/")}
 		}
 	}
-	return &workloadapi.RouteFilter{
-		Kind: &workloadapi.RouteFilter_UrlRewrite{
+	return &api.RouteFilter{
+		Kind: &api.RouteFilter_UrlRewrite{
 			UrlRewrite: ff,
 		},
 	}
@@ -169,9 +168,8 @@ func createADPMirrorFilter(
 	ctx RouteContext,
 	filter *k8s.HTTPRequestMirrorFilter,
 	ns string,
-	enforceRefGrant bool,
 	k config.GroupVersionKind,
-) (*workloadapi.RouteFilter, *ConfigError) {
+) (*api.RouteFilter, *ConfigError) {
 	if filter == nil {
 		return nil, nil
 	}
@@ -181,7 +179,7 @@ func createADPMirrorFilter(
 			BackendObjectReference: filter.BackendRef,
 			Weight:                 &weightOne,
 		},
-	}, ns, enforceRefGrant, k)
+	}, ns, k)
 	if err != nil {
 		return nil, err
 	}
@@ -196,25 +194,25 @@ func createADPMirrorFilter(
 	if percent == 0 {
 		return nil, nil
 	}
-	rm := &workloadapi.RequestMirror{
+	rm := &api.RequestMirror{
 		Kind:       nil,
 		Percentage: percent,
 		Port:       dst.Port,
 	}
 	switch dk := dst.Kind.(type) {
-	case *workloadapi.RouteBackend_Service:
-		rm.Kind = &workloadapi.RequestMirror_Service{
+	case *api.RouteBackend_Service:
+		rm.Kind = &api.RequestMirror_Service{
 			Service: dk.Service,
 		}
 	}
-	return &workloadapi.RouteFilter{Kind: &workloadapi.RouteFilter_RequestMirror{RequestMirror: rm}}, nil
+	return &api.RouteFilter{Kind: &api.RouteFilter_RequestMirror{RequestMirror: rm}}, nil
 }
 
-func createADPRedirectFilter(filter *k8s.HTTPRequestRedirectFilter) *workloadapi.RouteFilter {
+func createADPRedirectFilter(filter *k8s.HTTPRequestRedirectFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
-	ff := &workloadapi.RequestRedirect{
+	ff := &api.RequestRedirect{
 		Scheme: ptr.OrEmpty(filter.Scheme),
 		Host:   string(ptr.OrEmpty(filter.Hostname)),
 		Port:   uint32(ptr.OrEmpty(filter.Port)),
@@ -223,21 +221,21 @@ func createADPRedirectFilter(filter *k8s.HTTPRequestRedirectFilter) *workloadapi
 	if filter.Path != nil {
 		switch filter.Path.Type {
 		case k8s.PrefixMatchHTTPPathModifier:
-			ff.Path = &workloadapi.RequestRedirect_Prefix{Prefix: strings.TrimSuffix(*filter.Path.ReplacePrefixMatch, "/")}
+			ff.Path = &api.RequestRedirect_Prefix{Prefix: strings.TrimSuffix(*filter.Path.ReplacePrefixMatch, "/")}
 		case k8s.FullPathHTTPPathModifier:
-			ff.Path = &workloadapi.RequestRedirect_Full{Full: strings.TrimSuffix(*filter.Path.ReplaceFullPath, "/")}
+			ff.Path = &api.RequestRedirect_Full{Full: strings.TrimSuffix(*filter.Path.ReplaceFullPath, "/")}
 		}
 	}
-	return &workloadapi.RouteFilter{
-		Kind: &workloadapi.RouteFilter_RequestRedirect{
+	return &api.RouteFilter{
+		Kind: &api.RouteFilter_RequestRedirect{
 			RequestRedirect: ff,
 		},
 	}
 }
 
-func headerListToADP(hl []k8s.HTTPHeader) []*workloadapi.Header {
-	return slices.Map(hl, func(hl k8s.HTTPHeader) *workloadapi.Header {
-		return &workloadapi.Header{
+func headerListToADP(hl []k8s.HTTPHeader) []*api.Header {
+	return slices.Map(hl, func(hl k8s.HTTPHeader) *api.Header {
+		return &api.Header{
 			Name:  string(hl.Name),
 			Value: hl.Value,
 		}

@@ -15,47 +15,43 @@
 package gateway
 
 import (
-	"strings"
+	"fmt"
 
-	"go.uber.org/atomic"
+	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"istio.io/istio/pkg/config/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	istio "istio.io/api/networking/v1alpha3"
-	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/util/protoconv"
-	"istio.io/istio/pkg/config"
-	"istio.io/istio/pkg/config/constants"
-	kubeconfig "istio.io/istio/pkg/config/gateway/kube"
 	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
-	"istio.io/istio/pkg/revisions"
 	"istio.io/istio/pkg/slices"
-	"istio.io/istio/pkg/workloadapi"
 )
 
-func toResourcep(gw types.NamespacedName, t any) *model.ADPResource {
+func toResourcep(gw types.NamespacedName, t any) *ADPResource {
 	res := toResource(gw, t)
 	return &res
 }
 
-func toResource(gw types.NamespacedName, t any) model.ADPResource {
+func toResource(gw types.NamespacedName, t any) ADPResource {
 	switch tt := t.(type) {
 	case Bind:
-		return model.ADPResource{Resource: &workloadapi.Resource{Kind: &workloadapi.Resource_Bind{tt.Bind}}, Gateway: gw}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{tt.Bind}}, Gateway: gw}
 	case ADPListener:
-		return model.ADPResource{Resource: &workloadapi.Resource{Kind: &workloadapi.Resource_Listener{tt.Listener}}, Gateway: gw}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{tt.Listener}}, Gateway: gw}
 	case ADPRoute:
-		return model.ADPResource{Resource: &workloadapi.Resource{Kind: &workloadapi.Resource_Route{tt.Route}}, Gateway: gw}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{tt.Route}}, Gateway: gw}
 	}
 	panic("unknown resource kind")
 }
 
 // TODO: we need some way to associate this to a specific instance of the proxy!!
 type Bind struct {
-	*workloadapi.Bind
+	*api.Bind
 }
 
 func (g Bind) ResourceName() string {
@@ -67,7 +63,7 @@ func (g Bind) Equals(other Bind) bool {
 }
 
 type ADPListener struct {
-	*workloadapi.Listener
+	*api.Listener
 }
 
 func (g ADPListener) ResourceName() string {
@@ -79,7 +75,7 @@ func (g ADPListener) Equals(other ADPListener) bool {
 }
 
 type ADPRoute struct {
-	*workloadapi.Route
+	*api.Route
 }
 
 func (g ADPRoute) ResourceName() string {
@@ -95,8 +91,22 @@ type TLSInfo struct {
 	Key  []byte `json:"-"`
 }
 
+type PortBindings struct {
+	Gateway
+	Port string
+}
+
+func (g PortBindings) ResourceName() string {
+	return g.Gateway.Name
+}
+
+func (g PortBindings) Equals(other PortBindings) bool {
+	return g.Gateway.Equals(other.Gateway) &&
+		g.port == other.port
+}
+
 type Gateway struct {
-	*config.Config
+	*Config
 	parent     parentKey
 	parentInfo parentInfo
 	TLSInfo    *TLSInfo
@@ -104,7 +114,7 @@ type Gateway struct {
 }
 
 func (g Gateway) ResourceName() string {
-	return config.NamespacedName(g.Config).Name
+	return g.Config.Name
 }
 
 func (g Gateway) Equals(other Gateway) bool {
@@ -119,67 +129,47 @@ func GatewayCollection(
 	grants ReferenceGrants,
 	secrets krt.Collection[*corev1.Secret],
 	domainSuffix string,
-	gatewayContext krt.RecomputeProtected[*atomic.Pointer[GatewayContext]],
-	tagWatcher krt.RecomputeProtected[revisions.TagWatcher],
 	opts krt.OptionsBuilder,
-) (
-	krt.StatusCollection[*gateway.Gateway, gateway.GatewayStatus],
-	krt.Collection[Gateway],
-) {
-	statusCol, gw := krt.NewStatusManyCollection(gateways, func(ctx krt.HandlerContext, obj *gateway.Gateway) (*gateway.GatewayStatus, []Gateway) {
-		// We currently depend on service discovery information not know to krt; mark we depend on it.
-		context := gatewayContext.Get(ctx).Load()
-		if context == nil {
-			return nil, nil
-		}
-		if !tagWatcher.Get(ctx).IsMine(obj.ObjectMeta) {
-			return nil, nil
-		}
-		result := []Gateway{}
+) krt.Collection[Gateway] {
+	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gateway.Gateway) []Gateway {
+		var result []Gateway
 		kgw := obj.Spec
 		status := obj.Status.DeepCopy()
 		class := fetchClass(ctx, gatewayClasses, kgw.GatewayClassName)
 		if class == nil {
-			return nil, nil
+			return nil
 		}
 		controllerName := class.Controller
 		classInfo, f := classInfos[controllerName]
 		if !f {
-			return nil, nil
+			return nil
 		}
 		if classInfo.disableRouteGeneration {
-			reportUnmanagedGatewayStatus(status, obj)
 			// We found it, but don't want to handle this class
-			return status, nil
+			// TODO: log
+			return nil
 		}
-		servers := []*istio.Server{}
+		var servers []*istio.Server
 
 		// Extract the addresses. A gateway will bind to a specific Service
 		gatewayServices, err := extractGatewayServices(domainSuffix, obj, classInfo)
 		if len(gatewayServices) == 0 && err != nil {
 			// Short circuit if its a hard failure
-			reportGatewayStatus(context, obj, status, classInfo, gatewayServices, servers, err)
-			return status, nil
+			// TODO: log
+			return nil
 		}
 
 		for i, l := range kgw.Listeners {
 			server, tlsInfo, programmed := buildListener(ctx, secrets, grants, namespaces, obj, status, l, i, controllerName)
 
 			servers = append(servers, server)
-			if controllerName == constants.ManagedGatewayMeshController {
-				// Waypoint doesn't actually convert the routes to VirtualServices
-				continue
-			}
 			meta := parentMeta(obj, &l.Name)
-			meta[constants.InternalGatewaySemantics] = constants.GatewaySemanticsGateway
-			meta[model.InternalGatewayServiceAnnotation] = strings.Join(gatewayServices, ",")
-
 			// Each listener generates an Istio Gateway with a single Server. This allows binding to a specific listener.
-			gatewayConfig := config.Config{
-				Meta: config.Meta{
+			gatewayConfig := Config{
+				Meta: Meta{
 					CreationTimestamp: obj.CreationTimestamp.Time,
-					GroupVersionKind:  gvk.Gateway,
-					Name:              kubeconfig.InternalGatewayName(obj.Name, string(l.Name)),
+					GroupVersionKind:  GroupVersionKind{Group: wellknown.GatewayGroup, Kind: wellknown.GatewayKind},
+					Name:              InternalGatewayName(obj.Name, string(l.Name)),
 					Annotations:       meta,
 					Namespace:         obj.Namespace,
 					Domain:            domainSuffix,
@@ -215,43 +205,10 @@ func GatewayCollection(
 			result = append(result, res)
 		}
 
-		reportGatewayStatus(context, obj, status, classInfo, gatewayServices, servers, err)
-		return status, result
+		return result
 	}, opts.WithName("KubernetesGateway")...)
 
-	return statusCol, gw
-}
-
-var count = atomic.NewInt64(0)
-
-// FinalGatewayStatusCollection finalizes a Gateway status. There is a circular logic between Gateways and Routes to determine
-// the attachedRoute count, so we first build a partial Gateway status, then once routes are computed we finalize it with
-// the attachedRoute count.
-func FinalGatewayStatusCollection(
-	gatewayStatuses krt.StatusCollection[*gateway.Gateway, gateway.GatewayStatus],
-	routeAttachments krt.Collection[*RouteAttachment],
-	routeAttachmentsIndex krt.Index[GatewayAndListener, *RouteAttachment],
-	opts krt.OptionsBuilder,
-) krt.StatusCollection[*gateway.Gateway, gateway.GatewayStatus] {
-	return krt.NewCollection(
-		gatewayStatuses,
-		func(ctx krt.HandlerContext, i krt.ObjectWithStatus[*gateway.Gateway, gateway.GatewayStatus]) *krt.ObjectWithStatus[*gateway.Gateway, gateway.GatewayStatus] {
-			gw := config.NamespacedName(i.Obj)
-			counts := map[string]int32{}
-			for _, l := range i.Obj.Spec.Listeners {
-				routes := krt.FetchCount(ctx, routeAttachments, krt.FilterIndex(routeAttachmentsIndex, GatewayAndListener{To: gw, ListenerName: string(l.Name)}))
-				counts[string(l.Name)] += int32(routes)
-			}
-			status := i.Status.DeepCopy()
-			for i, s := range status.Listeners {
-				s.AttachedRoutes = counts[string(s.Name)]
-				status.Listeners[i] = s
-			}
-			return &krt.ObjectWithStatus[*gateway.Gateway, gateway.GatewayStatus]{
-				Obj:    i.Obj,
-				Status: *status,
-			}
-		}, opts.WithName("GatewayFinalStatus")...)
+	return gw
 }
 
 // RouteParents holds information about things routes can reference as parents.
@@ -291,4 +248,10 @@ func BuildRouteParents(
 		gateways:     gateways,
 		gatewayIndex: idx,
 	}
+}
+
+// InternalGatewayName returns the name of the internal Istio Gateway corresponding to the
+// specified gateway-api gateway and listener.
+func InternalGatewayName(gwName, lName string) string {
+	return fmt.Sprintf("%s-%s-%s", gwName, constants.KubernetesGatewayName, lName)
 }

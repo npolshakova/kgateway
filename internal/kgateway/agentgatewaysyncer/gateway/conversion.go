@@ -34,6 +34,7 @@ import (
 	k8salpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	k8sbeta "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/api/annotation"
 	"istio.io/api/label"
 	istio "istio.io/api/networking/v1alpha3"
@@ -56,7 +57,6 @@ import (
 	"istio.io/istio/pkg/ptr"
 	"istio.io/istio/pkg/slices"
 	"istio.io/istio/pkg/util/sets"
-	"istio.io/istio/pkg/workloadapi"
 )
 
 const (
@@ -64,18 +64,6 @@ const (
 	addressTypeOverride        = "networking.istio.io/address-type"
 	gatewayClassDefaults       = "gateway.istio.io/defaults-for-class"
 )
-
-func sortConfigByCreationTime(configs []config.Config) {
-	sort.Slice(configs, func(i, j int) bool {
-		if r := configs[i].CreationTimestamp.Compare(configs[j].CreationTimestamp); r != 0 {
-			return r == -1 // -1 means i is less than j, so return true
-		}
-		if r := cmp.Compare(configs[i].Namespace, configs[j].Namespace); r != 0 {
-			return r == -1
-		}
-		return cmp.Compare(configs[i].Name, configs[j].Name) == -1
-	})
-}
 
 func sortRoutesByCreationTime(configs []RouteWithKey) {
 	sort.Slice(configs, func(i, j int) bool {
@@ -89,15 +77,14 @@ func sortRoutesByCreationTime(configs []RouteWithKey) {
 	})
 }
 
-func sortedConfigByCreationTime(configs []config.Config) []config.Config {
-	sortConfigByCreationTime(configs)
-	return configs
+func sortedConfigByCreationTime(configs []Config) []Config {
+	return sortConfigByCreationTime(configs)
 }
 
 func convertHTTPRouteToADP(ctx RouteContext, r k8s.HTTPRouteRule,
-	obj *k8sbeta.HTTPRoute, pos int, matchPos int, enforceRefGrant bool,
-) (*workloadapi.Route, *ConfigError) {
-	res := &workloadapi.Route{
+	obj *k8sbeta.HTTPRoute, pos int, matchPos int,
+) (*api.Route, *ConfigError) {
+	res := &api.Route{
 		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) + "." + strconv.Itoa(matchPos),
 		RouteName:   obj.Namespace + "/" + obj.Name,
 		ListenerKey: "",
@@ -121,21 +108,21 @@ func convertHTTPRouteToADP(ctx RouteContext, r k8s.HTTPRouteRule,
 		if err != nil {
 			return nil, err
 		}
-		res.Matches = append(res.Matches, &workloadapi.RouteMatch{
+		res.Matches = append(res.Matches, &api.RouteMatch{
 			Path:        path,
 			Headers:     headers,
 			Method:      method,
 			QueryParams: query,
 		})
 	}
-	filters, err := buildADPFilters(ctx, obj.Namespace, enforceRefGrant, r.Filters)
+	filters, err := buildADPFilters(ctx, obj.Namespace, r.Filters)
 	if err != nil {
 		return nil, err
 	}
 	res.Filters = filters
 
 	if r.Timeouts != nil {
-		res.TrafficPolicy = &workloadapi.TrafficPolicy{}
+		res.TrafficPolicy = &api.TrafficPolicy{}
 		if r.Timeouts.Request != nil {
 			request, _ := time.ParseDuration(string(*r.Timeouts.Request))
 			if request > 0 {
@@ -151,7 +138,7 @@ func convertHTTPRouteToADP(ctx RouteContext, r k8s.HTTPRouteRule,
 	}
 
 	// Retry: todo
-	route, backendErr, err := buildADPHTTPDestination(ctx, r.BackendRefs, obj.Namespace, enforceRefGrant)
+	route, backendErr, err := buildADPHTTPDestination(ctx, r.BackendRefs, obj.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -165,10 +152,9 @@ func convertHTTPRouteToADP(ctx RouteContext, r k8s.HTTPRouteRule,
 func buildADPFilters(
 	ctx RouteContext,
 	ns string,
-	enforceRefGrant bool,
 	inputFilters []k8s.HTTPRouteFilter,
-) ([]*workloadapi.RouteFilter, *ConfigError) {
-	filters := []*workloadapi.RouteFilter{}
+) ([]*api.RouteFilter, *ConfigError) {
+	var filters []*api.RouteFilter
 	var mirrorBackendErr *ConfigError
 	for _, filter := range inputFilters {
 		switch filter.Type {
@@ -191,7 +177,7 @@ func buildADPFilters(
 			}
 			filters = append(filters, h)
 		case k8s.HTTPRouteFilterRequestMirror:
-			h, err := createADPMirrorFilter(ctx, filter.RequestMirror, ns, enforceRefGrant, gvk.HTTPRoute)
+			h, err := createADPMirrorFilter(ctx, filter.RequestMirror, ns, gvk.HTTPRoute)
 			if err != nil {
 				mirrorBackendErr = err
 			} else {
@@ -222,16 +208,15 @@ func buildADPHTTPDestination(
 	ctx RouteContext,
 	forwardTo []k8s.HTTPBackendRef,
 	ns string,
-	enforceRefGrant bool,
-) ([]*workloadapi.RouteBackend, *ConfigError, *ConfigError) {
+) ([]*api.RouteBackend, *ConfigError, *ConfigError) {
 	if forwardTo == nil {
 		return nil, nil, nil
 	}
 
 	var invalidBackendErr *ConfigError
-	res := []*workloadapi.RouteBackend{}
+	var res []*api.RouteBackend
 	for _, fwd := range forwardTo {
-		dst, err := buildADPDestination(ctx, fwd, ns, enforceRefGrant, gvk.HTTPRoute)
+		dst, err := buildADPDestination(ctx, fwd, ns, gvk.HTTPRoute)
 		if err != nil {
 			log.Errorf("howardjohn: adp error: %v", err)
 			if isInvalidBackend(err) {
@@ -242,7 +227,7 @@ func buildADPHTTPDestination(
 			}
 		}
 		if dst != nil {
-			filters, err := buildADPFilters(ctx, ns, enforceRefGrant, fwd.Filters)
+			filters, err := buildADPFilters(ctx, ns, fwd.Filters)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -257,17 +242,14 @@ func buildADPDestination(
 	ctx RouteContext,
 	to k8s.HTTPBackendRef,
 	ns string,
-	enforceRefGrant bool,
 	k config.GroupVersionKind,
-) (*workloadapi.RouteBackend, *ConfigError) {
+) (*api.RouteBackend, *ConfigError) {
 	// check if the reference is allowed
-	if enforceRefGrant {
-		if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
-			if !ctx.Grants.BackendAllowed(ctx.Krt, k, to.Name, *toNs, ns) {
-				return nil, &ConfigError{
-					Reason:  InvalidDestinationPermit,
-					Message: fmt.Sprintf("backendRef %v/%v not accessible to a %s in namespace %q (missing a ReferenceGrant?)", to.Name, *toNs, k.Kind, ns),
-				}
+	if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
+		if !ctx.Grants.BackendAllowed(ctx.Krt, k, to.Name, *toNs, ns) {
+			return nil, &ConfigError{
+				Reason:  InvalidDestinationPermit,
+				Message: fmt.Sprintf("backendRef %v/%v not accessible to a %s in namespace %q (missing a ReferenceGrant?)", to.Name, *toNs, k.Kind, ns),
 			}
 		}
 	}
@@ -276,25 +258,25 @@ func buildADPDestination(
 	var invalidBackendErr *ConfigError
 	var hostname string
 	ref := normalizeReference(to.Group, to.Kind, gvk.Service)
-	rb := &workloadapi.RouteBackend{
+	rb := &api.RouteBackend{
 		Weight: ptr.OrDefault(to.Weight, 1),
 	}
 	var port *k8s.PortNumber
 	switch ref {
-	case gvk.InferencePool:
-		if strings.Contains(string(to.Name), ".") {
-			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
-		}
-		hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
-		key := namespace + "/" + string(to.Name)
-		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
-		log.Errorf("howardjohn: got pool %v for %v", svc, key)
-		if svc == nil {
-			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
-		} else {
-			port = ptr.Of(k8s.PortNumber(svc.Spec.TargetPortNumber))
-		}
-		rb.Kind = &workloadapi.RouteBackend_Service{Service: namespace + "/" + hostname}
+	//case gvk.InferencePool:
+	//	if strings.Contains(string(to.Name), ".") {
+	//		return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
+	//	}
+	//	hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
+	//	key := namespace + "/" + string(to.Name)
+	//	svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
+	//	log.Errorf("howardjohn: got pool %v for %v", svc, key)
+	//	if svc == nil {
+	//		invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
+	//	} else {
+	//		port = ptr.Of(k8s.PortNumber(svc.Spec.TargetPortNumber))
+	//	}
+	//	rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
 	case gvk.Service:
 		port = to.Port
 		if strings.Contains(string(to.Name), ".") {
@@ -306,7 +288,7 @@ func buildADPDestination(
 		if svc == nil {
 			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
-		rb.Kind = &workloadapi.RouteBackend_Service{Service: namespace + "/" + hostname}
+		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
 	default:
 		port = to.Port
 		return nil, &ConfigError{
@@ -325,7 +307,7 @@ func buildADPDestination(
 }
 
 func convertHTTPRoute(ctx RouteContext, r k8s.HTTPRouteRule,
-	obj *k8sbeta.HTTPRoute, pos int, enforceRefGrant bool,
+	obj *k8sbeta.HTTPRoute, pos int,
 ) (*istio.HTTPRoute, *ConfigError) {
 	vs := &istio.HTTPRoute{}
 	if r.Name != nil {
@@ -384,7 +366,7 @@ func convertHTTPRoute(ctx RouteContext, r k8s.HTTPRouteRule,
 		case k8s.HTTPRouteFilterRequestRedirect:
 			vs.Redirect = createRedirectFilter(filter.RequestRedirect)
 		case k8s.HTTPRouteFilterRequestMirror:
-			mirror, err := createMirrorFilter(ctx, filter.RequestMirror, obj.Namespace, enforceRefGrant, gvk.HTTPRoute)
+			mirror, err := createMirrorFilter(ctx, filter.RequestMirror, obj.Namespace, gvk.HTTPRoute)
 			if err != nil {
 				mirrorBackendErr = err
 			} else {
@@ -421,10 +403,10 @@ func convertHTTPRoute(ctx RouteContext, r k8s.HTTPRouteRule,
 			// Invalid to set this when there are no attempts
 			vs.Retries.RetryOn = ""
 		}
-		if r.Retry.Backoff != nil {
-			retrybackOff, _ := time.ParseDuration(string(*r.Retry.Backoff))
-			vs.Retries.Backoff = durationpb.New(retrybackOff)
-		}
+		//if r.Retry.Backoff != nil {
+		//	retrybackOff, _ := time.ParseDuration(string(*r.Retry.Backoff))
+		//	vs.Retries.Backoff = durationpb.New(retrybackOff)
+		//}
 	}
 
 	if r.Timeouts != nil {
@@ -452,7 +434,7 @@ func convertHTTPRoute(ctx RouteContext, r k8s.HTTPRouteRule,
 			Status: 500,
 		}
 	} else {
-		route, backendErr, err := buildHTTPDestination(ctx, r.BackendRefs, obj.Namespace, enforceRefGrant)
+		route, backendErr, err := buildHTTPDestination(ctx, r.BackendRefs, obj.Namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -475,7 +457,7 @@ func joinErrors(a *ConfigError, b *ConfigError) *ConfigError {
 }
 
 func convertGRPCRoute(ctx RouteContext, r k8s.GRPCRouteRule,
-	obj *k8s.GRPCRoute, pos int, enforceRefGrant bool,
+	obj *k8s.GRPCRoute, pos int,
 ) (*istio.HTTPRoute, *ConfigError) {
 	vs := &istio.HTTPRoute{}
 	if r.Name != nil {
@@ -521,7 +503,7 @@ func convertGRPCRoute(ctx RouteContext, r k8s.GRPCRouteRule,
 			}
 			vs.Headers.Response = h
 		case k8s.GRPCRouteFilterRequestMirror:
-			mirror, err := createMirrorFilter(ctx, filter.RequestMirror, obj.Namespace, enforceRefGrant, gvk.GRPCRoute)
+			mirror, err := createMirrorFilter(ctx, filter.RequestMirror, obj.Namespace, gvk.GRPCRoute)
 			if err != nil {
 				return nil, err
 			}
@@ -540,7 +522,7 @@ func convertGRPCRoute(ctx RouteContext, r k8s.GRPCRouteRule,
 			Status: 500,
 		}
 	} else {
-		route, backendErr, err := buildGRPCDestination(ctx, r.BackendRefs, obj.Namespace, enforceRefGrant)
+		route, backendErr, err := buildGRPCDestination(ctx, r.BackendRefs, obj.Namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -549,17 +531,6 @@ func convertGRPCRoute(ctx RouteContext, r k8s.GRPCRouteRule,
 	}
 
 	return vs, nil
-}
-
-func parentTypes(rpi []routeParentReference) (mesh, gateway bool) {
-	for _, r := range rpi {
-		if r.IsMesh() {
-			mesh = true
-		} else {
-			gateway = true
-		}
-	}
-	return
 }
 
 func augmentPortMatch(routes []*istio.HTTPRoute, port k8s.PortNumber) []*istio.HTTPRoute {
@@ -757,7 +728,7 @@ func referenceAllowed(
 	parentRef parentReference,
 	hostnames []k8s.Hostname,
 	localNamespace string,
-) (*ParentError, *WaypointError) {
+) *ParentError {
 	if parentRef.Kind == gvk.Service {
 
 		key := parentRef.Namespace + "/" + parentRef.Name
@@ -766,25 +737,8 @@ func referenceAllowed(
 		// check that the referenced svc exists
 		if svc == nil {
 			return &ParentError{
-					Reason:  ParentErrorNotAccepted,
-					Message: fmt.Sprintf("parent service: %q not found", parentRef.Name),
-				}, &WaypointError{
-					Reason:  WaypointErrorReasonNoMatchingParent,
-					Message: WaypointErrorMsgNoMatchingParent,
-				}
-		}
-
-		// check that the reference has the use-waypoint label
-		if !waypointConfigured(svc.Labels) {
-			// if reference does not have use-waypoint label, check the namespace of the reference
-			ns := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Namespaces, krt.FilterKey(svc.Namespace)))
-			if ns != nil {
-				if !waypointConfigured(ns.Labels) {
-					return nil, &WaypointError{
-						Reason:  WaypointErrorReasonMissingLabel,
-						Message: WaypointErrorMsgMissingLabel,
-					}
-				}
+				Reason:  ParentErrorNotAccepted,
+				Message: fmt.Sprintf("parent service: %q not found", parentRef.Name),
 			}
 		}
 	} else if parentRef.Kind == gvk.ServiceEntry {
@@ -793,25 +747,8 @@ func referenceAllowed(
 		svcEntry := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.ServiceEntries, krt.FilterKey(key)))
 		if svcEntry == nil {
 			return &ParentError{
-					Reason:  ParentErrorNotAccepted,
-					Message: fmt.Sprintf("parent service entry: %q not found", parentRef.Name),
-				}, &WaypointError{
-					Reason:  WaypointErrorReasonNoMatchingParent,
-					Message: WaypointErrorMsgNoMatchingParent,
-				}
-		}
-
-		// check that the reference has the use-waypoint label
-		if !waypointConfigured(svcEntry.Labels) {
-			// if reference does not have use-waypoint label, check the namespace of the reference
-			ns := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Namespaces, krt.FilterKey(parentRef.Namespace)))
-			if ns != nil {
-				if !waypointConfigured(ns.Labels) {
-					return nil, &WaypointError{
-						Reason:  WaypointErrorReasonMissingLabel,
-						Message: WaypointErrorMsgMissingLabel,
-					}
-				}
+				Reason:  ParentErrorNotAccepted,
+				Message: fmt.Sprintf("parent service entry: %q not found", parentRef.Name),
 			}
 		}
 	} else {
@@ -820,13 +757,13 @@ func referenceAllowed(
 			return &ParentError{
 				Reason:  ParentErrorNotAccepted,
 				Message: fmt.Sprintf("port %v not found", parentRef.Port),
-			}, nil
+			}
 		}
 		if len(parentRef.SectionName) > 0 && parentRef.SectionName != parent.SectionName {
 			return &ParentError{
 				Reason:  ParentErrorNotAccepted,
 				Message: fmt.Sprintf("sectionName %q not found", parentRef.SectionName),
-			}, nil
+			}
 		}
 
 		// Next check the hostnames are a match. This is a bi-directional wildcard match. Only one route
@@ -863,7 +800,7 @@ func referenceAllowed(
 							"hostnames matched parent hostname %q, but namespace %q is not allowed by the parent",
 							parent.OriginalHostname, localNamespace,
 						),
-					}, nil
+					}
 				}
 				return &ParentError{
 					Reason: ParentErrorNoHostname,
@@ -871,7 +808,7 @@ func referenceAllowed(
 						"no hostnames matched parent hostname %q",
 						parent.OriginalHostname,
 					),
-				}, nil
+				}
 			}
 		}
 	}
@@ -887,15 +824,15 @@ func referenceAllowed(
 		return &ParentError{
 			Reason:  ParentErrorNotAllowed,
 			Message: fmt.Sprintf("kind %v is not allowed", routeKind),
-		}, nil
+		}
 	}
-	return nil, nil
+	return nil
 }
 
 func extractParentReferenceInfo(ctx RouteContext, parents RouteParents, obj controllers.Object) []routeParentReference {
 	routeRefs, hostnames, kind := GetCommonRouteInfo(obj)
 	localNamespace := obj.GetNamespace()
-	parentRefs := []routeParentReference{}
+	var parentRefs []routeParentReference
 	for _, ref := range routeRefs {
 		ir, err := toInternalParentReference(ref, localNamespace)
 		if err != nil {
@@ -928,7 +865,7 @@ func extractParentReferenceInfo(ctx RouteContext, parents RouteParents, obj cont
 				}
 				bannedHostnames.Insert(gw.OriginalHostname)
 			}
-			deniedReason, waypointError := referenceAllowed(ctx, pr, kind, pk, hostnames, localNamespace)
+			deniedReason := referenceAllowed(ctx, pr, kind, pk, hostnames, localNamespace)
 			rpi := routeParentReference{
 				InternalName:      pr.InternalName,
 				InternalKind:      ir.Kind,
@@ -938,7 +875,6 @@ func extractParentReferenceInfo(ctx RouteContext, parents RouteParents, obj cont
 				BannedHostnames:   bannedHostnames.Copy().Delete(pr.OriginalHostname),
 				ParentKey:         ir,
 				ParentSection:     pr.SectionName,
-				WaypointError:     waypointError,
 			}
 			parentRefs = append(parentRefs, rpi)
 		}
@@ -954,7 +890,7 @@ func extractParentReferenceInfo(ctx RouteContext, parents RouteParents, obj cont
 	return parentRefs
 }
 
-func convertTCPRoute(ctx RouteContext, r k8salpha.TCPRouteRule, obj *k8salpha.TCPRoute, enforceRefGrant bool) (*istio.TCPRoute, *ConfigError) {
+func convertTCPRoute(ctx RouteContext, r k8salpha.TCPRouteRule, obj *k8salpha.TCPRoute) (*istio.TCPRoute, *ConfigError) {
 	if tcpWeightSum(r.BackendRefs) == 0 {
 		// The spec requires us to reject connections when there are no >0 weight backends
 		// We don't have a great way to do it. TODO: add a fault injection API for TCP?
@@ -969,7 +905,7 @@ func convertTCPRoute(ctx RouteContext, r k8salpha.TCPRouteRule, obj *k8salpha.TC
 			}},
 		}, nil
 	}
-	dest, backendErr, err := buildTCPDestination(ctx, r.BackendRefs, obj.Namespace, enforceRefGrant, gvk.TCPRoute)
+	dest, backendErr, err := buildTCPDestination(ctx, r.BackendRefs, obj.Namespace, gvk.TCPRoute)
 	if err != nil {
 		return nil, err
 	}
@@ -978,7 +914,7 @@ func convertTCPRoute(ctx RouteContext, r k8salpha.TCPRouteRule, obj *k8salpha.TC
 	}, backendErr
 }
 
-func convertTLSRoute(ctx RouteContext, r k8salpha.TLSRouteRule, obj *k8salpha.TLSRoute, enforceRefGrant bool) (*istio.TLSRoute, *ConfigError) {
+func convertTLSRoute(ctx RouteContext, r k8salpha.TLSRouteRule, obj *k8salpha.TLSRoute) (*istio.TLSRoute, *ConfigError) {
 	if tcpWeightSum(r.BackendRefs) == 0 {
 		// The spec requires us to reject connections when there are no >0 weight backends
 		// We don't have a great way to do it. TODO: add a fault injection API for TCP?
@@ -993,7 +929,7 @@ func convertTLSRoute(ctx RouteContext, r k8salpha.TLSRouteRule, obj *k8salpha.TL
 			}},
 		}, nil
 	}
-	dest, backendErr, err := buildTCPDestination(ctx, r.BackendRefs, obj.Namespace, enforceRefGrant, gvk.TLSRoute)
+	dest, backendErr, err := buildTCPDestination(ctx, r.BackendRefs, obj.Namespace, gvk.TLSRoute)
 	if err != nil {
 		return nil, err
 	}
@@ -1007,7 +943,6 @@ func buildTCPDestination(
 	ctx RouteContext,
 	forwardTo []k8s.BackendRef,
 	ns string,
-	enforceRefGrant bool,
 	k config.GroupVersionKind,
 ) ([]*istio.RouteDestination, *ConfigError, *ConfigError) {
 	if forwardTo == nil {
@@ -1029,9 +964,9 @@ func buildTCPDestination(
 	}
 
 	var invalidBackendErr *ConfigError
-	res := []*istio.RouteDestination{}
+	var res []*istio.RouteDestination
 	for i, fwd := range action {
-		dst, err := buildDestination(ctx, fwd, ns, enforceRefGrant, k)
+		dst, err := buildDestination(ctx, fwd, ns, k)
 		if err != nil {
 			if isInvalidBackend(err) {
 				invalidBackendErr = err
@@ -1094,7 +1029,6 @@ func buildHTTPDestination(
 	ctx RouteContext,
 	forwardTo []k8s.HTTPBackendRef,
 	ns string,
-	enforceRefGrant bool,
 ) ([]*istio.HTTPRouteDestination, *ConfigError, *ConfigError) {
 	if forwardTo == nil {
 		return nil, nil, nil
@@ -1116,7 +1050,7 @@ func buildHTTPDestination(
 	var invalidBackendErr *ConfigError
 	res := []*istio.HTTPRouteDestination{}
 	for i, fwd := range action {
-		dst, err := buildDestination(ctx, fwd.BackendRef, ns, enforceRefGrant, gvk.HTTPRoute)
+		dst, err := buildDestination(ctx, fwd.BackendRef, ns, gvk.HTTPRoute)
 		if err != nil {
 			if isInvalidBackend(err) {
 				invalidBackendErr = err
@@ -1162,7 +1096,6 @@ func buildGRPCDestination(
 	ctx RouteContext,
 	forwardTo []k8s.GRPCBackendRef,
 	ns string,
-	enforceRefGrant bool,
 ) ([]*istio.HTTPRouteDestination, *ConfigError, *ConfigError) {
 	if forwardTo == nil {
 		return nil, nil, nil
@@ -1184,7 +1117,7 @@ func buildGRPCDestination(
 	var invalidBackendErr *ConfigError
 	res := []*istio.HTTPRouteDestination{}
 	for i, fwd := range action {
-		dst, err := buildDestination(ctx, fwd.BackendRef, ns, enforceRefGrant, gvk.GRPCRoute)
+		dst, err := buildDestination(ctx, fwd.BackendRef, ns, gvk.GRPCRoute)
 		if err != nil {
 			if isInvalidBackend(err) {
 				invalidBackendErr = err
@@ -1226,15 +1159,13 @@ func buildGRPCDestination(
 	return res, invalidBackendErr, nil
 }
 
-func buildDestination(ctx RouteContext, to k8s.BackendRef, ns string, enforceRefGrant bool, k config.GroupVersionKind) (*istio.Destination, *ConfigError) {
+func buildDestination(ctx RouteContext, to k8s.BackendRef, ns string, k config.GroupVersionKind) (*istio.Destination, *ConfigError) {
 	// check if the reference is allowed
-	if enforceRefGrant {
-		if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
-			if !ctx.Grants.BackendAllowed(ctx.Krt, k, to.Name, *toNs, ns) {
-				return &istio.Destination{}, &ConfigError{
-					Reason:  InvalidDestinationPermit,
-					Message: fmt.Sprintf("backendRef %v/%v not accessible to a %s in namespace %q (missing a ReferenceGrant?)", to.Name, *toNs, k.Kind, ns),
-				}
+	if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
+		if !ctx.Grants.BackendAllowed(ctx.Krt, k, to.Name, *toNs, ns) {
+			return &istio.Destination{}, &ConfigError{
+				Reason:  InvalidDestinationPermit,
+				Message: fmt.Sprintf("backendRef %v/%v not accessible to a %s in namespace %q (missing a ReferenceGrant?)", to.Name, *toNs, k.Kind, ns),
 			}
 		}
 	}
@@ -1244,16 +1175,16 @@ func buildDestination(ctx RouteContext, to k8s.BackendRef, ns string, enforceRef
 	var hostname string
 	ref := normalizeReference(to.Group, to.Kind, gvk.Service)
 	switch ref {
-	case gvk.InferencePool: // TODO: add validation
-		if strings.Contains(string(to.Name), ".") {
-			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
-		}
-		hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
-		key := namespace + "/" + string(to.Name)
-		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
-		if svc == nil {
-			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
-		}
+	//case gvk.InferencePool: // TODO: add validation
+	//	if strings.Contains(string(to.Name), ".") {
+	//		return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
+	//	}
+	//	hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
+	//	key := namespace + "/" + string(to.Name)
+	//	svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
+	//	if svc == nil {
+	//		invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
+	//	}
 	case gvk.Service:
 		if strings.Contains(string(to.Name), ".") {
 			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
@@ -1327,7 +1258,7 @@ func headerListToMap(hl []k8s.HTTPHeader) map[string]string {
 }
 
 func createMirrorFilter(ctx RouteContext, filter *k8s.HTTPRequestMirrorFilter, ns string,
-	enforceRefGrant bool, k config.GroupVersionKind,
+	k config.GroupVersionKind,
 ) (*istio.HTTPMirrorPolicy, *ConfigError) {
 	if filter == nil {
 		return nil, nil
@@ -1336,7 +1267,7 @@ func createMirrorFilter(ctx RouteContext, filter *k8s.HTTPRequestMirrorFilter, n
 	dst, err := buildDestination(ctx, k8s.BackendRef{
 		BackendObjectReference: filter.BackendRef,
 		Weight:                 &weightOne,
-	}, ns, enforceRefGrant, k)
+	}, ns, k)
 	if err != nil {
 		return nil, err
 	}
@@ -1708,8 +1639,6 @@ type routeParentReference struct {
 	BannedHostnames sets.Set[string]
 	ParentKey       parentKey
 	ParentSection   k8s.SectionName
-	// WaypointError, if present, indicates why the reference does not have valid configuration for generating a Waypoint
-	WaypointError *WaypointError
 }
 
 func (r routeParentReference) IsMesh() bool {
@@ -1951,9 +1880,9 @@ func reportUnmanagedGatewayStatus(
 //
 // If manual deployments are disabled, IsManaged() always returns true.
 func IsManaged(gw *k8s.GatewaySpec) bool {
-	if !features.EnableGatewayAPIManualDeployment {
-		return true
-	}
+	//if !features.EnableGatewayAPIManualDeployment {
+	//	return true
+	//}
 	if len(gw.Addresses) == 0 {
 		return true
 	}

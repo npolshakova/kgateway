@@ -6,8 +6,10 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/agentgateway/agentgateway/go/api"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/gateway"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
@@ -15,12 +17,20 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"google.golang.org/protobuf/proto"
+	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
+	"istio.io/istio/pilot/pkg/features"
+	"istio.io/istio/pkg/config/schema/gvr"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
+	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
+	"istio.io/istio/pkg/kube/kubetypes"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayalpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -139,14 +149,135 @@ func (r report) Equals(in report) bool {
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	logger.Debug("init agentgateway Syncer", "controllername", s.controllerName)
 
-	// TODO: convert auth to rbac json config for agentgateways
+	inputs := gateway.Inputs{
+		Namespaces: krt.NewInformer[*corev1.Namespace](s.istioClient),
+		Secrets: krt.WrapClient[*corev1.Secret](
+			kclient.NewFiltered[*corev1.Secret](s.istioClient, kubetypes.Filter{
+				//FieldSelector: kubesecrets.SecretsFieldSelector,
+				ObjectFilter: s.istioClient.ObjectFilter(),
+			}),
+		),
+		Services: krt.WrapClient[*corev1.Service](
+			kclient.NewFiltered[*corev1.Service](s.istioClient, kubetypes.Filter{ObjectFilter: s.istioClient.ObjectFilter()}),
+		),
+		GatewayClasses: buildClient[*gateway.GatewayClass](c, kc, gvr.GatewayClass, opts, "informer/GatewayClasses"),
+		Gateways:       buildClient[*gateway.Gateway](c, kc, gvr.KubernetesGateway, opts, "informer/Gateways"),
+		HTTPRoutes:     buildClient[*gateway.HTTPRoute](c, kc, gvr.HTTPRoute, opts, "informer/HTTPRoutes"),
+		GRPCRoutes:     buildClient[*gatewayv1.GRPCRoute](c, kc, gvr.GRPCRoute, opts, "informer/GRPCRoutes"),
 
-	gatewaysCol := krt.NewCollection(s.commonCols.GatewayIndex.Gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *ir.Gateway {
-		if gw.Obj.Spec.GatewayClassName != wellknown.AgentGatewayClassName {
+		ReferenceGrants: buildClient[*gateway.ReferenceGrant](c, kc, gvr.ReferenceGrant, opts, "informer/ReferenceGrants"),
+		ServiceEntries:  buildClient[*networkingclient.ServiceEntry](c, kc, gvr.ServiceEntry, opts, "informer/ServiceEntries"),
+		//InferencePools:  buildClient[*inf.InferencePool](c, kc, gvr.InferencePool, opts, "informer/InferencePools"),
+	}
+	if features.EnableAlphaGatewayAPI {
+		inputs.TCPRoutes = buildClient[*gatewayalpha.TCPRoute](c, kc, gvr.TCPRoute, opts, "informer/TCPRoutes")
+		inputs.TLSRoutes = buildClient[*gatewayalpha.TLSRoute](c, kc, gvr.TLSRoute, opts, "informer/TLSRoutes")
+	} else {
+		// If disabled, still build a collection but make it always empty
+		inputs.TCPRoutes = krt.NewStaticCollection[*gatewayalpha.TCPRoute](nil, opts.WithName("disable/TCPRoutes")...)
+		inputs.TLSRoutes = krt.NewStaticCollection[*gatewayalpha.TLSRoute](nil, opts.WithName("disable/TLSRoutes")...)
+	}
+
+	GatewayClasses := gateway.GatewayClassesCollection(inputs.GatewayClasses, opts)
+
+	RefGrants := BuildReferenceGrants(ReferenceGrantsCollection(inputs.ReferenceGrants, opts))
+
+	// Note: not fully complete until its join with route attachments to report attachedRoutes.
+	// Do not register yet.
+	Gateways := GatewayCollection(
+		inputs.Gateways,
+		GatewayClasses,
+		inputs.Namespaces,
+		RefGrants,
+		inputs.Secrets,
+		options.DomainSuffix,
+		opts,
+	)
+	ports := krt.NewCollection(Gateways, func(ctx krt.HandlerContext, obj Gateway) *IndexObject[string, Gateway] {
+		port := fmt.Sprint(obj.parentInfo.Port)
+		return &IndexObject[string, Gateway]{
+			Key:     port,
+			Objects: []Gateway{obj},
+		}
+	}, opts.WithName("ports")...)
+
+	Binds := krt.NewManyCollection(ports, func(ctx krt.HandlerContext, object IndexObject[string, Gateway]) []ADPResource {
+		port, _ := strconv.Atoi(object.Key)
+		uniq := sets.New[types.NamespacedName]()
+		for _, gw := range object.Objects {
+			uniq.Insert(types.NamespacedName{
+				Namespace: gw.parent.Namespace,
+				Name:      gw.parent.Name,
+			})
+		}
+		return slices.Map(uniq.UnsortedList(), func(e types.NamespacedName) ADPResource {
+			bind := Bind{
+				Bind: &api.Bind{
+					Key:  object.Key + "/" + e.String(),
+					Port: uint32(port),
+				},
+			}
+			return toResource(e, bind)
+		})
+	}, opts.WithName("Binds")...)
+
+	Listeners := krt.NewCollection(Gateways, func(ctx krt.HandlerContext, obj gateway.Gateway) *gateway.ADPResource {
+		l := &api.Listener{
+			Key:         obj.ResourceName(),
+			Name:        string(obj.parentInfo.SectionName),
+			BindKey:     fmt.Sprint(obj.parentInfo.Port) + "/" + obj.parent.Namespace + "/" + obj.parent.Name,
+			GatewayName: obj.parent.Namespace + "/" + obj.parent.Name,
+			Hostname:    obj.parentInfo.OriginalHostname,
+		}
+
+		switch obj.parentInfo.Protocol {
+		case gatewayv1.HTTPProtocolType:
+			l.Protocol = api.Protocol_HTTP
+		case gatewayv1.HTTPSProtocolType:
+			l.Protocol = api.Protocol_HTTPS
+			if obj.TLSInfo == nil {
+				return nil
+			}
+			l.Tls = &api.TLSConfig{
+				Cert:       obj.TLSInfo.Cert,
+				PrivateKey: obj.TLSInfo.Key,
+			}
+		case gatewayv1.TLSProtocolType:
+			l.Protocol = api.Protocol_TLS
+			if obj.TLSInfo == nil {
+				return nil
+			}
+			l.Tls = &api.TLSConfig{
+				Cert:       obj.TLSInfo.Cert,
+				PrivateKey: obj.TLSInfo.Key,
+			}
+		case gatewayv1.TCPProtocolType:
+			l.Protocol = api.Protocol_TCP
+		default:
 			return nil
 		}
-		return &gw
-	}, krtopts.ToOptions("agentgateway")...)
+		return toResourcep(types.NamespacedName{
+			Namespace: obj.parent.Namespace,
+			Name:      obj.parent.Name,
+		}, gateway.ADPListener{l})
+	}, krtopts.WithName("Listeners")...)
+
+	routeParents := gateway.BuildRouteParents(Gateways)
+
+	routeInputs := gateway.RouteContextInputs{
+		Grants:         RefGrants,
+		RouteParents:   routeParents,
+		DomainSuffix:   options.DomainSuffix,
+		Services:       inputs.Services,
+		Namespaces:     inputs.Namespaces,
+		ServiceEntries: inputs.ServiceEntries,
+		InferencePools: inputs.InferencePools,
+	}
+	ADPRoutes := gateway.ADPRouteCollection(
+		inputs.HTTPRoutes,
+		routeInputs,
+		opts,
+	)
 
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
