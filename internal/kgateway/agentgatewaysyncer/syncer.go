@@ -4,32 +4,23 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"regexp"
 	"slices"
-	"strings"
 
-	agentgateway "github.com/agentgateway/agentgateway/go/api"
-	"github.com/agentgateway/agentgateway/go/api/a2a"
-	"github.com/agentgateway/agentgateway/go/api/mcp"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"google.golang.org/protobuf/proto"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/xds"
-	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -37,12 +28,11 @@ var logger = logging.New("agentgateway/syncer")
 // AgentGwSyncer synchronizes Kubernetes Gateway API resources with xDS for agentgateway proxies.
 // It watches Gateway resources with the agentgateway class and translates them to agentgateway configuration.
 type AgentGwSyncer struct {
-	commonCols            *common.CommonCollections
-	controllerName        string
-	agentGatewayClassName string
-	xDS                   krt.Collection[agentGwXdsResources]
-	xdsCache              envoycache.SnapshotCache
-	istioClient           kube.Client
+	commonCols     *common.CommonCollections
+	controllerName string
+	xDS            krt.Collection[agentGwXdsResources]
+	xdsCache       envoycache.SnapshotCache
+	istioClient    kube.Client
 
 	waitForSync []cache.InformerSynced
 }
@@ -50,7 +40,6 @@ type AgentGwSyncer struct {
 func NewAgentGwSyncer(
 	ctx context.Context,
 	controllerName string,
-	agentGatewayClassName string,
 	mgr manager.Manager,
 	client kube.Client,
 	commonCols *common.CommonCollections,
@@ -58,10 +47,9 @@ func NewAgentGwSyncer(
 ) *AgentGwSyncer {
 	// TODO: register types (auth, policy, etc.) if necessary
 	return &AgentGwSyncer{
-		commonCols:            commonCols,
-		controllerName:        controllerName,
-		agentGatewayClassName: agentGatewayClassName,
-		xdsCache:              xdsCache,
+		commonCols:     commonCols,
+		controllerName: controllerName,
+		xdsCache:       xdsCache,
 		// mgr:            mgr,
 		istioClient: client,
 	}
@@ -70,21 +58,20 @@ func NewAgentGwSyncer(
 type agentGwXdsResources struct {
 	types.NamespacedName
 
-	reports            reports.ReportMap
-	AgentGwA2AServices envoycache.Resources
-	AgentGwMcpServices envoycache.Resources
-	Listeners          envoycache.Resources
+	reports   reports.ReportMap
+	Resources envoycache.Resources
+	Addresses envoycache.Resources
 }
 
 func (r agentGwXdsResources) ResourceName() string {
-	return xds.OwnerNamespaceNameID(OwnerNodeId, r.Namespace, r.Name)
+	return fmt.Sprintf("%s~%s", r.Namespace, r.Name)
 }
 
 func (r agentGwXdsResources) Equals(in agentGwXdsResources) bool {
 	return r.NamespacedName == in.NamespacedName &&
 		report{r.reports}.Equals(report{in.reports}) &&
-		r.AgentGwA2AServices.Version == in.AgentGwA2AServices.Version &&
-		r.AgentGwMcpServices.Version == in.AgentGwMcpServices.Version
+		r.Resources.Version == in.Resources.Version &&
+		r.Addresses.Version == in.Addresses.Version
 }
 
 type envoyResourceWithName struct {
@@ -155,162 +142,15 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	// TODO: convert auth to rbac json config for agentgateways
 
 	gatewaysCol := krt.NewCollection(s.commonCols.GatewayIndex.Gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *ir.Gateway {
-		if string(gw.Obj.Spec.GatewayClassName) != s.agentGatewayClassName {
+		if gw.Obj.Spec.GatewayClassName != wellknown.AgentGatewayClassName {
 			return nil
 		}
 		return &gw
 	}, krtopts.ToOptions("agentgateway")...)
 
-	// TODO(npolshak): optimize this in the future with an index
-	agentGwServices := krt.NewManyCollection(s.commonCols.Services, func(kctx krt.HandlerContext, s *corev1.Service) []agentGwService {
-		var allowedA2AListeners, allowedMCPListeners []string
-
-		gws := krt.Fetch(kctx, gatewaysCol)
-		for _, gw := range gws {
-			for _, listener := range gw.Listeners {
-				if listener.Protocol != A2AProtocol && listener.Protocol != MCPProtocol {
-					continue
-				}
-				logger.Debug("found agentgateway service", "namespace", s.Namespace, "name", s.Name)
-				if listener.AllowedRoutes == nil {
-					// only allow agent services in same namespace
-					if s.Namespace == gw.Obj.Namespace {
-						if listener.Protocol == A2AProtocol {
-							allowedA2AListeners = append(allowedA2AListeners, string(listener.Name))
-						} else {
-							allowedMCPListeners = append(allowedMCPListeners, string(listener.Name))
-						}
-					}
-				} else if listener.AllowedRoutes.Namespaces.From != nil {
-					switch *listener.AllowedRoutes.Namespaces.From {
-					case gwv1.NamespacesFromAll:
-						if listener.Protocol == A2AProtocol {
-							allowedA2AListeners = append(allowedA2AListeners, string(listener.Name))
-						} else {
-							allowedMCPListeners = append(allowedMCPListeners, string(listener.Name))
-						}
-					case gwv1.NamespacesFromSame:
-						// only allow agent services in same namespace
-						if s.Namespace == gw.Obj.Namespace {
-							if listener.Protocol == A2AProtocol {
-								allowedA2AListeners = append(allowedA2AListeners, string(listener.Name))
-							} else {
-								allowedMCPListeners = append(allowedMCPListeners, string(listener.Name))
-							}
-						}
-					case gwv1.NamespacesFromSelector:
-						// TODO: implement namespace selectors with gateway index
-						logger.Error("namespace selectors not supported for agentgateways")
-						continue
-					}
-				}
-			}
-		}
-		return translateAgentService(s, allowedA2AListeners, allowedMCPListeners)
-	})
-	xdsA2AServices := krt.NewCollection(agentGwServices, func(kctx krt.HandlerContext, s agentGwService) *envoyResourceWithName {
-		if s.protocol != A2AProtocol {
-			return nil
-		}
-		t := &a2a.Target{
-			Name:      getTargetName(s.ResourceName()),
-			Host:      s.ip,
-			Port:      uint32(s.port),
-			Path:      s.path,
-			Listeners: s.allowedListeners,
-		}
-		return &envoyResourceWithName{inner: t, version: utils.HashProto(t)}
-	}, krtopts.ToOptions("a2a-target-xds")...)
-	xdsMcpServices := krt.NewCollection(agentGwServices, func(kctx krt.HandlerContext, s agentGwService) *envoyResourceWithName {
-		if s.protocol != MCPProtocol {
-			return nil
-		}
-		t := &mcp.Target{
-			// Note: No slashes allowed here (must match ^[a-zA-Z0-9-]+$)
-			Name: getTargetName(s.ResourceName()),
-			Target: &mcp.Target_Sse{
-				Sse: &mcp.Target_SseTarget{
-					Host: s.ip,
-					Port: uint32(s.port),
-					Path: s.path,
-				},
-			},
-			Listeners: s.allowedListeners,
-		}
-		return &envoyResourceWithName{inner: t, version: utils.HashProto(t)}
-	}, krtopts.ToOptions("mcp-target-xds")...)
-
-	// translate gateways to xds
-	s.xDS = krt.NewCollection(gatewaysCol, func(kctx krt.HandlerContext, gw ir.Gateway) *agentGwXdsResources {
-		// listeners for the agentgateway
-		agwListeners := make([]envoytypes.Resource, 0, len(gw.Listeners))
-		var listenerVersion uint64
-		var listener *agentgateway.Listener
-		for _, gwListener := range gw.Listeners {
-			var protocol agentgateway.Listener_Protocol
-			switch string(gwListener.Protocol) {
-			case MCPProtocol:
-				protocol = agentgateway.Listener_MCP
-			case A2AProtocol:
-				protocol = agentgateway.Listener_A2A
-			default:
-				// Not a valid protocol for agentgateway
-				continue
-			}
-
-			listener = &agentgateway.Listener{
-				Name:     string(gwListener.Name),
-				Protocol: protocol,
-				// TODO: Add support for stdio listener
-				Listener: &agentgateway.Listener_Sse{
-					Sse: &agentgateway.SseListener{
-						Address: "[::]",
-						Port:    uint32(gwListener.Port),
-					},
-				},
-			}
-
-			// Update listenerVersion to be the result
-			listenerVersion ^= utils.HashProto(listener)
-			agwListeners = append(agwListeners, listener)
-		}
-
-		// a2a services
-		a2aServiceResources := krt.Fetch(kctx, xdsA2AServices)
-		logger.Debug("found A2A resources for gateway", "total_services", len(a2aServiceResources), "resource_ref", gw.ResourceName())
-		a2aResources := make([]envoytypes.Resource, len(a2aServiceResources))
-		var a2aVersion uint64
-		for i, res := range a2aServiceResources {
-			a2aVersion ^= res.version
-			target := res.inner.(*a2a.Target)
-			a2aResources[i] = target
-		}
-		// mcp services
-		mcpServiceResources := krt.Fetch(kctx, xdsMcpServices)
-		logger.Debug("found MCP resources for gateway", "total_services", len(mcpServiceResources), "resource_ref", gw.ResourceName())
-		mcpResources := make([]envoytypes.Resource, len(mcpServiceResources))
-		var mcpVersion uint64
-		for i, res := range mcpServiceResources {
-			mcpVersion ^= res.version
-			target := res.inner.(*mcp.Target)
-			mcpResources[i] = target
-		}
-		result := &agentGwXdsResources{
-			NamespacedName:     types.NamespacedName{Namespace: gw.Namespace, Name: gw.Name},
-			AgentGwA2AServices: envoycache.NewResources(fmt.Sprintf("%d", a2aVersion), a2aResources),
-			AgentGwMcpServices: envoycache.NewResources(fmt.Sprintf("%d", mcpVersion), mcpResources),
-			Listeners:          envoycache.NewResources(fmt.Sprintf("%d", listenerVersion), agwListeners),
-		}
-		logger.Debug("created XDS resources for with ID", "gwname", gw.Name, "resourceid", result.ResourceName())
-		return result
-	}, krtopts.ToOptions("agentgateway-xds")...)
-
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
-		xdsA2AServices.HasSynced,
-		xdsMcpServices.HasSynced,
 		gatewaysCol.HasSynced,
-		agentGwServices.HasSynced,
 		s.xDS.HasSynced,
 	}
 }
@@ -332,9 +172,8 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 				continue
 			}
 			snapshot := &agentGwSnapshot{
-				AgentGwA2AServices: r.AgentGwA2AServices,
-				AgentGwMcpServices: r.AgentGwMcpServices,
-				Listeners:          r.Listeners,
+				Resources: r.Resources,
+				Addresses: r.Addresses,
 			}
 			logger.Debug("setting xds snapshot", "resourcename", r.ResourceName())
 			err := s.xdsCache.SetSnapshot(ctx, r.ResourceName(), snapshot)
@@ -349,10 +188,9 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 }
 
 type agentGwSnapshot struct {
-	AgentGwA2AServices envoycache.Resources
-	AgentGwMcpServices envoycache.Resources
-	Listeners          envoycache.Resources
-	VersionMap         map[string]map[string]string
+	Resources  envoycache.Resources
+	Addresses  envoycache.Resources
+	VersionMap map[string]map[string]string
 }
 
 func (m *agentGwSnapshot) GetResources(typeURL string) map[string]envoytypes.Resource {
@@ -366,12 +204,10 @@ func (m *agentGwSnapshot) GetResources(typeURL string) map[string]envoytypes.Res
 
 func (m *agentGwSnapshot) GetResourcesAndTTL(typeURL string) map[string]envoytypes.ResourceWithTTL {
 	switch typeURL {
-	case TargetTypeA2AUrl:
-		return m.AgentGwA2AServices.Items
-	case TargetTypeMcpUrl:
-		return m.AgentGwMcpServices.Items
-	case TargetTypeListenerUrl:
-		return m.Listeners.Items
+	case TargetTypeResourceUrl:
+		return m.Resources.Items
+	case TargetTypeAddressUrl:
+		return m.Addresses.Items
 	default:
 		return nil
 	}
@@ -379,12 +215,10 @@ func (m *agentGwSnapshot) GetResourcesAndTTL(typeURL string) map[string]envoytyp
 
 func (m *agentGwSnapshot) GetVersion(typeURL string) string {
 	switch typeURL {
-	case TargetTypeA2AUrl:
-		return m.AgentGwA2AServices.Version
-	case TargetTypeMcpUrl:
-		return m.AgentGwMcpServices.Version
-	case TargetTypeListenerUrl:
-		return m.Listeners.Version
+	case TargetTypeResourceUrl:
+		return m.Resources.Version
+	case TargetTypeAddressUrl:
+		return m.Resources.Version
 	default:
 		return ""
 	}
@@ -400,9 +234,8 @@ func (m *agentGwSnapshot) ConstructVersionMap() error {
 
 	m.VersionMap = make(map[string]map[string]string)
 	resources := map[string]map[string]envoytypes.ResourceWithTTL{
-		TargetTypeA2AUrl:      m.AgentGwA2AServices.Items,
-		TargetTypeMcpUrl:      m.AgentGwMcpServices.Items,
-		TargetTypeListenerUrl: m.Listeners.Items,
+		TargetTypeResourceUrl: m.Resources.Items,
+		TargetTypeAddressUrl:  m.Addresses.Items,
 	}
 
 	for typeUrl, items := range resources {
@@ -428,69 +261,3 @@ func (m *agentGwSnapshot) GetVersionMap(typeURL string) map[string]string {
 }
 
 var _ envoycache.ResourceSnapshot = &agentGwSnapshot{}
-
-// getTargetName sanitizes the given resource name to ensure it matches the AgentGateway required pattern:
-// ^[a-zA-Z0-9-]+$ by replacing slashes and removing invalid characters.
-func getTargetName(resourceName string) string {
-	var (
-		invalidCharsRegex      = regexp.MustCompile(`[^a-zA-Z0-9-]+`)
-		consecutiveDashesRegex = regexp.MustCompile(`-+`)
-	)
-
-	// Replace all invalid characters with dashes
-	sanitized := invalidCharsRegex.ReplaceAllString(resourceName, "-")
-
-	// Remove leading/trailing dashes and collapse consecutive dashes
-	sanitized = strings.Trim(sanitized, "-")
-	sanitized = consecutiveDashesRegex.ReplaceAllString(sanitized, "-")
-
-	return sanitized
-}
-
-func translateAgentService(svc *corev1.Service, allowedA2AListeners, allowedMCPListeners []string) []agentGwService {
-	var svcs []agentGwService
-
-	if svc.Spec.ClusterIP == "" && svc.Spec.ExternalName == "" {
-		// Return early if there's no valid IP or external name set on the service
-		return svcs
-	}
-
-	addr := svc.Spec.ClusterIP
-	if addr == "" {
-		addr = svc.Spec.ExternalName
-	}
-
-	for _, port := range svc.Spec.Ports {
-		if port.AppProtocol == nil {
-			continue
-		}
-		appProtocol := *port.AppProtocol
-		var path string
-		var allowedListeners []string
-
-		switch appProtocol {
-		case A2AProtocol:
-			path = svc.Annotations[A2APathAnnotation]
-			allowedListeners = allowedA2AListeners
-		case MCPProtocol:
-			path = svc.Annotations[MCPPathAnnotation]
-			allowedListeners = allowedMCPListeners
-		default:
-			// Skip unsupported protocols
-			continue
-		}
-
-		svcs = append(svcs, agentGwService{
-			Named: krt.Named{
-				Name:      svc.Name,
-				Namespace: svc.Namespace,
-			},
-			ip:               addr,
-			port:             int(port.Port),
-			path:             path,
-			protocol:         appProtocol,
-			allowedListeners: allowedListeners,
-		})
-	}
-	return svcs
-}
