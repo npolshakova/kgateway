@@ -2255,9 +2255,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: preStop
       type:
         namedType: io.k8s.api.core.v1.LifecycleHandler
-    - name: stopSignal
-      type:
-        scalar: string
 - name: io.k8s.api.core.v1.LifecycleHandler
   map:
     fields:

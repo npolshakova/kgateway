@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.1-0.20250625175829-8d11ce77f347
+    controller-gen.kubebuilder.io/version: v0.17.3
   labels:
     app: kgateway
     app.kubernetes.io/name: kgateway
@@ -897,8 +897,6 @@ spec:
                                       - port
                                       type: object
                                   type: object
-                                stopSignal:
-                                  type: string
                               type: object
                             livenessProbe:
                               properties:
@@ -2388,10 +2386,6 @@ spec:
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
             type: object
-            x-kubernetes-validations:
-            - message: exactly one of the fields in [kube selfManaged] must be set
-              rule: '[has(self.kube),has(self.selfManaged)].filter(x,x==true).size()
-                == 1'
           status:
             type: object
         type: object

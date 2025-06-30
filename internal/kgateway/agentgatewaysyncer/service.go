@@ -11,7 +11,6 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	apiannotation "istio.io/api/annotation"
@@ -37,6 +36,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 )
 
 func (a *index) ServicesCollection(

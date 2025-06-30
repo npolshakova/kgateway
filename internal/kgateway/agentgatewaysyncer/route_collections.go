@@ -9,13 +9,14 @@ import (
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/slices"
 	"istio.io/istio/pkg/util/protomarshal"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 )
 
 // TODO: support other route collections (TCP, TLS, etc.)

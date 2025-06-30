@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/api/annotation"
 	"istio.io/api/label"
@@ -36,6 +35,8 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 )
 
 // internal object used for indexing in ambientindex maps
