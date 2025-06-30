@@ -77,7 +77,6 @@ type ADPCacheResource struct {
 	reports reports.ReportMap
 
 	Resources envoycache.Resources
-	Addresses envoycache.Resources
 
 	VersionMap map[string]map[string]string
 }
@@ -89,8 +88,25 @@ func (r ADPCacheResource) ResourceName() string {
 func (r ADPCacheResource) Equals(in ADPCacheResource) bool {
 	return r.Gateway == in.Gateway &&
 		report{r.reports}.Equals(report{in.reports}) &&
-		r.Resources.Version == in.Resources.Version &&
-		r.Addresses.Version == in.Addresses.Version
+		r.Resources.Version == in.Resources.Version
+}
+
+type ADPCacheAddress struct {
+	NamespacedName types.NamespacedName
+	Address        envoycache.Resources `json:"address"`
+	proxyKey       string
+
+	reports    reports.ReportMap
+	VersionMap map[string]map[string]string
+}
+
+func (r ADPCacheAddress) ResourceName() string {
+	return r.proxyKey
+}
+
+func (r ADPCacheAddress) Equals(in ADPCacheAddress) bool {
+	return report{r.reports}.Equals(report{in.reports}) &&
+		r.Address.Version == in.Address.Version
 }
 
 type ADPResource struct {

@@ -45,9 +45,7 @@ import (
 )
 
 const (
-	gatewayTLSTerminateModeKey = "gateway.istio.io/tls-terminate-mode"
-	addressTypeOverride        = "networking.istio.io/address-type"
-	gatewayClassDefaults       = "gateway.istio.io/defaults-for-class"
+	gatewayTLSTerminateModeKey = "gateway.agentgateway.io/tls-terminate-mode"
 )
 
 func sortRoutesByCreationTime(configs []RouteWithKey) {
@@ -60,10 +58,6 @@ func sortRoutesByCreationTime(configs []RouteWithKey) {
 		}
 		return cmp.Compare(configs[i].Name, configs[j].Name) == -1
 	})
-}
-
-func sortedConfigByCreationTime(configs []Config) []Config {
-	return sortConfigByCreationTime(configs)
 }
 
 func convertHTTPRouteToADP(ctx RouteContext, r k8s.HTTPRouteRule,
@@ -1620,28 +1614,6 @@ func getDefaultName(name string, kgw *k8s.GatewaySpec) string {
 	return fmt.Sprintf("%v-%v", name, kgw.GatewayClassName)
 }
 
-// Gateway currently requires a listener (https://github.com/kubernetes-sigs/gateway-api/pull/1596).
-// We don't *really* care about the listener, but it may make sense to add a warning if users do not
-// configure it in an expected way so that we have consistency and can make changes in the future as needed.
-// We could completely reject but that seems more likely to cause pain.
-func unexpectedWaypointListener(l k8s.Listener) bool {
-	if l.Port != 15008 {
-		return true
-	}
-	if l.Protocol != k8s.ProtocolType(protocol.HBONE) {
-		return true
-	}
-	return false
-}
-
-func getListenerNames(spec *k8s.GatewaySpec) sets.Set[k8s.SectionName] {
-	res := sets.New[k8s.SectionName]()
-	for _, l := range spec.Listeners {
-		res.Insert(l.Name)
-	}
-	return res
-}
-
 // IsManaged checks if a Gateway is managed (ie we create the Deployment and Service) or unmanaged.
 // This is based on the address field of the spec. If address is set with a Hostname type, it should point to an existing
 // Service that handles the gateway traffic. If it is not set, or refers to only a single IP, we will consider it managed and provision the Service.
@@ -1887,7 +1859,7 @@ func buildSecretReference(
 		return "", TLSInfo{}, &ConfigError{Reason: InvalidTLS, Message: fmt.Sprintf("invalid certificate reference %v, only secret is allowed", objectReferenceString(ref))}
 	}
 
-	secret := model.ConfigKey{
+	secret := ConfigKey{
 		Kind:      kind.Secret,
 		Name:      string(ref.Name),
 		Namespace: ptr.OrDefault((*string)(ref.Namespace), gw.Namespace),
@@ -1997,19 +1969,6 @@ func namespacesFromSelector(ctx krt.HandlerContext, localNamespace string, names
 	return namespaces
 }
 
-func humanReadableJoin(ss []string) string {
-	switch len(ss) {
-	case 0:
-		return ""
-	case 1:
-		return ss[0]
-	case 2:
-		return ss[0] + " and " + ss[1]
-	default:
-		return strings.Join(ss[:len(ss)-1], ", ") + ", and " + ss[len(ss)-1]
-	}
-}
-
 // NamespaceNameLabel represents that label added automatically to namespaces is newer Kubernetes clusters
 const NamespaceNameLabel = "kubernetes.io/metadata.name"
 
@@ -2042,22 +2001,6 @@ func GetCommonRouteInfo(spec any) ([]k8s.ParentReference, []k8s.Hostname, schema
 	default:
 		log.Fatalf("unknown type %T", t)
 		return nil, nil, schema.GroupVersionKind{}
-	}
-}
-
-func GetCommonRouteStateParents(spec any) []k8s.RouteParentStatus {
-	switch t := spec.(type) {
-	case *k8salpha.TCPRoute:
-		return t.Status.Parents
-	case *k8salpha.TLSRoute:
-		return t.Status.Parents
-	case *k8sbeta.HTTPRoute:
-		return t.Status.Parents
-	case *k8s.GRPCRoute:
-		return t.Status.Parents
-	default:
-		log.Fatalf("unknown type %T", t)
-		return nil
 	}
 }
 

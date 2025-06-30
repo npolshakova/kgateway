@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"net/netip"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,28 +11,220 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"k8s.io/apimachinery/pkg/types"
-
+	apiannotation "istio.io/api/annotation"
 	"istio.io/api/label"
+	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pilot/pkg/features"
+	"istio.io/istio/pilot/pkg/serviceregistry/kube"
 	"istio.io/istio/pilot/pkg/serviceregistry/provider"
 	"istio.io/istio/pilot/pkg/util/protoconv"
 	"istio.io/istio/pkg/cluster"
+	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/config/constants"
 	"istio.io/istio/pkg/config/host"
-	"istio.io/istio/pkg/config/labels"
+	kubeutil "istio.io/istio/pkg/config/kube"
 	"istio.io/istio/pkg/config/protocol"
 	"istio.io/istio/pkg/config/schema/kind"
 	"istio.io/istio/pkg/config/visibility"
+	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/maps"
 	pm "istio.io/istio/pkg/model"
-	"istio.io/istio/pkg/network"
 	"istio.io/istio/pkg/slices"
 	"istio.io/istio/pkg/util/protomarshal"
 	"istio.io/istio/pkg/util/sets"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
+
+func (a *index) ServicesCollection(
+	services krt.Collection[*v1.Service],
+	serviceEntries krt.Collection[*networkingclient.ServiceEntry],
+	namespaces krt.Collection[*v1.Namespace],
+	krtopts krtutil.KrtOptions,
+) krt.Collection[ServiceInfo] {
+	ServicesInfo := krt.NewCollection(services, a.serviceServiceBuilder(namespaces),
+		krtopts.ToOptions("ServicesInfo")...)
+	ServiceEntriesInfo := krt.NewManyCollection(serviceEntries, a.serviceEntryServiceBuilder(namespaces),
+		krtopts.ToOptions("ServiceEntriesInfo")...)
+	// TODO: add inference pool to svc collection
+	WorkloadServices := krt.JoinCollection([]krt.Collection[ServiceInfo]{ServicesInfo, ServiceEntriesInfo}, krtopts.ToOptions("WorkloadService")...)
+	return WorkloadServices
+}
+
+func (a *index) serviceServiceBuilder(
+	namespaces krt.Collection[*v1.Namespace],
+) krt.TransformationSingle[*v1.Service, ServiceInfo] {
+	return func(ctx krt.HandlerContext, s *v1.Service) *ServiceInfo {
+		if s.Spec.Type == v1.ServiceTypeExternalName {
+			// ExternalName services are not implemented by ambient (but will still work).
+			// The DNS requests will forward to the upstream DNS server, then Ztunnel can handle the request based on the target
+			// hostname.
+			// In theory we could add support for native 'DNS alias' into Ztunnel's DNS proxy. This would give the same behavior
+			// but let the DNS proxy handle it instead of forwarding upstream. However, at this time we do not do so.
+			return nil
+		}
+		portNames := map[int32]ServicePortName{}
+		for _, p := range s.Spec.Ports {
+			portNames[p.Port] = ServicePortName{
+				PortName:       p.Name,
+				TargetPortName: p.TargetPort.StrVal,
+			}
+		}
+
+		svc := a.constructService(ctx, s)
+		return precomputeServicePtr(&ServiceInfo{
+			Service:       svc,
+			PortNames:     portNames,
+			LabelSelector: NewSelector(s.Spec.Selector),
+			Source:        MakeSource(s),
+		})
+	}
+}
+
+// ServiceHostname produces FQDN for a k8s service
+func InferenceHostname(name, namespace, domainSuffix string) host.Name {
+	return host.Name(name + "." + namespace + "." + "inference" + "." + domainSuffix) // Format: "%s.%s.svc.%s"
+}
+
+func (a *index) inferencePoolBuilder(
+	namespaces krt.Collection[*v1.Namespace],
+) krt.TransformationSingle[*inf.InferencePool, ServiceInfo] {
+	return func(ctx krt.HandlerContext, s *inf.InferencePool) *ServiceInfo {
+		portNames := map[int32]ServicePortName{}
+		ports := []*api.Port{{
+			ServicePort: uint32(s.Spec.TargetPortNumber),
+			TargetPort:  uint32(s.Spec.TargetPortNumber),
+			AppProtocol: api.AppProtocol_HTTP11,
+		}}
+
+		// TODO this is only checking one controller - we may be missing service vips for instances in another cluster
+		svc := &api.Service{
+			Name:      s.Name,
+			Namespace: s.Namespace,
+			Hostname:  string(InferenceHostname(s.Name, s.Namespace, a.DomainSuffix)),
+			Ports:     ports,
+		}
+
+		selector := make(map[string]string, len(s.Spec.Selector))
+		for k, v := range s.Spec.Selector {
+			selector[string(k)] = string(v)
+		}
+		return precomputeServicePtr(&ServiceInfo{
+			Service:       svc,
+			PortNames:     portNames,
+			LabelSelector: NewSelector(selector),
+			Source:        MakeSource(s),
+		})
+	}
+}
+
+func (a *index) serviceEntryServiceBuilder(
+	namespaces krt.Collection[*v1.Namespace],
+) krt.TransformationMulti[*networkingclient.ServiceEntry, ServiceInfo] {
+	return func(ctx krt.HandlerContext, s *networkingclient.ServiceEntry) []ServiceInfo {
+		return a.serviceEntriesInfo(ctx, s)
+	}
+}
+
+func toAppProtocolFromKube(p v1.ServicePort) api.AppProtocol {
+	return toAppProtocolFromProtocol(string(kubeutil.ConvertProtocol(p.Port, p.Name, p.Protocol, p.AppProtocol)))
+}
+
+func (a *index) constructService(ctx krt.HandlerContext, svc *v1.Service) *api.Service {
+	ports := make([]*api.Port, 0, len(svc.Spec.Ports))
+	for _, p := range svc.Spec.Ports {
+		ports = append(ports, &api.Port{
+			ServicePort: uint32(p.Port),
+			TargetPort:  uint32(p.TargetPort.IntVal),
+			AppProtocol: toAppProtocolFromKube(p),
+		})
+	}
+
+	addresses, err := slices.MapErr(getVIPs(svc), func(e string) (*api.NetworkAddress, error) {
+		return a.toNetworkAddress(ctx, e)
+	})
+	if err != nil {
+		logger.Warn("fail to parse service", "svc", config.NamespacedName(svc), "error", err)
+		return nil
+	}
+
+	var lb *api.LoadBalancing
+
+	// The TrafficDistribution field is quite new, so we allow a legacy annotation option as well
+	preferClose := strings.EqualFold(svc.Annotations[apiannotation.NetworkingTrafficDistribution.Name], v1.ServiceTrafficDistributionPreferClose)
+	if svc.Spec.TrafficDistribution != nil {
+		preferClose = *svc.Spec.TrafficDistribution == v1.ServiceTrafficDistributionPreferClose
+	}
+	if preferClose {
+		lb = preferCloseLoadBalancer
+	}
+	if itp := svc.Spec.InternalTrafficPolicy; itp != nil && *itp == v1.ServiceInternalTrafficPolicyLocal {
+		lb = &api.LoadBalancing{
+			// Only allow endpoints on the same node.
+			RoutingPreference: []api.LoadBalancing_Scope{
+				api.LoadBalancing_NODE,
+			},
+			Mode: api.LoadBalancing_STRICT,
+		}
+	}
+	if svc.Spec.PublishNotReadyAddresses {
+		if lb == nil {
+			lb = &api.LoadBalancing{}
+		}
+		lb.HealthPolicy = api.LoadBalancing_ALLOW_ALL
+	}
+
+	ipFamily := api.IPFamilies_AUTOMATIC
+	if len(svc.Spec.IPFamilies) == 2 {
+		ipFamily = api.IPFamilies_DUAL
+	} else if len(svc.Spec.IPFamilies) == 1 {
+		family := svc.Spec.IPFamilies[0]
+		if family == v1.IPv4Protocol {
+			ipFamily = api.IPFamilies_IPV4_ONLY
+		} else {
+			ipFamily = api.IPFamilies_IPV6_ONLY
+		}
+	}
+	// TODO this is only checking one controller - we may be missing service vips for instances in another cluster
+	return &api.Service{
+		Name:          svc.Name,
+		Namespace:     svc.Namespace,
+		Hostname:      string(kube.ServiceHostname(svc.Name, svc.Namespace, a.DomainSuffix)),
+		Addresses:     addresses,
+		Ports:         ports,
+		LoadBalancing: lb,
+		IpFamilies:    ipFamily,
+	}
+}
+
+var preferCloseLoadBalancer = &api.LoadBalancing{
+	// Prefer endpoints in close zones, but allow spilling over to further endpoints where required.
+	RoutingPreference: []api.LoadBalancing_Scope{
+		api.LoadBalancing_NETWORK,
+		api.LoadBalancing_REGION,
+		api.LoadBalancing_ZONE,
+		api.LoadBalancing_SUBZONE,
+	},
+	Mode: api.LoadBalancing_FAILOVER,
+}
+
+func getVIPs(svc *v1.Service) []string {
+	res := []string{}
+	cips := svc.Spec.ClusterIPs
+	if len(cips) == 0 {
+		cips = []string{svc.Spec.ClusterIP}
+	}
+	for _, cip := range cips {
+		if cip != "" && cip != v1.ClusterIPNone {
+			res = append(res, cip)
+		}
+	}
+	return res
+}
 
 // Service describes an Istio service (e.g., catalog.mystore.com:8080)
 // Each service has a fully qualified domain name (FQDN) and one or more
@@ -171,14 +361,6 @@ func (resolution Resolution) String() string {
 }
 
 const (
-	// LocalityLabel indicates the region/zone/subzone of an instance. It is used to override the native
-	// registry's value.
-	//
-	// Note: because k8s labels does not support `/`, so we use `.` instead in k8s.
-	LocalityLabel = pm.LocalityLabel
-)
-
-const (
 	// TunnelLabel defines the label workloads describe to indicate that they support tunneling.
 	// Values are expected to be a CSV list, sorted by preference, of protocols supported.
 	// Currently supported values:
@@ -206,12 +388,6 @@ const (
 
 	// IstioMutualTLSModeLabel implies that the endpoint is ready to receive Istio mTLS connections.
 	IstioMutualTLSModeLabel = "istio"
-
-	// IstioCanonicalServiceLabelName is the name of label for the Istio Canonical Service for a workload instance.
-	IstioCanonicalServiceLabelName = pm.IstioCanonicalServiceLabelName
-
-	// IstioCanonicalServiceRevisionLabelName is the name of label for the Istio Canonical Service revision for a workload instance.
-	IstioCanonicalServiceRevisionLabelName = pm.IstioCanonicalServiceRevisionLabelName
 )
 
 func SupportsTunnel(labels map[string]string, tunnelType string) bool {
@@ -231,7 +407,7 @@ func SupportsTunnel(labels map[string]string, tunnelType string) bool {
 // connections. The port should be annotated with the type of protocol
 // used by the port.
 type Port struct {
-	// Name ascribes a human readable name for the port object. When a
+	// Name ascribes a human-readable name for the port object. When a
 	// service has multiple ports, the name field is mandatory
 	Name string `json:"name,omitempty"`
 
@@ -268,37 +444,6 @@ const (
 	trafficDirectionInboundSrvPrefix = string(TrafficDirectionInbound) + "_"
 )
 
-// ServiceInstance represents an individual instance of a specific version
-// of a service. It binds a network endpoint (ip:port), the service
-// description (which is oblivious to various versions) and a set of labels
-// that describe the service version associated with this instance.
-//
-// Since a ServiceInstance has a single IstioEndpoint, which has a single port,
-// multiple ServiceInstances are required to represent a workload that listens
-// on multiple ports.
-//
-// The labels associated with a service instance are unique per a network endpoint.
-// There is one well defined set of labels for each service instance network endpoint.
-//
-// For example, the set of service instances associated with catalog.mystore.com
-// are modeled like this
-//
-//	--> IstioEndpoint(172.16.0.1:8888), Service(catalog.myservice.com), Labels(foo=bar)
-//	--> IstioEndpoint(172.16.0.2:8888), Service(catalog.myservice.com), Labels(foo=bar)
-//	--> IstioEndpoint(172.16.0.3:8888), Service(catalog.myservice.com), Labels(kitty=cat)
-//	--> IstioEndpoint(172.16.0.4:8888), Service(catalog.myservice.com), Labels(kitty=cat)
-type ServiceInstance struct {
-	Service     *Service       `json:"service,omitempty"`
-	ServicePort *Port          `json:"servicePort,omitempty"`
-	Endpoint    *IstioEndpoint `json:"endpoint,omitempty"`
-}
-
-func (instance *ServiceInstance) CmpOpts() []cmp.Option {
-	res := []cmp.Option{}
-	res = append(res, serviceCmpOpts...)
-	return res
-}
-
 // ServiceTarget includes a Service object, along with a specific service port
 // and target port. This is basically a smaller version of ServiceInstance,
 // intended to avoid the need to have the full object when only port information
@@ -310,36 +455,13 @@ type ServiceTarget struct {
 
 type (
 	ServicePort = *Port
-	// ServiceInstancePort defines a port that has both a port and targetPort (which distinguishes it from model.Port)
+	// ServiceInstancePort defines a port that has both a port and targetPort (which distinguishes it from Port)
 	// Note: ServiceInstancePort only makes sense in the context of a specific ServiceInstance, because TargetPort depends on a specific instance.
 	ServiceInstancePort struct {
 		ServicePort
 		TargetPort uint32
 	}
 )
-
-func ServiceInstanceToTarget(e *ServiceInstance) ServiceTarget {
-	return ServiceTarget{
-		Service: e.Service,
-		Port: ServiceInstancePort{
-			ServicePort: e.ServicePort,
-			TargetPort:  e.Endpoint.EndpointPort,
-		},
-	}
-}
-
-// DeepCopy creates a copy of ServiceInstance.
-func (instance *ServiceInstance) DeepCopy() *ServiceInstance {
-	return &ServiceInstance{
-		Service:  instance.Service.DeepCopy(),
-		Endpoint: instance.Endpoint.DeepCopy(),
-		ServicePort: &Port{
-			Name:     instance.ServicePort.Name,
-			Port:     instance.ServicePort.Port,
-			Protocol: instance.ServicePort.Protocol,
-		},
-	}
-}
 
 type workloadKind int
 
@@ -361,69 +483,6 @@ func (k workloadKind) String() string {
 	return ""
 }
 
-type WorkloadInstance struct {
-	Name      string `json:"name,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-	// Where the workloadInstance come from, valid values are`Pod` or `WorkloadEntry`
-	Kind     workloadKind      `json:"kind"`
-	Endpoint *IstioEndpoint    `json:"endpoint,omitempty"`
-	PortMap  map[string]uint32 `json:"portMap,omitempty"`
-	// Can only be selected by service entry of DNS type.
-	DNSServiceEntryOnly bool `json:"dnsServiceEntryOnly,omitempty"`
-}
-
-// DeepCopy creates a copy of WorkloadInstance.
-func (instance *WorkloadInstance) DeepCopy() *WorkloadInstance {
-	out := *instance
-	out.PortMap = maps.Clone(instance.PortMap)
-	out.Endpoint = instance.Endpoint.DeepCopy()
-	return &out
-}
-
-// WorkloadInstancesEqual is a custom comparison of workload instances based on the fields that we need.
-// Returns true if equal, false otherwise.
-func WorkloadInstancesEqual(first, second *WorkloadInstance) bool {
-	if first.Endpoint == nil || second.Endpoint == nil {
-		return first.Endpoint == second.Endpoint
-	}
-
-	if !slices.EqualUnordered(first.Endpoint.Addresses, second.Endpoint.Addresses) {
-		return false
-	}
-
-	if first.Endpoint.Network != second.Endpoint.Network {
-		return false
-	}
-	if first.Endpoint.TLSMode != second.Endpoint.TLSMode {
-		return false
-	}
-	if !first.Endpoint.Labels.Equals(second.Endpoint.Labels) {
-		return false
-	}
-	if first.Endpoint.ServiceAccount != second.Endpoint.ServiceAccount {
-		return false
-	}
-	if first.Endpoint.Locality != second.Endpoint.Locality {
-		return false
-	}
-	if first.Endpoint.GetLoadBalancingWeight() != second.Endpoint.GetLoadBalancingWeight() {
-		return false
-	}
-	if first.Namespace != second.Namespace {
-		return false
-	}
-	if first.Name != second.Name {
-		return false
-	}
-	if first.Kind != second.Kind {
-		return false
-	}
-	if !maps.Equal(first.PortMap, second.PortMap) {
-		return false
-	}
-	return true
-}
-
 // GetLocalityLabel returns the locality from the supplied label. Because Kubernetes
 // labels don't support `/`, we replace "." with "/" in the supplied label as a workaround.
 func GetLocalityLabel(label string) string {
@@ -434,182 +493,6 @@ func GetLocalityLabel(label string) string {
 type Locality struct {
 	// Label for locality on the endpoint. This is a "/" separated string.
 	Label string
-
-	// ClusterID where the endpoint is located
-	ClusterID cluster.ID
-}
-
-// HealthStatus indicates the status of the Endpoint.
-type HealthStatus int32
-
-const (
-	// Healthy indicates an endpoint is ready to accept traffic
-	Healthy HealthStatus = 1
-	// UnHealthy indicates an endpoint is not ready to accept traffic
-	UnHealthy HealthStatus = 2
-	// Draining is a special case, which is used only when persistent sessions are enabled. This indicates an endpoint
-	// was previously healthy, but is now shutting down.
-	// Without persistent sessions, an endpoint that is shutting down will be marked as Terminating.
-	Draining HealthStatus = 3
-	// Terminating marks an endpoint as shutting down. Similar to "unhealthy", this means we should not send it traffic.
-	// But unlike "unhealthy", this means we do not consider it when calculating failover.
-	Terminating HealthStatus = 4
-)
-
-// IstioEndpoint defines a network address (IP:port) associated with an instance of the
-// service. A service has one or more instances each running in a
-// container/VM/pod. If a service has multiple ports, then the same
-// instance IP is expected to be listening on multiple ports (one per each
-// service port). Note that the port associated with an instance does not
-// have to be the same as the port associated with the service. Depending
-// on the network setup (NAT, overlays), this could vary.
-//
-// For e.g., if catalog.mystore.com is accessible through port 80 and 8080,
-// and it maps to an instance with IP 172.16.0.1, such that connections to
-// port 80 are forwarded to port 55446, and connections to port 8080 are
-// forwarded to port 33333,
-//
-// then internally, we have two endpoint structs for the
-// service catalog.mystore.com
-//
-//	--> 172.16.0.1:55446 (with ServicePort pointing to 80) and
-//	--> 172.16.0.1:33333 (with ServicePort pointing to 8080)
-type IstioEndpoint struct {
-	// Labels points to the workload or deployment labels.
-	Labels labels.Instance
-
-	// Addresses are the addresses of the endpoint, using envoy proto:
-	// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/endpoint/v3/endpoint_components.proto#config-endpoint-v3-endpoint-additionaladdress
-	// This field can support multiple addresses for an Dual Stack endpoint, especially for an endpoint which contains both ipv4 or ipv6 addresses.
-	// There should be some constraints below:
-	// 1. Each address of the endpoint must have the same metadata.
-	// 2. The function Key() of IstioEndpoint returns the first IP address of this field in string format.
-	// 3. The IP address of field `address` in Envoy Endpoint is equal to the first address of this field.
-	// When the additional_addresses field is populated for EDS in Envoy configuration, Envoy will use an Happy Eyeballs algorithm.
-	// Therefore Envoy will first attempt connecting to the IP address in the `address` field of Envoy Endpoint.
-	// If the first attempt fails, then it will interleave IP addresses in the `additional_addresses` field based on IP version, as described in rfc8305,
-	// and attempt connections with them with a delay of 300ms each. The first connection to succeed will be used.
-	// Note: it uses Hash Based Load Balancing Policies for multiple addresses support Endpoint, and only the first address of the
-	// endpoint will be used as the hash key for the ring or maglev list, however, the upstream address that load balancer ends up
-	// connecting to will depend on the one that ends up "winning" using the Happy Eyeballs algorithm.
-	// Please refer to https://docs.google.com/document/d/1AjmTcMWwb7nia4rAgqE-iqIbSbfiXCI4h1vk-FONFdM/ for more details.
-	Addresses []string
-
-	// ServicePortName tracks the name of the port, this is used to select the IstioEndpoint by service port.
-	ServicePortName string
-	// LegacyClusterPortKey provides an alternative key from ServicePortName to support legacy quirks in the API.
-	// Basically, EDS merges by port name, but CDS historically ignored port name and matched on number.
-	// Note that for Kubernetes Service, this is identical - its only ServiceEntry where these checks can differ
-	LegacyClusterPortKey int
-
-	// ServiceAccount holds the associated service account.
-	ServiceAccount string
-
-	// Network holds the network where this endpoint is present
-	Network network.ID
-
-	// The locality where the endpoint is present.
-	Locality Locality
-
-	// EndpointPort is the port where the workload is listening, can be different
-	// from the service port.
-	EndpointPort uint32
-
-	// The load balancing weight associated with this endpoint.
-	LbWeight uint32
-
-	// TLSMode endpoint is injected with istio sidecar and ready to configure Istio mTLS
-	TLSMode string
-
-	// Namespace that this endpoint belongs to. This is for telemetry purpose.
-	Namespace string
-
-	// Name of the workload that this endpoint belongs to. This is for telemetry purpose.
-	WorkloadName string
-
-	// Specifies the hostname of the Pod, empty for vm workload.
-	HostName string
-
-	// If specified, the fully qualified Pod hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
-	SubDomain string
-
-	// Indicates the endpoint health status.
-	HealthStatus HealthStatus
-
-	// SendUnhealthyEndpoints indicates whether this endpoint should be sent when it is unhealthy
-	// Note: this is more appropriate at the Service level, but some codepaths require this in areas without the service
-	// object present.
-	SendUnhealthyEndpoints bool
-
-	// If in k8s, the node where the pod resides
-	NodeName string
-}
-
-func (ep *IstioEndpoint) SupportsTunnel(tunnelType string) bool {
-	return SupportsTunnel(ep.Labels, tunnelType)
-}
-
-// GetLoadBalancingWeight returns the weight for this endpoint, normalized to always be > 0.
-func (ep *IstioEndpoint) GetLoadBalancingWeight() uint32 {
-	if ep.LbWeight > 0 {
-		return ep.LbWeight
-	}
-	return 1
-}
-
-// MetadataClone returns the cloned endpoint metadata used for telemetry purposes.
-// This should be used when the endpoint labels should be updated.
-func (ep *IstioEndpoint) MetadataClone() *EndpointMetadata {
-	return &EndpointMetadata{
-		Network:      ep.Network,
-		TLSMode:      ep.TLSMode,
-		WorkloadName: ep.WorkloadName,
-		Namespace:    ep.Namespace,
-		Labels:       maps.Clone(ep.Labels),
-		ClusterID:    ep.Locality.ClusterID,
-	}
-}
-
-// Metadata returns the endpoint metadata used for telemetry purposes.
-func (ep *IstioEndpoint) Metadata() *EndpointMetadata {
-	return &EndpointMetadata{
-		Network:      ep.Network,
-		TLSMode:      ep.TLSMode,
-		WorkloadName: ep.WorkloadName,
-		Namespace:    ep.Namespace,
-		Labels:       ep.Labels,
-		ClusterID:    ep.Locality.ClusterID,
-	}
-}
-
-func (ep *IstioEndpoint) FirstAddressOrNil() string {
-	if ep == nil || len(ep.Addresses) == 0 {
-		return ""
-	}
-	return ep.Addresses[0]
-}
-
-// Key returns a function suitable for usage to distinguish this IstioEndpoint from another
-func (ep *IstioEndpoint) Key() string {
-	return ep.FirstAddressOrNil() + "/" + ep.WorkloadName + "/" + ep.ServicePortName
-}
-
-// EndpointMetadata represents metadata set on Envoy LbEndpoint used for telemetry purposes.
-type EndpointMetadata struct {
-	// Network holds the network where this endpoint is present
-	Network network.ID
-
-	// TLSMode endpoint is injected with istio sidecar and ready to configure Istio mTLS
-	TLSMode string
-
-	// Name of the workload that this endpoint belongs to. This is for telemetry purpose.
-	WorkloadName string
-
-	// Namespace that this endpoint belongs to. This is for telemetry purpose.
-	Namespace string
-
-	// Labels points to the workload or deployment labels.
-	Labels labels.Instance
 
 	// ClusterID where the endpoint is located
 	ClusterID cluster.ID
@@ -927,27 +810,6 @@ func (l LabelSelector) GetLabelSelector() map[string]string {
 	return l.Labels
 }
 
-func ExtractWorkloadsFromAddresses(addrs []AddressInfo) []WorkloadInfo {
-	return slices.MapFilter(addrs, func(a AddressInfo) *WorkloadInfo {
-		switch addr := a.Type.(type) {
-		case *api.Address_Workload:
-			return &WorkloadInfo{Workload: addr.Workload}
-		default:
-			return nil
-		}
-	})
-}
-
-func SortWorkloadsByCreationTime(workloads []WorkloadInfo) []WorkloadInfo {
-	sort.SliceStable(workloads, func(i, j int) bool {
-		if workloads[i].CreationTime.Equal(workloads[j].CreationTime) {
-			return workloads[i].Workload.GetUid() < workloads[j].Workload.GetUid()
-		}
-		return workloads[i].CreationTime.Before(workloads[j].CreationTime)
-	})
-	return workloads
-}
-
 type NamespaceInfo struct {
 	Name               string
 	IngressUseWaypoint bool
@@ -1026,91 +888,6 @@ func (ports PortList) String() string {
 	return strings.Join(sp, ", ")
 }
 
-// BuildSubsetKey generates a unique string referencing service instances for a given service name, a subset and a port.
-// The proxy queries Pilot with this key to obtain the list of instances in a subset.
-func BuildSubsetKey(direction TrafficDirection, subsetName string, hostname host.Name, port int) string {
-	return string(direction) + "|" + strconv.Itoa(port) + "|" + subsetName + "|" + string(hostname)
-}
-
-// BuildInboundSubsetKey generates a unique string referencing service instances with port.
-func BuildInboundSubsetKey(port int) string {
-	return BuildSubsetKey(TrafficDirectionInbound, "", "", port)
-}
-
-// BuildDNSSrvSubsetKey generates a unique string referencing service instances for a given service name, a subset and a port.
-// The proxy queries Pilot with this key to obtain the list of instances in a subset.
-// This is used only for the SNI-DNAT router. Do not use for other purposes.
-// The DNS Srv format of the cluster is also used as the default SNI string for Istio mTLS connections
-func BuildDNSSrvSubsetKey(direction TrafficDirection, subsetName string, hostname host.Name, port int) string {
-	return string(direction) + "_." + strconv.Itoa(port) + "_." + subsetName + "_." + string(hostname)
-}
-
-// IsValidSubsetKey checks if a string is valid for subset key parsing.
-func IsValidSubsetKey(s string) bool {
-	return strings.Count(s, "|") == 3
-}
-
-// IsDNSSrvSubsetKey checks whether the given key is a DNSSrv key (built by BuildDNSSrvSubsetKey).
-func IsDNSSrvSubsetKey(s string) bool {
-	if strings.HasPrefix(s, trafficDirectionOutboundSrvPrefix) ||
-		strings.HasPrefix(s, trafficDirectionInboundSrvPrefix) {
-		return true
-	}
-	return false
-}
-
-// ParseSubsetKeyHostname is an optimized specialization of ParseSubsetKey that only returns the hostname.
-// This is created as this is used in some hot paths and is about 2x faster than ParseSubsetKey; for typical use ParseSubsetKey is sufficient (and zero-alloc).
-func ParseSubsetKeyHostname(s string) (hostname string) {
-	idx := strings.LastIndex(s, "|")
-	if idx == -1 {
-		// Could be DNS SRV format.
-		// Do not do LastIndex("_."), as those are valid characters in the hostname (unlike |)
-		// Fallback to the full parser.
-		_, _, hostname, _ := ParseSubsetKey(s)
-		return string(hostname)
-	}
-	return s[idx+1:]
-}
-
-// ParseSubsetKey is the inverse of the BuildSubsetKey method
-func ParseSubsetKey(s string) (direction TrafficDirection, subsetName string, hostname host.Name, port int) {
-	sep := "|"
-	// This could be the DNS srv form of the cluster that uses outbound_.port_.subset_.hostname
-	// Since we do not want every callsite to implement the logic to differentiate between the two forms
-	// we add an alternate parser here.
-	if strings.HasPrefix(s, trafficDirectionOutboundSrvPrefix) ||
-		strings.HasPrefix(s, trafficDirectionInboundSrvPrefix) {
-		sep = "_."
-	}
-
-	// Format: dir|port|subset|hostname
-	dir, s, ok := strings.Cut(s, sep)
-	if !ok {
-		return
-	}
-	direction = TrafficDirection(dir)
-
-	p, s, ok := strings.Cut(s, sep)
-	if !ok {
-		return
-	}
-	port, _ = strconv.Atoi(p)
-
-	ss, s, ok := strings.Cut(s, sep)
-	if !ok {
-		return
-	}
-	subsetName = ss
-
-	// last part. No | remains -- verify this
-	if strings.Contains(s, sep) {
-		return
-	}
-	hostname = host.Name(s)
-	return
-}
-
 // HasAddressOrAssigned returns whether the service has an IP address.
 // This includes auto-allocated IP addresses. Note that not all proxies support auto-allocated IP addresses;
 // typically GetAllAddressesForProxy should be used which automatically filters addresses to account for that.
@@ -1130,37 +907,6 @@ func (s *Service) HasAddressOrAssigned(id cluster.ID) bool {
 		return true
 	}
 	return false
-}
-
-func filterAddresses(addresses []string, supportsV4, supportsV6 bool) []string {
-	var ipv4Addresses []string
-	var ipv6Addresses []string
-	for _, addr := range addresses {
-		// check if an address is a CIDR range
-		if strings.Contains(addr, "/") {
-			if prefix, err := netip.ParsePrefix(addr); err != nil {
-				logger.Warn("failed to parse prefix address", "addr", addr, "error", err)
-				continue
-			} else if supportsV4 && prefix.Addr().Is4() {
-				ipv4Addresses = append(ipv4Addresses, addr)
-			} else if supportsV6 && prefix.Addr().Is6() {
-				ipv6Addresses = append(ipv6Addresses, addr)
-			}
-		} else {
-			if ipAddr, err := netip.ParseAddr(addr); err != nil {
-				logger.Warn("failed to parse address", "addr", addr, "error", err)
-				continue
-			} else if supportsV4 && ipAddr.Is4() {
-				ipv4Addresses = append(ipv4Addresses, addr)
-			} else if supportsV6 && ipAddr.Is6() {
-				ipv6Addresses = append(ipv6Addresses, addr)
-			}
-		}
-	}
-	if len(ipv4Addresses) > 0 {
-		return ipv4Addresses
-	}
-	return ipv6Addresses
 }
 
 // GetTLSModeFromEndpointLabels returns the value of the label
@@ -1233,66 +979,6 @@ func (s *Service) Equals(other *Service) bool {
 	return s.DefaultAddress == other.DefaultAddress && s.AutoAllocatedIPv4Address == other.AutoAllocatedIPv4Address &&
 		s.AutoAllocatedIPv6Address == other.AutoAllocatedIPv6Address && s.Hostname == other.Hostname &&
 		s.Resolution == other.Resolution
-}
-
-// DeepCopy creates a clone of IstioEndpoint.
-func (ep *IstioEndpoint) DeepCopy() *IstioEndpoint {
-	if ep == nil {
-		return nil
-	}
-
-	out := *ep
-	out.Labels = maps.Clone(ep.Labels)
-	out.Addresses = slices.Clone(ep.Addresses)
-
-	return &out
-}
-
-// ShallowCopy creates a shallow clone of IstioEndpoint.
-func (ep *IstioEndpoint) ShallowCopy() *IstioEndpoint {
-	// nolint: govet
-	cpy := *ep
-	return &cpy
-}
-
-// Equals checks whether the attributes are equal from the passed in service.
-func (ep *IstioEndpoint) Equals(other *IstioEndpoint) bool {
-	if ep == nil {
-		return other == nil
-	}
-	if other == nil {
-		return ep == nil
-	}
-
-	// Check things we can directly compare...
-	eq := ep.ServicePortName == other.ServicePortName &&
-		ep.LegacyClusterPortKey == other.LegacyClusterPortKey &&
-		ep.ServiceAccount == other.ServiceAccount &&
-		ep.Network == other.Network &&
-		ep.Locality == other.Locality &&
-		ep.EndpointPort == other.EndpointPort &&
-		ep.LbWeight == other.LbWeight &&
-		ep.TLSMode == other.TLSMode &&
-		ep.Namespace == other.Namespace &&
-		ep.WorkloadName == other.WorkloadName &&
-		ep.HostName == other.HostName &&
-		ep.SubDomain == other.SubDomain &&
-		ep.HealthStatus == other.HealthStatus &&
-		ep.SendUnhealthyEndpoints == other.SendUnhealthyEndpoints &&
-		ep.NodeName == other.NodeName
-	if !eq {
-		return false
-	}
-
-	// check everything else
-	if !slices.EqualUnordered(ep.Addresses, other.Addresses) {
-		return false
-	}
-	if !maps.Equal(ep.Labels, other.Labels) {
-		return false
-	}
-
-	return true
 }
 
 func equalUsingPremarshaled[T proto.Message](a T, am *anypb.Any, b T, bm *anypb.Any) bool {
