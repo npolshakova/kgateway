@@ -777,19 +777,6 @@ func (l LabelSelector) GetLabelSelector() map[string]string {
 	return l.Labels
 }
 
-type NamespaceInfo struct {
-	Name               string
-	IngressUseWaypoint bool
-}
-
-func (i NamespaceInfo) ResourceName() string {
-	return i.Name
-}
-
-func (i NamespaceInfo) Equals(other NamespaceInfo) bool {
-	return i == other
-}
-
 // MCSServiceInfo combines the name of a service with a particular Kubernetes cluster. This
 // is used for debug information regarding the state of Kubernetes Multi-Cluster Services (MCS).
 type MCSServiceInfo struct {

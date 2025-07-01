@@ -110,6 +110,7 @@ func (g Gateway) Equals(other Gateway) bool {
 }
 
 func GatewayCollection(
+	agentGatewayClassName string,
 	gateways krt.Collection[*gateway.Gateway],
 	gatewayClasses krt.Collection[GatewayClass],
 	namespaces krt.Collection[*corev1.Namespace],
@@ -119,6 +120,10 @@ func GatewayCollection(
 	krtopts krtutil.KrtOptions,
 ) krt.Collection[Gateway] {
 	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gateway.Gateway) []Gateway {
+		if string(obj.Spec.GatewayClassName) != agentGatewayClassName {
+			return nil // ignore non agentgateway gws
+		}
+
 		var result []Gateway
 		kgw := obj.Spec
 		status := obj.Status.DeepCopy()
@@ -142,7 +147,7 @@ func GatewayCollection(
 
 			servers = append(servers, server)
 			meta := parentMeta(obj, &l.Name)
-			// Each listener generates an Istio Gateway with a single Server. This allows binding to a specific listener.
+			// Each listener generates a Gateway with a single Server. This allows binding to a specific listener.
 			gatewayConfig := Config{
 				Meta: Meta{
 					CreationTimestamp: obj.CreationTimestamp.Time,
@@ -152,6 +157,7 @@ func GatewayCollection(
 					Namespace:         obj.Namespace,
 					Domain:            domainSuffix,
 				},
+				// TODO: move away from istio gateway ir
 				Spec: &istio.Gateway{
 					Servers: []*istio.Server{server},
 				},

@@ -213,11 +213,14 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 		domainSuffix := "cluster.local" // TODO: don't hard code
 		agentGatewaySyncer := agentgatewaysyncer.NewAgentGwSyncer(
 			cfg.ControllerName,
+			cfg.AgentGatewayClassName,
 			cfg.Client,
 			cfg.UniqueClients,
 			commoncol,
 			cfg.SetupOpts.Cache,
 			domainSuffix,
+			namespaces.GetPodNamespace(),
+			cfg.Client.ClusterID().String(),
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)
 

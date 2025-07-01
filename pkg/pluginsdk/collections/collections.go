@@ -41,7 +41,7 @@ type CommonCollections struct {
 	Services          krt.Collection[*corev1.Service]
 	ServiceEntries    krt.Collection[*networkingclient.ServiceEntry]
 
-	Pods         krt.Collection[*corev1.Pod] // TODO: refactor to ir that can work with agentgateway
+	WrappedPods  krt.Collection[krtcollections.WrappedPod]
 	LocalityPods krt.Collection[krtcollections.LocalityPod]
 	RefGrants    *krtcollections.RefGrantIndex
 	ConfigMaps   krt.Collection[*corev1.ConfigMap]
@@ -59,7 +59,7 @@ func (c *CommonCollections) HasSynced() bool {
 	return c.Secrets != nil && c.Secrets.HasSynced() &&
 		c.BackendIndex != nil && c.BackendIndex.HasSynced() &&
 		c.Routes != nil && c.Routes.HasSynced() &&
-		c.Pods != nil && c.Pods.HasSynced() &&
+		c.WrappedPods != nil && c.WrappedPods.HasSynced() &&
 		c.LocalityPods != nil && c.LocalityPods.HasSynced() &&
 		c.RefGrants != nil && c.RefGrants.HasSynced() &&
 		c.ConfigMaps != nil && c.ConfigMaps.HasSynced() &&
@@ -141,11 +141,7 @@ func NewCommonCollections(
 
 	gwExts := krtcollections.NewGatewayExtensionsCollection(ctx, client, ourClient, krtOptions)
 
-	podClient := kclient.NewFiltered[*corev1.Pod](client, kclient.Filter{
-		ObjectTransform: kube.StripPodUnusedFields,
-		ObjectFilter:    client.ObjectFilter(),
-	})
-	pods := krt.WrapClient(podClient, krtOptions.ToOptions("Pods")...)
+	localityPods, wrappedPods := krtcollections.NewPodsCollection(client, krtOptions)
 
 	return &CommonCollections{
 		OurClient:         ourClient,
@@ -153,8 +149,8 @@ func NewCommonCollections(
 		CrudClient:        cl,
 		KrtOpts:           krtOptions,
 		Secrets:           krtcollections.NewSecretIndex(secrets, refgrants),
-		LocalityPods:      krtcollections.NewPodsCollection(client, pods, krtOptions),
-		Pods:              pods,
+		LocalityPods:      localityPods,
+		WrappedPods:       wrappedPods,
 		RefGrants:         refgrants,
 		Settings:          settings,
 		Namespaces:        namespaces,

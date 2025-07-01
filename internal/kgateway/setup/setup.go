@@ -9,9 +9,7 @@ import (
 	xdsserver "github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"github.com/go-logr/logr"
 	istiokube "istio.io/istio/pkg/kube"
-	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -215,13 +213,8 @@ func StartKgatewayWithConfig(
 
 	slog.Info("creating krt collections")
 	krtOpts := krtutil.NewKrtOptions(ctx.Done(), setupOpts.KrtDebugger)
-
-	podClient := kclient.NewFiltered[*corev1.Pod](kubeClient, kclient.Filter{
-		ObjectTransform: istiokube.StripPodUnusedFields,
-		ObjectFilter:    kubeClient.ObjectFilter(),
-	})
-	pods := krt.WrapClient(podClient, krtOpts.ToOptions("Pods")...)
-	augmentedPods := krtcollections.NewPodsCollection(kubeClient, pods, krtOpts)
+	
+	augmentedPods, _ := krtcollections.NewPodsCollection(kubeClient, krtOpts)
 	augmentedPodsForUcc := augmentedPods
 	if envutils.IsEnvTruthy("DISABLE_POD_LOCALITY_XDS") {
 		augmentedPodsForUcc = nil
