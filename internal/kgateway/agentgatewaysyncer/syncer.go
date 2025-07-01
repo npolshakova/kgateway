@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"strconv"
+	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
@@ -12,7 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pilot/pkg/features"
-	"istio.io/istio/pkg/config/schema/gvr"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/kclient"
@@ -29,12 +29,14 @@ import (
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
+	"github.com/kgateway-dev/kgateway/v2/pkg/metrics"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -50,6 +52,7 @@ type AgentGwSyncer struct {
 	xdsCache                envoycache.SnapshotCache
 	client                  kube.Client
 	domainSuffix            string
+	xdsSnapshotsMetrics     krtcollections.CollectionMetricsRecorder
 
 	waitForSync []cache.InformerSynced
 }
@@ -64,12 +67,13 @@ func NewAgentGwSyncer(
 ) *AgentGwSyncer {
 	// TODO: register types (auth, policy, etc.) if necessary
 	return &AgentGwSyncer{
-		commonCols:     commonCols,
-		controllerName: controllerName,
-		xdsCache:       xdsCache,
-		client:         client,
-		uniqueClients:  uniqueClients,
-		domainSuffix:   domainSuffix,
+		commonCols:          commonCols,
+		controllerName:      controllerName,
+		xdsCache:            xdsCache,
+		client:              client,
+		uniqueClients:       uniqueClients,
+		domainSuffix:        domainSuffix,
+		xdsSnapshotsMetrics: krtcollections.NewCollectionMetricsRecorder("AgentGatewayXDSSnapshots"),
 	}
 }
 
@@ -159,7 +163,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		GRPCRoutes:     krt.WrapClient(kclient.New[*gatewayv1.GRPCRoute](s.client), krtopts.ToOptions("informer/GRPCRoutes")...),
 
 		ReferenceGrants: krt.WrapClient(kclient.New[*gateway.ReferenceGrant](s.client), krtopts.ToOptions("informer/ReferenceGrants")...),
-		ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
+		//ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
 		//InferencePools:  krt.WrapClient(kclient.New[*inf.InferencePool](s.client), krtopts.ToOptions("informer/InferencePools")...),
 	}
 	if features.EnableAlphaGatewayAPI {
@@ -260,12 +264,12 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	routeParents := BuildRouteParents(Gateways)
 
 	routeInputs := RouteContextInputs{
-		Grants:         RefGrants,
-		RouteParents:   routeParents,
-		DomainSuffix:   s.domainSuffix,
-		Services:       inputs.Services,
-		Namespaces:     inputs.Namespaces,
-		ServiceEntries: inputs.ServiceEntries,
+		Grants:       RefGrants,
+		RouteParents: routeParents,
+		DomainSuffix: s.domainSuffix,
+		Services:     inputs.Services,
+		Namespaces:   inputs.Namespaces,
+		//ServiceEntries: inputs.ServiceEntries,
 		InferencePools: inputs.InferencePools,
 	}
 	ADPRoutes := ADPRouteCollection(
@@ -282,31 +286,25 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	)
 	endpointSlices := krt.WrapClient(epSliceClient, s.commonCols.KrtOpts.ToOptions("informer/EndpointSlices")...)
 
-	// Create a separate Pods client for agentgateway syncer
-	podsClient := kclient.NewFiltered[*corev1.Pod](
-		s.client,
-		kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()},
-	)
-	pods := krt.WrapClient(podsClient)
-
 	nsClient := kclient.NewFiltered[*corev1.Namespace](
 		s.commonCols.Client,
 		kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()},
 	)
 	namespaces := krt.WrapClient(nsClient, s.commonCols.KrtOpts.ToOptions("informer/Namespaces")...)
 
-	seInformer := kclient.NewDelayedInformer[*networkingclient.ServiceEntry](
-		s.client, gvr.ServiceEntry,
-		kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.client.ObjectFilter()},
-	)
-	serviceEntries := krt.WrapClient(seInformer, krtopts.ToOptions("informer/ServiceEntries")...)
+	//seInformer := kclient.NewDelayedInformer[*networkingclient.ServiceEntry](
+	//	s.client, gvr.ServiceEntry,
+	//	kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.client.ObjectFilter()},
+	//)
+	//serviceEntries := krt.WrapClient(seInformer, krtopts.ToOptions("informer/ServiceEntries")...)
 
 	workloadIndex := index{
 		services: servicesCollection{},
 	}
 
 	// these are agw api-style services combined from kube services and service entries
-	WorkloadServices := workloadIndex.ServicesCollection(inputs.Services, serviceEntries, namespaces, krtopts)
+	//WorkloadServices := workloadIndex.ServicesCollection(inputs.Services, serviceEntries, namespaces, krtopts)
+	WorkloadServices := workloadIndex.ServicesCollection(inputs.Services, nil, namespaces, krtopts)
 	avcAddresses := krt.NewCollection(WorkloadServices, func(ctx krt.HandlerContext, obj ServiceInfo) *ADPCacheAddress {
 		var cacheResources []envoytypes.Resource
 		addrMessage := obj.AsAddress.Address
@@ -331,9 +329,9 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	})
 
 	Workloads := workloadIndex.WorkloadsCollection(
-		pods,
+		s.commonCols.Pods,
 		WorkloadServices,
-		serviceEntries,
+		nil, // serviceEntries,
 		endpointSlices,
 		namespaces,
 		krtopts,
@@ -402,6 +400,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		s.uniqueClients,
 		s.mostXdsSnapshots,
 		addrPerClient,
+		s.xdsSnapshotsMetrics,
 	)
 
 	s.waitForSync = []cache.InformerSynced{
@@ -412,9 +411,8 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		ADPRoutes.HasSynced,
 		s.mostXdsSnapshots.HasSynced,
 		// addresses
-		serviceEntries.HasSynced,
+		//serviceEntries.HasSynced,
 		namespaces.HasSynced,
-		pods.HasSynced,
 		endpointSlices.HasSynced,
 		WorkloadServices.HasSynced,
 		Workloads.HasSynced,
@@ -443,6 +441,10 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 			}
 			logger.Debug("setting per-client xds snapshot", "proxy_key", snap.proxyKey)
 			err := s.xdsCache.SetSnapshot(ctx, snap.proxyKey, snap.snap)
+
+			// todo: remove debug
+			dumpXDSCacheState(ctx, s.xdsCache)
+
 			if err != nil {
 				logger.Error("failed to set per-client xds snapshot", "proxy_key", snap.proxyKey, "error", err.Error())
 				continue
@@ -615,6 +617,7 @@ func snapshotPerClient(
 	uccCol krt.Collection[ir.UniqlyConnectedClient],
 	mostXdsSnapshots krt.Collection[ADPCacheResource],
 	addresses PerClientAddresses,
+	metricsRecorder krtcollections.CollectionMetricsRecorder,
 ) krt.Collection[XdsSnapWrapper] {
 	addrResources := krt.NewCollection(uccCol, func(kctx krt.HandlerContext, ucc ir.UniqlyConnectedClient) *addressesWithUccName {
 		endpointsForUcc := addresses.FetchEndpointsForClient(kctx, ucc)
@@ -678,6 +681,50 @@ func snapshotPerClient(
 
 		return &snap
 	}, krtopts.ToOptions("PerClientXdsSnapshots")...)
+
+	// Register metrics for the collection
+	metrics.RegisterEvents(xdsSnapshotsForUcc, func(o krt.Event[XdsSnapWrapper]) {
+		name := o.Latest().ResourceName()
+		namespace := "unknown"
+
+		pks := strings.SplitN(name, "~", 5)
+		if len(pks) > 1 {
+			namespace = pks[1]
+		}
+
+		if len(pks) > 2 {
+			name = pks[2]
+		}
+
+		switch o.Event {
+		case controllers.EventDelete:
+			metricsRecorder.SetResources(krtcollections.CollectionResourcesMetricLabels{
+				Namespace: namespace,
+				Name:      name,
+				Resource:  "Resource",
+			}, 0)
+
+			metricsRecorder.SetResources(krtcollections.CollectionResourcesMetricLabels{
+				Namespace: namespace,
+				Name:      name,
+				Resource:  "Address",
+			}, 0)
+		case controllers.EventAdd, controllers.EventUpdate:
+			snap := o.Latest().snap
+			metricsRecorder.SetResources(krtcollections.CollectionResourcesMetricLabels{
+				Namespace: namespace,
+				Name:      name,
+				Resource:  "Resource",
+			}, len(snap.Resources.Items))
+
+			metricsRecorder.SetResources(krtcollections.CollectionResourcesMetricLabels{
+				Namespace: namespace,
+				Name:      name,
+				Resource:  "Address",
+			}, len(snap.Addresses.Items))
+		}
+	})
+
 	return xdsSnapshotsForUcc
 }
 
@@ -685,4 +732,34 @@ type resourcesStringer envoycache.Resources
 
 func (r resourcesStringer) String() string {
 	return fmt.Sprintf("len: %d, version %s", len(r.Items), r.Version)
+}
+
+// dumpXDSCacheState is a helper function that dump the current state of the XDS cache for the agentgateway cache
+func dumpXDSCacheState(ctx context.Context, cache envoycache.SnapshotCache) {
+	logger.Info("current XDS cache state:")
+
+	// Get all snapshot IDs from cache
+	for _, nodeID := range cache.GetStatusKeys() {
+		logger.Info("snapshot has node", "node_id", nodeID)
+
+		snapshot, err := cache.GetSnapshot(nodeID)
+		if err != nil {
+			logger.Info("error getting snapshot", "error", err.Error())
+			continue
+		}
+
+		// Check for Resource targets
+		logger.Info("Resource targets version", "snapshot", snapshot.GetVersion(TargetTypeResourceUrl)) //nolint:sloglint // ignore msg-type
+		resources := snapshot.GetResources(TargetTypeResourceUrl)
+		for name := range resources {
+			logger.Info("snapshot has resources", "name", name)
+		}
+
+		// Check addresses
+		logger.Info("Address targets version", "snapshot", snapshot.GetVersion(TargetTypeAddressUrl)) //nolint:sloglint // ignore msg-type
+		addrs := snapshot.GetResources(TargetTypeAddressUrl)
+		for name := range addrs {
+			logger.Info("snapshot has addr", "name", name)
+		}
+	}
 }

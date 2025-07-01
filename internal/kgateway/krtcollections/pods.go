@@ -74,12 +74,7 @@ func NewNodeMetadataCollection(nodes krt.Collection[*corev1.Node]) krt.Collectio
 	})
 }
 
-func NewPodsCollection(istioClient kube.Client, krtOptions krtutil.KrtOptions) krt.Collection[LocalityPod] {
-	podClient := kclient.NewFiltered[*corev1.Pod](istioClient, kclient.Filter{
-		ObjectTransform: kube.StripPodUnusedFields,
-		ObjectFilter:    istioClient.ObjectFilter(),
-	})
-	pods := krt.WrapClient(podClient, krtOptions.ToOptions("Pods")...)
+func NewPodsCollection(istioClient kube.Client, pods krt.Collection[*corev1.Pod], krtOptions krtutil.KrtOptions) krt.Collection[LocalityPod] {
 	nodes := newNodeCollection(istioClient, krtOptions)
 	return NewLocalityPodsCollection(nodes, pods, krtOptions)
 }
@@ -152,7 +147,7 @@ func AugmentLabels(locality ir.PodLocality, labels map[string]string) {
 
 // technically the plural PodIPs isn't a required field.
 // we don't use it yet, but it will be useful to support ipv6
-// "Pods may be allocated at most 1 value for each of IPv4 and IPv6."
+// "LocalityPods may be allocated at most 1 value for each of IPv4 and IPv6."
 //   - k8s docs
 func extractPodIPs(pod *corev1.Pod) []string {
 	if len(pod.Status.PodIPs) > 0 {

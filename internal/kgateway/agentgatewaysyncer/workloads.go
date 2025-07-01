@@ -106,13 +106,15 @@ func (a *index) WorkloadsCollection(
 		krtopts.ToOptions("PodWorkloads")...,
 	)
 	// TODO(npolshak): Add support for WE?
+
 	// Workloads coming from serviceEntries. These are inlined workloadEntries (under `spec.endpoints`); these serviceEntries will
 	// also be generating `api.Service` definitions in the `ServicesCollection` logic.
-	ServiceEntryWorkloads := krt.NewManyCollection(
-		serviceEntries,
-		a.serviceEntryWorkloadBuilder(),
-		krtopts.ToOptions("ServiceEntryWorkloads")...,
-	)
+	//ServiceEntryWorkloads := krt.NewManyCollection(
+	//	serviceEntries,
+	//	a.serviceEntryWorkloadBuilder(),
+	//	krtopts.ToOptions("ServiceEntryWorkloads")...,
+	//)
+
 	// Workloads coming from endpointSlices. These are for *manually added* endpoints. Typically, Kubernetes will insert each pod
 	// into the EndpointSlice. This is because Kubernetes has 3 APIs in its model: Service, Pod, and EndpointSlice.
 	// In our API, we only have two: Service and Workload.
@@ -126,7 +128,7 @@ func (a *index) WorkloadsCollection(
 	Workloads := krt.JoinCollection(
 		[]krt.Collection[WorkloadInfo]{
 			PodWorkloads,
-			ServiceEntryWorkloads,
+			//ServiceEntryWorkloads,
 			EndpointSliceWorkloads,
 		},
 		// Each collection has its own unique UID as the key. This guarantees an object can exist in only a single collection

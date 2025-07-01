@@ -32,7 +32,7 @@ func NewPlugin(ctx context.Context, commonCol *common.CommonCollections) extensi
 		kclient.Filter{ObjectFilter: commonCol.Client.ObjectFilter()},
 	)
 	endpointSlices := krt.WrapClient(epSliceClient, commonCol.KrtOpts.ToOptions("EndpointSlices")...)
-	return NewPluginFromCollections(ctx, commonCol.KrtOpts, commonCol.Pods, commonCol.Services, endpointSlices, commonCol.Settings)
+	return NewPluginFromCollections(ctx, commonCol.KrtOpts, commonCol.LocalityPods, commonCol.Services, endpointSlices, commonCol.Settings)
 }
 
 func NewPluginFromCollections(

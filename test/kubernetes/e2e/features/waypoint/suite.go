@@ -60,8 +60,8 @@ func NewIngressTestingSuite(ctx context.Context, testInst *e2e.TestInstallation)
 // SetupSuite provides common objects used by all tests:
 // * Create an ambient captured Namespace - `testNamespace`
 // * Deploy a kgateway-waypoint using a Gateway resource - `gwName`
-// * Deploy server (Services, Pods) - `svc-a`, `svc-b`
-// * Deploy client (Pods) - `client-a`
+// * Deploy server (Services, LocalityPods) - `svc-a`, `svc-b`
+// * Deploy client (LocalityPods) - `client-a`
 func (s *testingSuite) SetupSuite() {
 	// must apply the ns first
 	err := s.testInstallation.ClusterContext.Cli.ApplyFilePath(s.ctx, nsYAML)

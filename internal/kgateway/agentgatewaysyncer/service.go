@@ -48,10 +48,12 @@ func (a *index) ServicesCollection(
 ) krt.Collection[ServiceInfo] {
 	ServicesInfo := krt.NewCollection(services, a.serviceServiceBuilder(namespaces),
 		krtopts.ToOptions("ServicesInfo")...)
-	ServiceEntriesInfo := krt.NewManyCollection(serviceEntries, a.serviceEntryServiceBuilder(namespaces),
-		krtopts.ToOptions("ServiceEntriesInfo")...)
+	//ServiceEntriesInfo := krt.NewManyCollection(serviceEntries, a.serviceEntryServiceBuilder(namespaces),
+	//	krtopts.ToOptions("ServiceEntriesInfo")...)
 	// TODO: add inference pool to svc collection
-	WorkloadServices := krt.JoinCollection([]krt.Collection[ServiceInfo]{ServicesInfo, ServiceEntriesInfo}, krtopts.ToOptions("WorkloadService")...)
+	//WorkloadServices := krt.JoinCollection([]krt.Collection[ServiceInfo]{ServicesInfo, ServiceEntriesInfo}, krtopts.ToOptions("WorkloadService")...)
+
+	WorkloadServices := krt.JoinCollection([]krt.Collection[ServiceInfo]{ServicesInfo}, krtopts.ToOptions("WorkloadService")...)
 	return WorkloadServices
 }
 

@@ -137,7 +137,7 @@ func initServiceEntryCollections(
 	SelectedWorkloads, selectedWorkloadsIndex := selectedWorkloads(
 		SelectingServiceEntries,
 		WorkloadEntries,
-		commonCols.Pods,
+		commonCols.LocalityPods,
 		opts.Aliaser,
 	)
 
@@ -221,7 +221,7 @@ func selectedWorkloads(
 		return &workload
 	}, krt.WithName("ServiceEntrySelectWorkloadEntry"))
 
-	// Pods: selection logic
+	// LocalityPods: selection logic
 	selectedPods := krt.NewCollection(Pods, func(ctx krt.HandlerContext, workload krtcollections.LocalityPod) *selectedWorkload {
 		serviceEntries := krt.Fetch(
 			ctx,
@@ -241,7 +241,7 @@ func selectedWorkloads(
 		}
 	}, krt.WithName("ServiceEntrySelectPod"))
 
-	// consolidate Pods and WorkloadEntries
+	// consolidate LocalityPods and WorkloadEntries
 	allWorkloads := krt.JoinCollection([]krt.Collection[selectedWorkload]{selectedPods, selectedWorkloadEntries}, krt.WithName("ServiceEntrySelectWorkloads"))
 	workloadsByServiceEntry := krt.NewIndex(allWorkloads, func(o selectedWorkload) []string {
 		return slices.Map(o.selectedBy, func(n krt.Named) string {

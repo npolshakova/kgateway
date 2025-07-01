@@ -15,7 +15,7 @@ import (
 // are in the ready state and able to receive traffic.
 func (p *Provider) EventuallyReadyReplicas(ctx context.Context, deploymentMeta metav1.ObjectMeta, replicaMatcher types.GomegaMatcher) {
 	p.Gomega.Eventually(func(innerG Gomega) {
-		// We intentionally rely only on Pods that have marked themselves as ready as a way of defining more explicit assertions
+		// We intentionally rely only on LocalityPods that have marked themselves as ready as a way of defining more explicit assertions
 		pods, err := kubeutils.GetReadyPodsForDeployment(ctx, p.clusterContext.Clientset, deploymentMeta)
 		innerG.Expect(err).NotTo(HaveOccurred(), "can get pods for deployment")
 		innerG.Expect(len(pods)).To(replicaMatcher, "running pods matches expected count")
