@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pilot/pkg/features"
+	"istio.io/istio/pkg/config/schema/kubeclient"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/kclient"
@@ -20,13 +21,19 @@ import (
 	"istio.io/istio/pkg/kube/kubetypes"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	"sigs.k8s.io/gateway-api-inference-extension/client-go/clientset/versioned"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayalpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
@@ -180,6 +187,25 @@ type Inputs struct {
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	logger.Debug("init agentgateway Syncer", "controllername", s.controllerName)
 
+	// TODO: move this
+	// Create the inference extension clientset.
+	inferencePoolGVR := wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools")
+	infCli, err := versioned.NewForConfig(s.commonCols.Client.RESTConfig())
+	if err != nil {
+		logger.Error("failed to create inference extension client", "error", err)
+	} else {
+		kubeclient.Register[*inf.InferencePool](
+			inferencePoolGVR,
+			wellknown.InferencePoolGVK,
+			func(c kubeclient.ClientGetter, namespace string, o metav1.ListOptions) (runtime.Object, error) {
+				return infCli.InferenceV1alpha2().InferencePools(namespace).List(context.Background(), o)
+			},
+			func(c kubeclient.ClientGetter, namespace string, o metav1.ListOptions) (watch.Interface, error) {
+				return infCli.InferenceV1alpha2().InferencePools(namespace).Watch(context.Background(), o)
+			},
+		)
+	}
+
 	inputs := Inputs{
 		Namespaces: krt.NewInformer[*corev1.Namespace](s.client),
 		Secrets: krt.WrapClient[*corev1.Secret](
@@ -199,7 +225,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 
 		ReferenceGrants: krt.WrapClient(kclient.New[*gateway.ReferenceGrant](s.client), krtopts.ToOptions("informer/ReferenceGrants")...),
 		//ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
-		//InferencePools:  krt.WrapClient(kclient.New[*inf.InferencePool](s.client), krtopts.ToOptions("informer/InferencePools")...),
+		InferencePools: krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, inferencePoolGVR, kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...),
 	}
 	if features.EnableAlphaGatewayAPI {
 		inputs.TCPRoutes = krt.WrapClient(kclient.New[*gatewayalpha.TCPRoute](s.client), krtopts.ToOptions("informer/TCPRoutes")...)
@@ -335,8 +361,6 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	//serviceEntries := krt.WrapClient(seInformer, krtopts.ToOptions("informer/ServiceEntries")...)
 
 	workloadIndex := index{
-		services:        servicesCollection{},
-		workloads:       workloadsCollection{},
 		namespaces:      s.commonCols.Namespaces,
 		SystemNamespace: s.systemNamespace,
 		ClusterID:       s.clusterID,
@@ -345,7 +369,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 
 	// these are agw api-style services combined from kube services and service entries
 	//WorkloadServices := workloadIndex.ServicesCollection(inputs.Services, serviceEntries, namespaces, krtopts)
-	workloadServices := workloadIndex.ServicesCollection(inputs.Services, nil, namespaces, krtopts)
+	workloadServices := workloadIndex.ServicesCollection(inputs.Services, nil, inputs.InferencePools, namespaces, krtopts)
 	svcAddresses := krt.NewCollection(workloadServices, func(ctx krt.HandlerContext, obj ServiceInfo) *ADPCacheAddress {
 		var cacheResources []envoytypes.Resource
 		addrMessage := obj.AsAddress.Address

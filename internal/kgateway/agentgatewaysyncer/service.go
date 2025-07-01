@@ -43,17 +43,19 @@ import (
 func (a *index) ServicesCollection(
 	services krt.Collection[*v1.Service],
 	serviceEntries krt.Collection[*networkingclient.ServiceEntry],
+	inferencePools krt.Collection[*inf.InferencePool],
 	namespaces krt.Collection[*v1.Namespace],
 	krtopts krtutil.KrtOptions,
 ) krt.Collection[ServiceInfo] {
-	ServicesInfo := krt.NewCollection(services, a.serviceServiceBuilder(namespaces),
+	servicesInfo := krt.NewCollection(services, a.serviceServiceBuilder(namespaces),
 		krtopts.ToOptions("ServicesInfo")...)
 	//ServiceEntriesInfo := krt.NewManyCollection(serviceEntries, a.serviceEntryServiceBuilder(namespaces),
 	//	krtopts.ToOptions("ServiceEntriesInfo")...)
-	// TODO: add inference pool to svc collection
+	inferencePoolsInfo := krt.NewCollection(inferencePools, a.inferencePoolBuilder(namespaces),
+		krtopts.ToOptions("InferencePools")...)
 	//WorkloadServices := krt.JoinCollection([]krt.Collection[ServiceInfo]{ServicesInfo, ServiceEntriesInfo}, krtopts.ToOptions("WorkloadService")...)
 
-	WorkloadServices := krt.JoinCollection([]krt.Collection[ServiceInfo]{ServicesInfo}, krtopts.ToOptions("WorkloadService")...)
+	WorkloadServices := krt.JoinCollection([]krt.Collection[ServiceInfo]{servicesInfo, inferencePoolsInfo}, krtopts.ToOptions("WorkloadService")...)
 	return WorkloadServices
 }
 
@@ -119,7 +121,13 @@ func (a *index) inferencePoolBuilder(
 			Service:       svc,
 			PortNames:     portNames,
 			LabelSelector: NewSelector(selector),
-			Source:        MakeSource(s),
+			Source: TypedObject{
+				NamespacedName: types.NamespacedName{
+					Namespace: s.Namespace,
+					Name:      s.Name,
+				},
+				Kind: "InferencePool", // TODO: get wellknown kind
+			},
 		})
 	}
 }
@@ -665,7 +673,7 @@ func (i AddressInfo) ResourceName() string {
 
 type TypedObject struct {
 	types.NamespacedName
-	Kind kind.Kind
+	Kind string
 }
 
 type ServicePortName struct {

@@ -234,22 +234,22 @@ func buildADPDestination(
 	}
 	var port *k8s.PortNumber
 	ref := normalizeReference(to.Group, to.Kind, wellknown.ServiceGVK)
-	switch ref {
-	//case wellknown.InferencePoolGVK:
-	//	if strings.Contains(string(to.Name), ".") {
-	//		return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
-	//	}
-	//	hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
-	//	key := namespace + "/" + string(to.Name)
-	//	svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
-	//	log.Errorf("howardjohn: got pool %v for %v", svc, key)
-	//	if svc == nil {
-	//		invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
-	//	} else {
-	//		port = ptr.Of(k8s.PortNumber(svc.Spec.TargetPortNumber))
-	//	}
-	//	rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
-	case wellknown.ServiceGVK:
+	switch ref.GroupKind() {
+	case wellknown.InferencePoolGVK.GroupKind():
+		if strings.Contains(string(to.Name), ".") {
+			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
+		}
+		hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
+		key := namespace + "/" + string(to.Name)
+		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
+		logger.Debug("Found pull pool for service", "svc", svc, "key", key)
+		if svc == nil {
+			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
+		} else {
+			port = ptr.Of(k8s.PortNumber(svc.Spec.TargetPortNumber))
+		}
+		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
+	case wellknown.ServiceGVK.GroupKind():
 		port = to.Port
 		if strings.Contains(string(to.Name), ".") {
 			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}

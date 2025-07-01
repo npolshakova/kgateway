@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/api/annotation"
 	"istio.io/api/label"
@@ -36,18 +35,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 )
-
-// internal object used for indexing in ambientindex maps
-type networkAddress struct {
-	network string
-	ip      string
-}
-
-func (n networkAddress) String() string {
-	return n.network + "/" + n.ip
-}
 
 type NamespaceHostname struct {
 	Namespace string
@@ -58,22 +49,9 @@ func (n NamespaceHostname) String() string {
 	return n.Namespace + "/" + n.Hostname
 }
 
-type workloadsCollection struct {
-	krt.Collection[WorkloadInfo]
-	ByAddress    krt.Index[networkAddress, WorkloadInfo]
-	ByServiceKey krt.Index[string, WorkloadInfo]
-}
-
-type servicesCollection struct {
-	krt.Collection[ServiceInfo]
-	ByAddress krt.Index[networkAddress, ServiceInfo]
-}
-
 // index maintains an index of ambient WorkloadInfo objects by various keys.
 // These are intentionally pre-computed based on events such that lookups are efficient.
 type index struct {
-	services   servicesCollection
-	workloads  workloadsCollection
 	namespaces krt.Collection[krtcollections.NamespaceMetadata]
 
 	SystemNamespace string
@@ -174,7 +152,7 @@ func (a *index) podWorkloadBuilder(
 		fo := []krt.FetchOption{krt.FilterIndex(workloadServicesNamespaceIndex, p.Namespace), krt.FilterSelectsNonEmpty(p.Labels)}
 		if !features.EnableServiceEntrySelectPods {
 			fo = append(fo, krt.FilterGeneric(func(a any) bool {
-				return a.(ServiceInfo).Source.Kind == kind.Service
+				return a.(ServiceInfo).Source.Kind == kind.Service.String()
 			}))
 		}
 		services := krt.Fetch(ctx, workloadServices, fo...)
@@ -263,7 +241,7 @@ func (a *index) matchingServicesWithoutSelectors(
 		serviceKey := es.Namespace + "/" + hostname
 		svcs := krt.Fetch(ctx, workloadServices, krt.FilterKey(serviceKey), krt.FilterGeneric(func(a any) bool {
 			// Only find Service, not Service Entry
-			return a.(ServiceInfo).Source.Kind == kind.Service
+			return a.(ServiceInfo).Source.Kind == kind.Service.String()
 		}))
 		if len(svcs) == 0 {
 			// no service found
@@ -298,7 +276,7 @@ func (a *index) serviceEntriesInfo(ctx krt.HandlerContext, s *networkingclient.S
 func MakeSource(o controllers.Object) TypedObject {
 	return TypedObject{
 		NamespacedName: config.NamespacedName(o),
-		Kind:           kind.MustFromGVK(kubetypes.GvkFromObject(o)),
+		Kind:           kubetypes.GvkFromObject(o).Kind,
 	}
 }
 
@@ -542,7 +520,7 @@ func (a *index) endpointSlicesBuilder(
 		serviceKey := es.Namespace + "/" + string(kube.ServiceHostname(serviceName, es.Namespace, a.DomainSuffix))
 		svcs := krt.Fetch(ctx, workloadServices, krt.FilterKey(serviceKey), krt.FilterGeneric(func(a any) bool {
 			// Only find Service, not Service Entry
-			return a.(ServiceInfo).Source.Kind == kind.Service
+			return a.(ServiceInfo).Source.Kind == kind.Service.String()
 		}))
 		if len(svcs) == 0 {
 			// no service found
@@ -673,7 +651,7 @@ func constructServicesFromWorkloadEntry(p *networkingv1alpha3.WorkloadEntry, ser
 		for _, port := range svc.Service.Ports {
 			targetPort := port.TargetPort
 			// Named targetPort has different semantics from Service vs ServiceEntry
-			if svc.Source.Kind == kind.Service {
+			if svc.Source.Kind == kind.Service.String() {
 				// Service has explicit named targetPorts.
 				if named, f := svc.PortNames[int32(port.ServicePort)]; f && named.TargetPortName != "" {
 					// This port is a named target port, look it up
