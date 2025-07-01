@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"google.golang.org/protobuf/types/known/anypb"
 	"istio.io/istio/pilot/pkg/serviceregistry/kube"
 	"istio.io/istio/pilot/pkg/util/protoconv"
 	"istio.io/istio/pkg/cluster"
 	"istio.io/istio/pkg/config/schema/gvk"
-	kubeutil "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
 	kubelabels "istio.io/istio/pkg/kube/labels"
 	"istio.io/istio/pkg/network"
@@ -89,7 +89,7 @@ type NetworkGateway struct {
 // A Workload represents a single addressable unit of compute -- typically a Pod or a VM.
 // Workloads can come from a variety of sources; these are joined together to build one complete `Collection[WorkloadInfo]`.
 func buildWorkloadsCollection(
-	pods krt.Collection[*corev1.Pod],
+	pods krt.Collection[krtcollections.PodWrapper],
 	workloadServices krt.Collection[ServiceInfo],
 	endpointSlices krt.Collection[*discovery.EndpointSlice],
 	domainSuffix, clusterId string,
@@ -142,12 +142,12 @@ func podWorkloadBuilder(
 	endpointSlices krt.Collection[*discovery.EndpointSlice],
 	endpointSlicesAddressIndex krt.Index[TargetRef, *discovery.EndpointSlice],
 	domainSuffix, clusterId string,
-) krt.TransformationSingle[*corev1.Pod, WorkloadInfo] {
-	return func(ctx krt.HandlerContext, p *corev1.Pod) *WorkloadInfo {
+) krt.TransformationSingle[krtcollections.PodWrapper, WorkloadInfo] {
+	return func(ctx krt.HandlerContext, p krtcollections.PodWrapper) *WorkloadInfo {
 		// TODO: Pod Is Pending but have a pod IP should be a valid workload, we should build it
 		// See https://github.com/istio/istio/issues/48854
 
-		k8sPodIPs := getPodIPs(p)
+		k8sPodIPs := getPodIPs(&p)
 		if len(k8sPodIPs) == 0 {
 			return nil
 		}
@@ -163,12 +163,12 @@ func podWorkloadBuilder(
 			return nil
 		}
 		services := krt.Fetch(ctx, workloadServices)
-		services = append(services, matchingServicesWithoutSelectors(ctx, p, services, workloadServices, endpointSlices, endpointSlicesAddressIndex, domainSuffix)...)
+		services = append(services, matchingServicesWithoutSelectors(ctx, &p, services, workloadServices, endpointSlices, endpointSlicesAddressIndex, domainSuffix)...)
 
 		// Logic from https://github.com/kubernetes/kubernetes/blob/7c873327b679a70337288da62b96dd610858181d/staging/src/k8s.io/endpointslice/utils.go#L37
 		// Kubernetes has Ready, Serving, and Terminating. We only have a boolean, which is sufficient for our cases
 		status := api.WorkloadStatus_HEALTHY
-		if !IsPodReady(p) || p.DeletionTimestamp != nil {
+		if !IsPodReady(&p) || p.DeletionTimestamp != nil {
 			status = api.WorkloadStatus_UNHEALTHY
 		}
 
@@ -178,17 +178,17 @@ func podWorkloadBuilder(
 			Namespace:      p.Namespace,
 			ClusterId:      clusterId,
 			Addresses:      podIPs,
-			ServiceAccount: p.Spec.ServiceAccountName,
-			Services:       constructServices(p, services),
+			ServiceAccount: p.ServiceAccountName,
+			Services:       constructServices(&p, services),
 			Status:         status,
 			// TODO: support other fields (Locality, Node, Network, etc.)
 		}
 
-		if p.Spec.HostNetwork {
+		if p.HostNetwork {
 			w.NetworkMode = api.NetworkMode_HOST_NETWORK
 		}
 
-		w.WorkloadName = workloadNameForPod(p)
+		w.WorkloadName = workloadNameForPod(&p)
 		w.WorkloadType = api.WorkloadType_POD // backwards compatibility
 		w.CanonicalName, w.CanonicalRevision = kubelabels.CanonicalService(p.Labels, w.WorkloadName)
 
@@ -223,9 +223,8 @@ func workloadToAddress(w *api.Workload) *api.Address {
 	}
 }
 
-func workloadNameForPod(pod *corev1.Pod) string {
-	objMeta, _ := kubeutil.GetWorkloadMetaFromPod(pod)
-	return objMeta.Name
+func workloadNameForPod(pod *krtcollections.PodWrapper) string {
+	return pod.WorkloadNameForPod
 }
 
 type AddressInfo struct {
@@ -295,7 +294,7 @@ func (w WorkloadInfo) ResourceName() string {
 
 var _ krt.ResourceNamer = WorkloadInfo{}
 
-func getPodIPs(p *corev1.Pod) []corev1.PodIP {
+func getPodIPs(p *krtcollections.PodWrapper) []corev1.PodIP {
 	k8sPodIPs := p.Status.PodIPs
 	if len(k8sPodIPs) == 0 && p.Status.PodIP != "" {
 		k8sPodIPs = []corev1.PodIP{{IP: p.Status.PodIP}}
@@ -304,7 +303,7 @@ func getPodIPs(p *corev1.Pod) []corev1.PodIP {
 }
 
 // IsPodReady is copied from kubernetes/pkg/api/v1/pod/utils.go
-func IsPodReady(pod *corev1.Pod) bool {
+func IsPodReady(pod *krtcollections.PodWrapper) bool {
 	return IsPodReadyConditionTrue(pod.Status)
 }
 
@@ -349,7 +348,7 @@ func GetPodConditionFromList(conditions []corev1.PodCondition, conditionType cor
 // we do not implicitly merge a Pod with an EndpointSlice just based on IP.
 func matchingServicesWithoutSelectors(
 	ctx krt.HandlerContext,
-	p *corev1.Pod,
+	p *krtcollections.PodWrapper,
 	alreadyMatchingServices []ServiceInfo,
 	workloadServices krt.Collection[ServiceInfo],
 	endpointSlices krt.Collection[*discovery.EndpointSlice],
@@ -398,7 +397,7 @@ func matchingServicesWithoutSelectors(
 	return res
 }
 
-func constructServices(p *corev1.Pod, services []ServiceInfo) map[string]*api.PortList {
+func constructServices(p *krtcollections.PodWrapper, services []ServiceInfo) map[string]*api.PortList {
 	res := map[string]*api.PortList{}
 	for _, svc := range services {
 		n := namespacedHostname(svc.Service.Namespace, svc.Service.Hostname)
@@ -429,9 +428,9 @@ func constructServices(p *corev1.Pod, services []ServiceInfo) map[string]*api.Po
 	return res
 }
 
-func FindPortName(pod *corev1.Pod, name string) (int32, bool) {
-	for _, container := range pod.Spec.Containers {
-		for _, port := range container.Ports {
+func FindPortName(pod *krtcollections.PodWrapper, name string) (int32, bool) {
+	for _, ports := range pod.ContainerPorts {
+		for _, port := range ports {
 			if port.Name == name {
 				return port.ContainerPort, true
 			}

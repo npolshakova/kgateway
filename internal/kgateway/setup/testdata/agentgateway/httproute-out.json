@@ -1,14 +1,14 @@
 {
   "addresses": [
     {
+      "Type": null
+    },
+    {
       "Type": {
         "Workload": {
           "name": "8080/gwtest/http-httproute"
         }
       }
-    },
-    {
-      "Type": null
     }
   ],
   "resources": [

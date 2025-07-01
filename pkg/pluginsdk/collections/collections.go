@@ -42,6 +42,7 @@ type CommonCollections struct {
 	ServiceEntries    krt.Collection[*networkingclient.ServiceEntry]
 
 	Pods       krt.Collection[krtcollections.LocalityPod]
+	PodWrapper krt.Collection[krtcollections.PodWrapper]
 	RefGrants  *krtcollections.RefGrantIndex
 	ConfigMaps krt.Collection[*corev1.ConfigMap]
 
@@ -139,13 +140,16 @@ func NewCommonCollections(
 
 	gwExts := krtcollections.NewGatewayExtensionsCollection(ctx, client, ourClient, krtOptions)
 
+	pods, podWrapper := krtcollections.NewPodsCollection(client, krtOptions)
+
 	return &CommonCollections{
 		OurClient:         ourClient,
 		Client:            client,
 		CrudClient:        cl,
 		KrtOpts:           krtOptions,
 		Secrets:           krtcollections.NewSecretIndex(secrets, refgrants),
-		Pods:              krtcollections.NewPodsCollection(client, krtOptions),
+		Pods:              pods,
+		PodWrapper:        podWrapper,
 		RefGrants:         refgrants,
 		Settings:          settings,
 		Namespaces:        namespaces,

@@ -1,247 +1,390 @@
 package agentgatewaysyncer
 
 import (
-	"fmt"
+	"iter"
+	"maps"
+	"reflect"
+	"strings"
+	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"google.golang.org/protobuf/proto"
-	"istio.io/istio/pkg/kube/krt"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
+	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
+	"istio.io/istio/pkg/config"
+	"istio.io/istio/pkg/kube/controllers"
+	"istio.io/istio/pkg/kube/krt"
+	"istio.io/istio/pkg/slices"
+	"istio.io/istio/pkg/util/protomarshal"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 )
 
-var routeLogger = logging.New("agentgateway/route-collection")
+// Spec defines the spec for the  In order to use below helper methods,
+// this must be one of:
+// * golang/protobuf Message
+// * gogo/protobuf Message
+// * Able to marshal/unmarshal using json
+type Spec any
 
-// AgentRouteResource represents a translated route resource for agentgateway
-type AgentRouteResource struct {
-	types.NamespacedName
-	Route *api.Route
+type Status any
+
+// Meta is metadata attached to each configuration unit.
+// The revision is optional, and if provided, identifies the
+// last update operation on the object.
+type Meta struct {
+	// GroupVersionKind is a short configuration name that matches the content message type
+	// (e.g. "route-rule")
+	GroupVersionKind schema.GroupVersionKind `json:"type,omitempty"`
+
+	// UID
+	UID string `json:"uid,omitempty"`
+
+	// Name is a unique immutable identifier in a namespace
+	Name string `json:"name,omitempty"`
+
+	// Namespace defines the space for names (optional for some types),
+	// applications may choose to use namespaces for a variety of purposes
+	// (security domains, fault domains, organizational domains)
+	Namespace string `json:"namespace,omitempty"`
+
+	// Domain defines the suffix of the fully qualified name past the namespace.
+	// Domain is not a part of the unique key unlike name and namespace.
+	Domain string `json:"domain,omitempty"`
+
+	// Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations is an unstructured key value map stored with a resource that may be
+	// set by external tools to store and retrieve arbitrary metadata. They are not
+	// queryable and should be preserved when modifying objects.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// ResourceVersion is an opaque identifier for tracking updates to the config registry.
+	// The implementation may use a change index or a commit log for the revision.
+	// The config client should not make any assumptions about revisions and rely only on
+	// exact equality to implement optimistic concurrency of read-write operations.
+	//
+	// The lifetime of an object of a particular revision depends on the underlying data store.
+	// The data store may compactify old revisions in the interest of storage optimization.
+	//
+	// An empty revision carries a special meaning that the associated object has
+	// not been stored and assigned a revision.
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+
+	// CreationTimestamp records the creation time
+	CreationTimestamp time.Time `json:"creationTimestamp,omitempty"`
+
+	// OwnerReferences allows specifying in-namespace owning objects.
+	OwnerReferences []metav1.OwnerReference `json:"ownerReferences,omitempty"`
+
+	// A sequence number representing a specific generation of the desired state. Populated by the system. Read-only.
+	Generation int64 `json:"generation,omitempty"`
 }
 
-func (r AgentRouteResource) ResourceName() string {
-	return fmt.Sprintf("%s/%s", r.Namespace, r.Name)
+// Config is a configuration unit consisting of the type of configuration, the
+// key identifier that is unique per type, and the content represented as a
+// protobuf message.
+type Config struct {
+	Meta
+
+	// Spec holds the configuration object as a gogo protobuf message
+	Spec Spec
+
+	// Status holds long-running status.
+	Status Status
 }
 
-func (r AgentRouteResource) Equals(other AgentRouteResource) bool {
-	if r.NamespacedName != other.NamespacedName {
+func (c *Config) GetName() string {
+	return c.GetName()
+}
+
+func (c *Config) GetNamespace() string {
+	return c.GetNamespace()
+}
+
+func (c *Config) Equals(other *Config) bool {
+	am, bm := c.Meta, other.Meta
+	if am.GroupVersionKind != bm.GroupVersionKind {
 		return false
 	}
-	if r.Route == nil && other.Route != nil || r.Route != nil && other.Route == nil {
+	if am.UID != bm.UID {
 		return false
 	}
-	if r.Route != nil && !proto.Equal(r.Route, other.Route) {
+	if am.Name != bm.Name {
+		return false
+	}
+	if am.Namespace != bm.Namespace {
+		return false
+	}
+	if am.Domain != bm.Domain {
+		return false
+	}
+	if !maps.Equal(am.Labels, bm.Labels) {
+		return false
+	}
+	if !maps.Equal(am.Annotations, bm.Annotations) {
+		return false
+	}
+	if am.ResourceVersion != bm.ResourceVersion {
+		return false
+	}
+	if am.CreationTimestamp != bm.CreationTimestamp {
+		return false
+	}
+	if !slices.EqualFunc(am.OwnerReferences, bm.OwnerReferences, func(a metav1.OwnerReference, b metav1.OwnerReference) bool {
+		if a.APIVersion != b.APIVersion {
+			return false
+		}
+		if a.Kind != b.Kind {
+			return false
+		}
+		if a.Name != b.Name {
+			return false
+		}
+		if a.UID != b.UID {
+			return false
+		}
+		if !ptr.Equal(a.Controller, b.Controller) {
+			return false
+		}
+		if !ptr.Equal(a.BlockOwnerDeletion, b.BlockOwnerDeletion) {
+			return false
+		}
+		return true
+	}) {
+		return false
+	}
+	if am.Generation != bm.Generation {
+		return false
+	}
+
+	if !equals(c.Spec, other.Spec) {
+		return false
+	}
+	if !equals(c.Status, other.Status) {
 		return false
 	}
 	return true
 }
 
-// RouteContext defines the context for route processing
-type RouteContext struct {
-	Krt           krt.HandlerContext
-	RouteParents  RouteParents
-	DomainSuffix  string
-	Services      krt.Collection[*corev1.Service]
-	ServicesIndex krt.Index[string, *corev1.Service]
-	Namespaces    krt.Collection[krtcollections.NamespaceMetadata]
+func equals(a any, b any) bool {
+	if _, ok := a.(protoreflect.ProtoMessage); ok {
+		if pb, ok := a.(proto.Message); ok {
+			return proto.Equal(pb, b.(proto.Message))
+		}
+	}
+	// We do NOT do gogo here. The reason is Kubernetes has hacked up almost-gogo types that do not allow Equals() calls
+
+	return reflect.DeepEqual(a, b)
 }
 
-// RouteContextInputs defines the inputs needed for route processing
+type ADPResource struct {
+	Resource *api.Resource        `json:"resource"`
+	Gateway  types.NamespacedName `json:"gwv1"`
+
+	reports reports.ReportMap
+}
+
+func (g ADPResource) ResourceName() string {
+	switch t := g.Resource.GetKind().(type) {
+	case *api.Resource_Bind:
+		return "bind/" + t.Bind.GetKey()
+	case *api.Resource_Listener:
+		return "listener/" + t.Listener.GetKey()
+	case *api.Resource_Route:
+		return "route/" + t.Route.GetKey()
+	}
+	panic("unknown resource kind")
+}
+
+func (g ADPResource) Equals(other ADPResource) bool {
+	return proto.Equal(g.Resource, other.Resource) && g.Gateway == other.Gateway
+}
+
+// TODO: support other route collections (TCP, TLS, etc.)
+func ADPRouteCollection(
+	httpRoutes krt.Collection[*gwv1.HTTPRoute],
+	inputs RouteContextInputs,
+	krtopts krtutil.KrtOptions,
+) krt.Collection[ADPResource] {
+	routes := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
+		ctx := inputs.WithCtx(krtctx)
+		route := obj.Spec
+		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gwv1.HTTPRoute) iter.Seq2[ADPRoute, *ConfigError] {
+			return func(yield func(ADPRoute, *ConfigError) bool) {
+				for n, r := range route.Rules {
+					// split the rule to make sure each rule has up to one match
+					matches := slices.Reference(r.Matches)
+					if len(matches) == 0 {
+						matches = append(matches, nil)
+					}
+					for idx, m := range matches {
+						if m != nil {
+							r.Matches = []gwv1.HTTPRouteMatch{*m}
+						}
+						res, err := convertHTTPRouteToADP(ctx, r, obj, n, idx)
+
+						if !yield(ADPRoute{Route: res}, err) {
+							return
+						}
+					}
+				}
+			}
+		})
+
+		var res []ADPResource
+		for _, parent := range filteredReferences(parentRefs) {
+			// for gwv1 routes, build one VS per gwv1+host
+			routes := gwResult.routes
+			if len(routes) == 0 {
+				continue
+			}
+			gw := types.NamespacedName{
+				Namespace: parent.ParentKey.Namespace,
+				Name:      parent.ParentKey.Name,
+			}
+			res = append(res, slices.Map(routes, func(e ADPRoute) ADPResource {
+				inner := protomarshal.Clone(e.Route)
+				_, name, _ := strings.Cut(parent.InternalName, "/")
+				inner.ListenerKey = name
+				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
+				return toResource(gw, ADPRoute{Route: inner})
+			})...)
+		}
+		return res
+	}, krtopts.ToOptions("ADPRoutes")...)
+
+	return routes
+}
+
+type conversionResult[O any] struct {
+	error  *ConfigError
+	routes []O
+}
+
+// IsNil works around comparing generic types
+func IsNil[O comparable](o O) bool {
+	var t O
+	return o == t
+}
+
+// computeRoute holds the common route building logic shared amongst all types
+func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, translator func(
+	obj T,
+) iter.Seq2[O, *ConfigError],
+) ([]routeParentReference, conversionResult[O]) {
+	parentRefs := extractParentReferenceInfo(ctx, ctx.RouteParents, obj)
+
+	convertRules := func() conversionResult[O] {
+		res := conversionResult[O]{}
+		for vs, err := range translator(obj) {
+			// This was a hard error
+			if IsNil(vs) {
+				res.error = err
+				return conversionResult[O]{error: err}
+			}
+			// Got an error but also routes
+			if err != nil {
+				res.error = err
+			}
+			res.routes = append(res.routes, vs)
+		}
+		return res
+	}
+	gwResult := buildGatewayRoutes(parentRefs, convertRules)
+
+	return parentRefs, gwResult
+}
+
+// RouteContext defines a common set of inputs to a route collection. This should be built once per route translation and
+// not shared outside of that.
+// The embedded RouteContextInputs is typically based into a collection, then translated to a RouteContext with RouteContextInputs.WithCtx().
+type RouteContext struct {
+	Krt krt.HandlerContext
+	RouteContextInputs
+}
+
 type RouteContextInputs struct {
-	RouteParents  RouteParents
-	DomainSuffix  string
-	Services      krt.Collection[*corev1.Service]
-	ServicesIndex krt.Index[string, *corev1.Service]
-	Namespaces    krt.Collection[krtcollections.NamespaceMetadata]
+	Grants         ReferenceGrants
+	RouteParents   RouteParents
+	DomainSuffix   string
+	Services       krt.Collection[*corev1.Service]
+	InferencePools krt.Collection[*inf.InferencePool]
+	Namespaces     krt.Collection[krtcollections.NamespaceMetadata]
+	ServiceEntries krt.Collection[*networkingclient.ServiceEntry]
 }
 
 func (i RouteContextInputs) WithCtx(krtctx krt.HandlerContext) RouteContext {
 	return RouteContext{
-		Krt:           krtctx,
-		RouteParents:  i.RouteParents,
-		Services:      i.Services,
-		ServicesIndex: i.ServicesIndex,
-		Namespaces:    i.Namespaces,
-		DomainSuffix:  i.DomainSuffix,
+		Krt:                krtctx,
+		RouteContextInputs: i,
 	}
 }
 
-// convertPathMatch converts a Gateway API path match to agentgateway path match
-func convertPathMatch(path *gwv1.HTTPPathMatch) *api.RouteMatch {
-	if path == nil {
-		return nil
-	}
-
-	var pathMatch *api.PathMatch
-
-	switch {
-	case *path.Type == gwv1.PathMatchExact && path.Value != nil:
-		pathMatch = &api.PathMatch{
-			Kind: &api.PathMatch_Exact{
-				Exact: *path.Value,
-			},
-		}
-	case *path.Type == gwv1.PathMatchPathPrefix && path.Value != nil:
-		pathMatch = &api.PathMatch{
-			Kind: &api.PathMatch_PathPrefix{
-				PathPrefix: *path.Value,
-			},
-		}
-	case *path.Type == gwv1.PathMatchRegularExpression && path.Value != nil:
-		pathMatch = &api.PathMatch{
-			Kind: &api.PathMatch_Regex{
-				Regex: *path.Value,
-			},
-		}
-	}
-
-	if pathMatch == nil {
-		return nil
-	}
-
-	return &api.RouteMatch{
-		Path: pathMatch,
-	}
+type RouteWithKey struct {
+	*Config
+	Key string
 }
 
-// convertHeaderMatch converts a Gateway API header match to agentgateway header match
-func convertHeaderMatch(header gwv1.HTTPHeaderMatch) *api.RouteMatch {
-	// TODO: implement header matching when agentgateway API supports it
-	routeLogger.Debug("header matching not yet implemented")
-	return nil
+func (r RouteWithKey) ResourceName() string {
+	return config.NamespacedName(r.Config).String()
 }
 
-// convertHTTPFilter converts a Gateway API HTTP filter to agentgateway filter
-func convertHTTPFilter(filter gwv1.HTTPRouteFilter) *api.RouteFilter {
-	switch filter.Type {
-	case gwv1.HTTPRouteFilterRequestRedirect:
-		if filter.RequestRedirect == nil {
-			return nil
-		}
-		return convertRedirectFilter(filter.RequestRedirect)
-	case gwv1.HTTPRouteFilterURLRewrite:
-		if filter.URLRewrite == nil {
-			return nil
-		}
-		return convertURLRewriteFilter(filter.URLRewrite)
-	case gwv1.HTTPRouteFilterRequestHeaderModifier:
-		if filter.RequestHeaderModifier == nil {
-			return nil
-		}
-		return convertHeaderModifierFilter(filter.RequestHeaderModifier)
-	default:
-		routeLogger.Debug("unsupported filter type", "type", filter.Type)
-		return nil
-	}
+func (r RouteWithKey) Equals(o RouteWithKey) bool {
+	return r.Config.Equals(o.Config)
 }
 
-// convertRedirectFilter converts a redirect filter
-func convertRedirectFilter(redirect *gwv1.HTTPRequestRedirectFilter) *api.RouteFilter {
-	// TODO: implement redirect filter conversion
-	routeLogger.Debug("redirect filter not yet implemented")
-	return nil
+// buildGatewayRoutes contains common logic to build a set of routes with gwv1 semantics
+func buildGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
+	return convertRules()
 }
 
-// convertURLRewriteFilter converts a URL rewrite filter
-func convertURLRewriteFilter(rewrite *gwv1.HTTPURLRewriteFilter) *api.RouteFilter {
-	if rewrite == nil {
-		return nil
-	}
-
-	if rewrite.Path == nil {
-		return nil
-	}
-
-	var pathRewrite *api.UrlRewrite
-	switch {
-	case rewrite.Path.ReplaceFullPath != nil:
-		pathRewrite = &api.UrlRewrite{
-			Path: &api.UrlRewrite_Full{
-				Full: *rewrite.Path.ReplaceFullPath,
-			},
-		}
-	case rewrite.Path.ReplacePrefixMatch != nil:
-		pathRewrite = &api.UrlRewrite{
-			Path: &api.UrlRewrite_Prefix{
-				Prefix: *rewrite.Path.ReplacePrefixMatch,
-			},
-		}
-	}
-
-	if pathRewrite == nil {
-		return nil
-	}
-
-	return &api.RouteFilter{
-		Kind: &api.RouteFilter_UrlRewrite{
-			UrlRewrite: pathRewrite,
-		},
-	}
+// RouteResult holds the result of a route collection
+type RouteResult[I, IStatus any] struct {
+	// VirtualServices are the primary output that configures the internal routing logic
+	VirtualServices krt.Collection[*Config]
+	// RouteAttachments holds information about parent attachment to routes, used for computed the `attachedRoutes` count.
+	RouteAttachments krt.Collection[*RouteAttachment]
 }
 
-// convertHeaderModifierFilter converts a header modifier filter
-func convertHeaderModifierFilter(modifier *gwv1.HTTPHeaderFilter) *api.RouteFilter {
-	// TODO: implement header modifier filter conversion
-	routeLogger.Debug("header modifier filter not yet implemented")
-	return nil
+type GatewayAndListener struct {
+	// To is assumed to be a Gateway
+	To           types.NamespacedName
+	ListenerName string
 }
 
-//// AgentGRPCRouteCollection creates a collection that translates GRPCRoute resources to agentgateway routes
-//func AgentGRPCRouteCollection(
-//	grpcRoutes krt.Collection[*gwv1.GRPCRoute],
-//	inputs RouteContextInputs,
-//	krtopts krtutil.KrtOptions,
-//) RouteResult[*gwv1.GRPCRoute] {
-//	// TODO: implement GRPC route collection
-//	routeLogger.Debug("GRPC route collection not yet implemented")
-//
-//	emptyRoutes := krt.NewCollection(grpcRoutes, func(krtctx krt.HandlerContext, obj *gwv1.GRPCRoute) *AgentRouteResource {
-//		return nil
-//	}, krtopts.ToOptions("agentgateway-grpc-route")...)
-//
-//	return RouteResult[*gwv1.GRPCRoute]{
-//		Routes: emptyRoutes,
-//		Input:  grpcRoutes,
-//	}
-//}
-//
-//// AgentTCPRouteCollection creates a collection that translates TCPRoute resources to agentgateway routes
-//func AgentTCPRouteCollection(
-//	tcpRoutes krt.Collection[any], // Using any for now since TCPRoute type is not available
-//	inputs RouteContextInputs,
-//	krtopts krtutil.KrtOptions,
-//) RouteResult[any] {
-//	// TODO: implement TCP route collection
-//	routeLogger.Debug("TCP route collection not yet implemented")
-//
-//	emptyRoutes := krt.NewCollection(tcpRoutes, func(krtctx krt.HandlerContext, obj any) *AgentRouteResource {
-//		return nil
-//	}, krtopts.ToOptions("agentgateway-tcp-route")...)
-//
-//	return RouteResult[any]{
-//		Routes: emptyRoutes,
-//		Input:  tcpRoutes,
-//	}
-//}
-//
-//// AgentTLSRouteCollection creates a collection that translates TLSRoute resources to agentgateway routes
-//func AgentTLSRouteCollection(
-//	tlsRoutes krt.Collection[any], // Using any for now since TLSRoute type is not available
-//	inputs RouteContextInputs,
-//	krtopts krtutil.KrtOptions,
-//) RouteResult[any] {
-//	// TODO: implement TLS route collection
-//	routeLogger.Debug("TLS route collection not yet implemented")
-//
-//	emptyRoutes := krt.NewCollection(tlsRoutes, func(krtctx krt.HandlerContext, obj any) *AgentRouteResource {
-//		return nil
-//	}, krtopts.ToOptions("agentgateway-tls-route")...)
-//
-//	return RouteResult[any]{
-//		Routes: emptyRoutes,
-//		Input:  tlsRoutes,
-//	}
-//}
+func (g GatewayAndListener) String() string {
+	return g.To.String() + "/" + g.ListenerName
+}
+
+type TypedResource struct {
+	Kind schema.GroupVersionKind
+	Name types.NamespacedName
+}
+
+type RouteAttachment struct {
+	From TypedResource
+	// To is assumed to be a Gateway
+	To           types.NamespacedName
+	ListenerName string
+}
+
+func (r *RouteAttachment) ResourceName() string {
+	return r.From.Kind.String() + "/" + r.From.Name.String() + "/" + r.To.String() + "/" + r.ListenerName
+}
+
+func (r *RouteAttachment) Equals(other RouteAttachment) bool {
+	return r.From == other.From && r.To == other.To && r.ListenerName == other.ListenerName
+}
