@@ -204,6 +204,7 @@ func GatewayCollection(
 		r.Gateway(obj).SetCondition(reporter.GatewayCondition{
 			Type:   gwv1.GatewayConditionAccepted,
 			Status: metav1.ConditionTrue,
+			Reason: gwv1.GatewayReasonAccepted,
 		})
 		return result
 	}, krtopts.ToOptions("KubernetesGateway")...)

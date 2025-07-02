@@ -730,6 +730,7 @@ func (i ServiceInfo) ResourceName() string {
 }
 
 func serviceResourceName(s *api.Service) string {
+	// TODO: check prepending svc
 	return s.GetNamespace() + "/" + s.GetHostname()
 }
 

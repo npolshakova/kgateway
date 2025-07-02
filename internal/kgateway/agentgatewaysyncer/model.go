@@ -94,14 +94,13 @@ func (r ADPCacheResource) Equals(in ADPCacheResource) bool {
 type ADPCacheAddress struct {
 	NamespacedName types.NamespacedName
 	Address        envoycache.Resources `json:"address"`
-	proxyKey       string
 
 	reports    reports.ReportMap
 	VersionMap map[string]map[string]string
 }
 
 func (r ADPCacheAddress) ResourceName() string {
-	return r.proxyKey
+	return r.NamespacedName.String()
 }
 
 func (r ADPCacheAddress) Equals(in ADPCacheAddress) bool {

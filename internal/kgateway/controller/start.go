@@ -80,6 +80,8 @@ type StartConfig struct {
 	Client      istiokube.Client
 
 	AugmentedPods krt.Collection[krtcollections.LocalityPod]
+	// Special collection built using envoy callbacks
+	// Need this for DR (failover for eds snapshot)
 	UniqueClients krt.Collection[ir.UniqlyConnectedClient]
 
 	KrtOptions krtutil.KrtOptions
@@ -215,7 +217,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.ControllerName,
 			cfg.AgentGatewayClassName,
 			cfg.Client,
-			cfg.UniqueClients,
+			mgr,
 			commoncol,
 			cfg.SetupOpts.Cache,
 			domainSuffix,
