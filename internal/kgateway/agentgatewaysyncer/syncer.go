@@ -29,9 +29,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	"sigs.k8s.io/gateway-api-inference-extension/client-go/clientset/versioned"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gatewayalpha "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 
@@ -173,13 +173,13 @@ type Inputs struct {
 	Services krt.Collection[*corev1.Service]
 	Secrets  krt.Collection[*corev1.Secret]
 
-	GatewayClasses  krt.Collection[*gateway.GatewayClass]
-	Gateways        krt.Collection[*gateway.Gateway]
-	HTTPRoutes      krt.Collection[*gateway.HTTPRoute]
-	GRPCRoutes      krt.Collection[*gatewayv1.GRPCRoute]
-	TCPRoutes       krt.Collection[*gatewayalpha.TCPRoute]
-	TLSRoutes       krt.Collection[*gatewayalpha.TLSRoute]
-	ReferenceGrants krt.Collection[*gateway.ReferenceGrant]
+	GatewayClasses  krt.Collection[*gwv1.GatewayClass]
+	Gateways        krt.Collection[*gwv1.Gateway]
+	HTTPRoutes      krt.Collection[*gwv1.HTTPRoute]
+	GRPCRoutes      krt.Collection[*gwv1.GRPCRoute]
+	TCPRoutes       krt.Collection[*gwv1alpha2.TCPRoute]
+	TLSRoutes       krt.Collection[*gwv1alpha2.TLSRoute]
+	ReferenceGrants krt.Collection[*gwv1beta1.ReferenceGrant]
 	ServiceEntries  krt.Collection[*networkingclient.ServiceEntry]
 	InferencePools  krt.Collection[*inf.InferencePool]
 }
@@ -218,22 +218,22 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 			kclient.NewFiltered[*corev1.Service](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}),
 			krtopts.ToOptions("informer/Services")...),
 
-		GatewayClasses: krt.WrapClient(kclient.New[*gateway.GatewayClass](s.client), krtopts.ToOptions("informer/GatewayClasses")...),
-		Gateways:       krt.WrapClient(kclient.New[*gateway.Gateway](s.client), krtopts.ToOptions("informer/Gateways")...),
-		HTTPRoutes:     krt.WrapClient(kclient.New[*gateway.HTTPRoute](s.client), krtopts.ToOptions("informer/HTTPRoutes")...),
-		GRPCRoutes:     krt.WrapClient(kclient.New[*gatewayv1.GRPCRoute](s.client), krtopts.ToOptions("informer/GRPCRoutes")...),
+		GatewayClasses: krt.WrapClient(kclient.New[*gwv1.GatewayClass](s.client), krtopts.ToOptions("informer/GatewayClasses")...),
+		Gateways:       krt.WrapClient(kclient.New[*gwv1.Gateway](s.client), krtopts.ToOptions("informer/Gateways")...),
+		HTTPRoutes:     krt.WrapClient(kclient.New[*gwv1.HTTPRoute](s.client), krtopts.ToOptions("informer/HTTPRoutes")...),
+		GRPCRoutes:     krt.WrapClient(kclient.New[*gwv1.GRPCRoute](s.client), krtopts.ToOptions("informer/GRPCRoutes")...),
 
-		ReferenceGrants: krt.WrapClient(kclient.New[*gateway.ReferenceGrant](s.client), krtopts.ToOptions("informer/ReferenceGrants")...),
+		ReferenceGrants: krt.WrapClient(kclient.New[*gwv1beta1.ReferenceGrant](s.client), krtopts.ToOptions("informer/ReferenceGrants")...),
 		//ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
 		InferencePools: krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, inferencePoolGVR, kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...),
 	}
 	if features.EnableAlphaGatewayAPI {
-		inputs.TCPRoutes = krt.WrapClient(kclient.New[*gatewayalpha.TCPRoute](s.client), krtopts.ToOptions("informer/TCPRoutes")...)
-		inputs.TLSRoutes = krt.WrapClient(kclient.New[*gatewayalpha.TLSRoute](s.client), krtopts.ToOptions("informer/TLSRoutes")...)
+		inputs.TCPRoutes = krt.WrapClient(kclient.New[*gwv1alpha2.TCPRoute](s.client), krtopts.ToOptions("informer/TCPRoutes")...)
+		inputs.TLSRoutes = krt.WrapClient(kclient.New[*gwv1alpha2.TLSRoute](s.client), krtopts.ToOptions("informer/TLSRoutes")...)
 	} else {
 		// If disabled, still build a collection but make it always empty
-		inputs.TCPRoutes = krt.NewStaticCollection[*gatewayalpha.TCPRoute](nil, krtopts.ToOptions("disable/TCPRoutes")...)
-		inputs.TLSRoutes = krt.NewStaticCollection[*gatewayalpha.TLSRoute](nil, krtopts.ToOptions("disable/TLSRoutes")...)
+		inputs.TCPRoutes = krt.NewStaticCollection[*gwv1alpha2.TCPRoute](nil, krtopts.ToOptions("disable/TCPRoutes")...)
+		inputs.TLSRoutes = krt.NewStaticCollection[*gwv1alpha2.TLSRoute](nil, krtopts.ToOptions("disable/TLSRoutes")...)
 	}
 
 	GatewayClasses := GatewayClassesCollection(inputs.GatewayClasses, krtopts)
@@ -292,9 +292,9 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		}
 
 		switch obj.parentInfo.Protocol {
-		case gatewayv1.HTTPProtocolType:
+		case gwv1.HTTPProtocolType:
 			l.Protocol = api.Protocol_HTTP
-		case gatewayv1.HTTPSProtocolType:
+		case gwv1.HTTPSProtocolType:
 			l.Protocol = api.Protocol_HTTPS
 			if obj.TLSInfo == nil {
 				return nil
@@ -303,7 +303,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 				Cert:       obj.TLSInfo.Cert,
 				PrivateKey: obj.TLSInfo.Key,
 			}
-		case gatewayv1.TLSProtocolType:
+		case gwv1.TLSProtocolType:
 			l.Protocol = api.Protocol_TLS
 			if obj.TLSInfo == nil {
 				return nil
@@ -312,7 +312,7 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 				Cert:       obj.TLSInfo.Cert,
 				PrivateKey: obj.TLSInfo.Key,
 			}
-		case gatewayv1.TCPProtocolType:
+		case gwv1.TCPProtocolType:
 			l.Protocol = api.Protocol_TCP
 		default:
 			return nil
@@ -339,8 +339,6 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		routeInputs,
 		krtopts,
 	)
-
-	// TODO: inference pool
 
 	epSliceClient := kclient.NewFiltered[*discoveryv1.EndpointSlice](
 		s.commonCols.Client,
@@ -449,13 +447,13 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 		for _, resource := range resourceList {
 			// TODO: filter at collection? (add index per gw?)
 			// TODO: empty gw??
-			//if resource.Gateway.Name == gwNamespacedName.Name && resource.Gateway.Namespace == gwNamespacedName.Namespace {
-			cacheResources = append(cacheResources, &envoyResourceWithCustomName{
-				Message: resource.Resource,
-				Name:    resource.ResourceName(),
-				version: utils.HashProto(resource.Resource),
-			})
-			//}
+			if resource.Gateway.Name == gwNamespacedName.Name && resource.Gateway.Namespace == gwNamespacedName.Namespace {
+				cacheResources = append(cacheResources, &envoyResourceWithCustomName{
+					Message: resource.Resource,
+					Name:    resource.ResourceName(),
+					version: utils.HashProto(resource.Resource),
+				})
+			}
 		}
 
 		// Create the resource wrappers

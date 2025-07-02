@@ -7,10 +7,10 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/istio/pkg/slices"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	k8s "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-func createADPMethodMatch(match k8s.HTTPRouteMatch) (*api.MethodMatch, *ConfigError) {
+func createADPMethodMatch(match gwv1.HTTPRouteMatch) (*api.MethodMatch, *ConfigError) {
 	if match.Method == nil {
 		return nil, nil
 	}
@@ -19,20 +19,20 @@ func createADPMethodMatch(match k8s.HTTPRouteMatch) (*api.MethodMatch, *ConfigEr
 	}, nil
 }
 
-func createADPQueryMatch(match k8s.HTTPRouteMatch) ([]*api.QueryMatch, *ConfigError) {
+func createADPQueryMatch(match gwv1.HTTPRouteMatch) ([]*api.QueryMatch, *ConfigError) {
 	res := []*api.QueryMatch{}
 	for _, header := range match.QueryParams {
-		tp := k8s.QueryParamMatchExact
+		tp := gwv1.QueryParamMatchExact
 		if header.Type != nil {
 			tp = *header.Type
 		}
 		switch tp {
-		case k8s.QueryParamMatchExact:
+		case gwv1.QueryParamMatchExact:
 			res = append(res, &api.QueryMatch{
 				Name:  string(header.Name),
 				Value: &api.QueryMatch_Exact{Exact: header.Value},
 			})
-		case k8s.QueryParamMatchRegularExpression:
+		case gwv1.QueryParamMatchRegularExpression:
 			res = append(res, &api.QueryMatch{
 				Name:  string(header.Name),
 				Value: &api.QueryMatch_Regex{Regex: header.Value},
@@ -48,8 +48,8 @@ func createADPQueryMatch(match k8s.HTTPRouteMatch) ([]*api.QueryMatch, *ConfigEr
 	return res, nil
 }
 
-func createADPPathMatch(match k8s.HTTPRouteMatch) (*api.PathMatch, *ConfigError) {
-	tp := k8s.PathMatchPathPrefix
+func createADPPathMatch(match gwv1.HTTPRouteMatch) (*api.PathMatch, *ConfigError) {
+	tp := gwv1.PathMatchPathPrefix
 	if match.Path.Type != nil {
 		tp = *match.Path.Type
 	}
@@ -58,7 +58,7 @@ func createADPPathMatch(match k8s.HTTPRouteMatch) (*api.PathMatch, *ConfigError)
 		dest = *match.Path.Value
 	}
 	switch tp {
-	case k8s.PathMatchPathPrefix:
+	case gwv1.PathMatchPathPrefix:
 		// "When specified, a trailing `/` is ignored."
 		if dest != "/" {
 			dest = strings.TrimSuffix(dest, "/")
@@ -66,11 +66,11 @@ func createADPPathMatch(match k8s.HTTPRouteMatch) (*api.PathMatch, *ConfigError)
 		return &api.PathMatch{Kind: &api.PathMatch_PathPrefix{
 			PathPrefix: dest,
 		}}, nil
-	case k8s.PathMatchExact:
+	case gwv1.PathMatchExact:
 		return &api.PathMatch{Kind: &api.PathMatch_Exact{
 			Exact: dest,
 		}}, nil
-	case k8s.PathMatchRegularExpression:
+	case gwv1.PathMatchRegularExpression:
 		return &api.PathMatch{Kind: &api.PathMatch_Regex{
 			Regex: dest,
 		}}, nil
@@ -80,20 +80,20 @@ func createADPPathMatch(match k8s.HTTPRouteMatch) (*api.PathMatch, *ConfigError)
 	}
 }
 
-func createADPHeadersMatch(match k8s.HTTPRouteMatch) ([]*api.HeaderMatch, *ConfigError) {
+func createADPHeadersMatch(match gwv1.HTTPRouteMatch) ([]*api.HeaderMatch, *ConfigError) {
 	res := []*api.HeaderMatch{}
 	for _, header := range match.Headers {
-		tp := k8s.HeaderMatchExact
+		tp := gwv1.HeaderMatchExact
 		if header.Type != nil {
 			tp = *header.Type
 		}
 		switch tp {
-		case k8s.HeaderMatchExact:
+		case gwv1.HeaderMatchExact:
 			res = append(res, &api.HeaderMatch{
 				Name:  string(header.Name),
 				Value: &api.HeaderMatch_Exact{Exact: header.Value},
 			})
-		case k8s.HeaderMatchRegularExpression:
+		case gwv1.HeaderMatchRegularExpression:
 			res = append(res, &api.HeaderMatch{
 				Name:  string(header.Name),
 				Value: &api.HeaderMatch_Regex{Regex: header.Value},
@@ -110,7 +110,7 @@ func createADPHeadersMatch(match k8s.HTTPRouteMatch) ([]*api.HeaderMatch, *Confi
 	return res, nil
 }
 
-func createADPHeadersFilter(filter *k8s.HTTPHeaderFilter) *api.RouteFilter {
+func createADPHeadersFilter(filter *gwv1.HTTPHeaderFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
@@ -125,7 +125,7 @@ func createADPHeadersFilter(filter *k8s.HTTPHeaderFilter) *api.RouteFilter {
 	}
 }
 
-func createADPResponseHeadersFilter(filter *k8s.HTTPHeaderFilter) *api.RouteFilter {
+func createADPResponseHeadersFilter(filter *gwv1.HTTPHeaderFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
@@ -140,7 +140,7 @@ func createADPResponseHeadersFilter(filter *k8s.HTTPHeaderFilter) *api.RouteFilt
 	}
 }
 
-func createADPRewriteFilter(filter *k8s.HTTPURLRewriteFilter) *api.RouteFilter {
+func createADPRewriteFilter(filter *gwv1.HTTPURLRewriteFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
@@ -154,9 +154,9 @@ func createADPRewriteFilter(filter *k8s.HTTPURLRewriteFilter) *api.RouteFilter {
 	}
 	if filter.Path != nil {
 		switch filter.Path.Type {
-		case k8s.PrefixMatchHTTPPathModifier:
+		case gwv1.PrefixMatchHTTPPathModifier:
 			ff.Path = &api.UrlRewrite_Prefix{Prefix: strings.TrimSuffix(*filter.Path.ReplacePrefixMatch, "/")}
-		case k8s.FullPathHTTPPathModifier:
+		case gwv1.FullPathHTTPPathModifier:
 			ff.Path = &api.UrlRewrite_Full{Full: strings.TrimSuffix(*filter.Path.ReplaceFullPath, "/")}
 		}
 	}
@@ -169,7 +169,7 @@ func createADPRewriteFilter(filter *k8s.HTTPURLRewriteFilter) *api.RouteFilter {
 
 func createADPMirrorFilter(
 	ctx RouteContext,
-	filter *k8s.HTTPRequestMirrorFilter,
+	filter *gwv1.HTTPRequestMirrorFilter,
 	ns string,
 	k schema.GroupVersionKind,
 ) (*api.RouteFilter, *ConfigError) {
@@ -177,8 +177,8 @@ func createADPMirrorFilter(
 		return nil, nil
 	}
 	var weightOne int32 = 1
-	dst, err := buildADPDestination(ctx, k8s.HTTPBackendRef{
-		BackendRef: k8s.BackendRef{
+	dst, err := buildADPDestination(ctx, gwv1.HTTPBackendRef{
+		BackendRef: gwv1.BackendRef{
 			BackendObjectReference: filter.BackendRef,
 			Weight:                 &weightOne,
 		},
@@ -215,7 +215,7 @@ func createADPMirrorFilter(
 	return &api.RouteFilter{Kind: &api.RouteFilter_RequestMirror{RequestMirror: rm}}, nil
 }
 
-func createADPRedirectFilter(filter *k8s.HTTPRequestRedirectFilter) *api.RouteFilter {
+func createADPRedirectFilter(filter *gwv1.HTTPRequestRedirectFilter) *api.RouteFilter {
 	if filter == nil {
 		return nil
 	}
@@ -242,9 +242,9 @@ func createADPRedirectFilter(filter *k8s.HTTPRequestRedirectFilter) *api.RouteFi
 	}
 	if filter.Path != nil {
 		switch filter.Path.Type {
-		case k8s.PrefixMatchHTTPPathModifier:
+		case gwv1.PrefixMatchHTTPPathModifier:
 			ff.Path = &api.RequestRedirect_Prefix{Prefix: strings.TrimSuffix(*filter.Path.ReplacePrefixMatch, "/")}
-		case k8s.FullPathHTTPPathModifier:
+		case gwv1.FullPathHTTPPathModifier:
 			ff.Path = &api.RequestRedirect_Full{Full: strings.TrimSuffix(*filter.Path.ReplaceFullPath, "/")}
 		}
 	}
@@ -255,8 +255,8 @@ func createADPRedirectFilter(filter *k8s.HTTPRequestRedirectFilter) *api.RouteFi
 	}
 }
 
-func headerListToADP(hl []k8s.HTTPHeader) []*api.Header {
-	return slices.Map(hl, func(hl k8s.HTTPHeader) *api.Header {
+func headerListToADP(hl []gwv1.HTTPHeader) []*api.Header {
+	return slices.Map(hl, func(hl gwv1.HTTPHeader) *api.Header {
 		return &api.Header{
 			Name:  string(hl.Name),
 			Value: hl.Value,

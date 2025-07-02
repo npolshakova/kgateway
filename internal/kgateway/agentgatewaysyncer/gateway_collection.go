@@ -4,19 +4,21 @@ import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
-
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
 	istio "istio.io/api/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/util/protoconv"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
 	"istio.io/istio/pkg/slices"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
 func toResourcep(gw types.NamespacedName, t any) *ADPResource {
@@ -111,7 +113,7 @@ func (g Gateway) Equals(other Gateway) bool {
 
 func GatewayCollection(
 	agentGatewayClassName string,
-	gateways krt.Collection[*gateway.Gateway],
+	gateways krt.Collection[*gwv1.Gateway],
 	gatewayClasses krt.Collection[GatewayClass],
 	namespaces krt.Collection[*corev1.Namespace],
 	grants ReferenceGrants,
@@ -119,7 +121,11 @@ func GatewayCollection(
 	domainSuffix string,
 	krtopts krtutil.KrtOptions,
 ) krt.Collection[Gateway] {
-	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gateway.Gateway) []Gateway {
+	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gwv1.Gateway) []Gateway {
+		rm := reports.NewReportMap()
+		r := reports.NewReporter(&rm)
+		logger.Debug("translating Gateway", "gw_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
+
 		if string(obj.Spec.GatewayClassName) != agentGatewayClassName {
 			return nil // ignore non agentgateway gws
 		}
@@ -134,11 +140,17 @@ func GatewayCollection(
 		controllerName := class.Controller
 		var servers []*istio.Server
 
-		// Extract the addresses. A gateway will bind to a specific Service
+		// Extract the addresses. A gwv1 will bind to a specific Service
 		gatewayServices, err := extractGatewayServices(domainSuffix, obj)
 		if len(gatewayServices) == 0 && err != nil {
 			// Short circuit if its a hard failure
-			// TODO: log
+			logger.Error("failed to translate gwv1", "name", obj.GetName(), "namespace", obj.GetNamespace(), "err", err.Message)
+			r.Gateway(obj).SetCondition(reporter.GatewayCondition{
+				Type:    gwv1.GatewayConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.GatewayReasonInvalid, // TODO: check reason
+				Message: err.Message,
+			})
 			return nil
 		}
 
@@ -157,7 +169,7 @@ func GatewayCollection(
 					Namespace:         obj.Namespace,
 					Domain:            domainSuffix,
 				},
-				// TODO: move away from istio gateway ir
+				// TODO: clean up and move away from istio gwv1 ir
 				Spec: &istio.Gateway{
 					Servers: []*istio.Server{server},
 				},
@@ -189,6 +201,10 @@ func GatewayCollection(
 			result = append(result, res)
 		}
 
+		r.Gateway(obj).SetCondition(reporter.GatewayCondition{
+			Type:   gwv1.GatewayConditionAccepted,
+			Status: metav1.ConditionTrue,
+		})
 		return result
 	}, krtopts.ToOptions("KubernetesGateway")...)
 
@@ -220,7 +236,7 @@ func BuildRouteParents(
 }
 
 // InternalGatewayName returns the name of the internal Istio Gateway corresponding to the
-// specified gateway-api gateway and listener.
+// specified gwv1-api gwv1 and listener.
 func InternalGatewayName(gwName, lName string) string {
 	return fmt.Sprintf("%s-%s-%s", gwName, AgentgatewayName, lName)
 }

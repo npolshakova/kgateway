@@ -79,7 +79,7 @@ func testAgentGatewayScenario(
 
 	// read the out file
 	fout := fpre + "-out" + fext
-	write := true
+	write := false
 	_, err := os.ReadFile(fout)
 	// if not exist
 	if os.IsNotExist(err) {

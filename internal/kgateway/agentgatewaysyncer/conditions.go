@@ -1,23 +1,21 @@
 package agentgatewaysyncer
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8s "sigs.k8s.io/gateway-api/apis/v1"
-	k8sbeta "sigs.k8s.io/gateway-api/apis/v1beta1"
-
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
 	"istio.io/istio/pilot/pkg/model/kstatus"
 	"istio.io/istio/pkg/maps"
 	"istio.io/istio/pkg/slices"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
 type ParentErrorReason string
 
 const (
-	ParentErrorNotAccepted       = ParentErrorReason(k8s.RouteReasonNoMatchingParent)
-	ParentErrorNotAllowed        = ParentErrorReason(k8s.RouteReasonNotAllowedByListeners)
-	ParentErrorNoHostname        = ParentErrorReason(k8s.RouteReasonNoMatchingListenerHostname)
+	ParentErrorNotAccepted       = ParentErrorReason(gwv1.RouteReasonNoMatchingParent)
+	ParentErrorNotAllowed        = ParentErrorReason(gwv1.RouteReasonNotAllowedByListeners)
+	ParentErrorNoHostname        = ParentErrorReason(gwv1.RouteReasonNoMatchingListenerHostname)
 	ParentErrorParentRefConflict = ParentErrorReason("ParentRefConflict")
 	ParentNoError                = ParentErrorReason("")
 )
@@ -27,19 +25,19 @@ type ConfigErrorReason = string
 const (
 	// InvalidDestination indicates an issue with the destination
 	InvalidDestination ConfigErrorReason = "InvalidDestination"
-	InvalidAddress     ConfigErrorReason = ConfigErrorReason(k8s.GatewayReasonUnsupportedAddress)
+	InvalidAddress     ConfigErrorReason = ConfigErrorReason(gwv1.GatewayReasonUnsupportedAddress)
 	// InvalidDestinationPermit indicates a destination was not permitted
-	InvalidDestinationPermit ConfigErrorReason = ConfigErrorReason(k8s.RouteReasonRefNotPermitted)
+	InvalidDestinationPermit ConfigErrorReason = ConfigErrorReason(gwv1.RouteReasonRefNotPermitted)
 	// InvalidDestinationKind indicates an issue with the destination kind
-	InvalidDestinationKind ConfigErrorReason = ConfigErrorReason(k8s.RouteReasonInvalidKind)
+	InvalidDestinationKind ConfigErrorReason = ConfigErrorReason(gwv1.RouteReasonInvalidKind)
 	// InvalidDestinationNotFound indicates a destination does not exist
-	InvalidDestinationNotFound ConfigErrorReason = ConfigErrorReason(k8s.RouteReasonBackendNotFound)
+	InvalidDestinationNotFound ConfigErrorReason = ConfigErrorReason(gwv1.RouteReasonBackendNotFound)
 	// InvalidFilter indicates an issue with the filters
 	InvalidFilter ConfigErrorReason = "InvalidFilter"
 	// InvalidTLS indicates an issue with TLS settings
-	InvalidTLS ConfigErrorReason = ConfigErrorReason(k8s.ListenerReasonInvalidCertificateRef)
+	InvalidTLS ConfigErrorReason = ConfigErrorReason(gwv1.ListenerReasonInvalidCertificateRef)
 	// InvalidListenerRefNotPermitted indicates a listener reference was not permitted
-	InvalidListenerRefNotPermitted ConfigErrorReason = ConfigErrorReason(k8s.ListenerReasonRefNotPermitted)
+	InvalidListenerRefNotPermitted ConfigErrorReason = ConfigErrorReason(gwv1.ListenerReasonRefNotPermitted)
 	// InvalidConfiguration indicates a generic error for all other invalid configurations
 	InvalidConfiguration ConfigErrorReason = "InvalidConfiguration"
 	DeprecateFieldUsage  ConfigErrorReason = "DeprecatedField"
@@ -117,22 +115,22 @@ func setConditions(generation int64, existingConditions []metav1.Condition, cond
 	return existingConditions
 }
 
-func reportListenerCondition(index int, l k8s.Listener, obj *k8sbeta.Gateway,
-	gs *k8sbeta.GatewayStatus, conditions map[string]*condition,
+func reportListenerCondition(index int, l gwv1.Listener, obj *gwv1.Gateway,
+	gs *gwv1.GatewayStatus, conditions map[string]*condition,
 ) {
 	for index >= len(gs.Listeners) {
-		gs.Listeners = append(gs.Listeners, k8s.ListenerStatus{})
+		gs.Listeners = append(gs.Listeners, gwv1.ListenerStatus{})
 	}
 	cond := gs.Listeners[index].Conditions
 	supported, valid := generateSupportedKinds(l)
 	if !valid {
-		conditions[string(k8s.ListenerConditionResolvedRefs)] = &condition{
-			reason:  string(k8s.ListenerReasonInvalidRouteKinds),
+		conditions[string(gwv1.ListenerConditionResolvedRefs)] = &condition{
+			reason:  string(gwv1.ListenerReasonInvalidRouteKinds),
 			status:  metav1.ConditionFalse,
 			message: "Invalid route kinds",
 		}
 	}
-	gs.Listeners[index] = k8s.ListenerStatus{
+	gs.Listeners[index] = gwv1.ListenerStatus{
 		Name:           l.Name,
 		AttachedRoutes: 0, // this will be reported later
 		SupportedKinds: supported,
@@ -140,28 +138,28 @@ func reportListenerCondition(index int, l k8s.Listener, obj *k8sbeta.Gateway,
 	}
 }
 
-func generateSupportedKinds(l k8s.Listener) ([]k8s.RouteGroupKind, bool) {
-	var supported []k8s.RouteGroupKind
+func generateSupportedKinds(l gwv1.Listener) ([]gwv1.RouteGroupKind, bool) {
+	var supported []gwv1.RouteGroupKind
 	switch l.Protocol {
-	case k8s.HTTPProtocolType, k8s.HTTPSProtocolType:
+	case gwv1.HTTPProtocolType, gwv1.HTTPSProtocolType:
 		// Only terminate allowed, so its always HTTP
-		supported = []k8s.RouteGroupKind{
+		supported = []gwv1.RouteGroupKind{
 			toRouteKind(wellknown.HTTPRouteGVK),
 			toRouteKind(wellknown.GRPCRouteGVK),
 		}
-	case k8s.TCPProtocolType:
-		supported = []k8s.RouteGroupKind{toRouteKind(wellknown.TCPRouteGVK)}
-	case k8s.TLSProtocolType:
-		if l.TLS != nil && l.TLS.Mode != nil && *l.TLS.Mode == k8s.TLSModePassthrough {
-			supported = []k8s.RouteGroupKind{toRouteKind(wellknown.TLSRouteGVK)}
+	case gwv1.TCPProtocolType:
+		supported = []gwv1.RouteGroupKind{toRouteKind(wellknown.TCPRouteGVK)}
+	case gwv1.TLSProtocolType:
+		if l.TLS != nil && l.TLS.Mode != nil && *l.TLS.Mode == gwv1.TLSModePassthrough {
+			supported = []gwv1.RouteGroupKind{toRouteKind(wellknown.TLSRouteGVK)}
 		} else {
-			supported = []k8s.RouteGroupKind{toRouteKind(wellknown.TCPRouteGVK)}
+			supported = []gwv1.RouteGroupKind{toRouteKind(wellknown.TCPRouteGVK)}
 		}
 		// UDP route not support
 	}
 	if l.AllowedRoutes != nil && len(l.AllowedRoutes.Kinds) > 0 {
 		// We need to filter down to only ones we actually support
-		var intersection []k8s.RouteGroupKind
+		var intersection []gwv1.RouteGroupKind
 		for _, s := range supported {
 			for _, kind := range l.AllowedRoutes.Kinds {
 				if routeGroupKindEqual(s, kind) {

@@ -4,31 +4,38 @@ import (
 	"iter"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
-	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
-
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/slices"
 	"istio.io/istio/pkg/util/protomarshal"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
 // TODO: support other route collections (TCP, TLS, etc.)
 func ADPRouteCollection(
-	httpRoutes krt.Collection[*gateway.HTTPRoute],
+	httpRoutes krt.Collection[*gwv1.HTTPRoute],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
 ) krt.Collection[ADPResource] {
-	routes := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gateway.HTTPRoute) []ADPResource {
+	routes := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
+		rm := reports.NewReportMap()
+		rep := reports.NewReporter(&rm)
+		logger.Debug("translating HTTPRoute", "route_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
+
 		ctx := inputs.WithCtx(krtctx)
 		route := obj.Spec
-		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gateway.HTTPRoute) iter.Seq2[ADPRoute, *ConfigError] {
+		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gwv1.HTTPRoute) iter.Seq2[ADPRoute, *ConfigError] {
 			return func(yield func(ADPRoute, *ConfigError) bool) {
 				for n, r := range route.Rules {
 					// split the rule to make sure each rule has up to one match
@@ -38,10 +45,9 @@ func ADPRouteCollection(
 					}
 					for idx, m := range matches {
 						if m != nil {
-							r.Matches = []gateway.HTTPRouteMatch{*m}
+							r.Matches = []gwv1.HTTPRouteMatch{*m}
 						}
 						res, err := convertHTTPRouteToADP(ctx, r, obj, n, idx)
-
 						if !yield(ADPRoute{Route: res}, err) {
 							return
 						}
@@ -52,11 +58,20 @@ func ADPRouteCollection(
 
 		var res []ADPResource
 		for _, parent := range filteredReferences(parentRefs) {
-			// for gateway routes, build one VS per gateway+host
+			// for gwv1beta1 routes, build one VS per gwv1beta1+host
 			routes := gwResult.routes
 			if len(routes) == 0 {
 				continue
 			}
+			if gwResult.error != nil {
+				rep.Route(obj).ParentRef(&parent.OriginalReference).SetCondition(reporter.RouteCondition{
+					Type:    gwv1beta1.RouteConditionResolvedRefs, // TODO: check type
+					Status:  metav1.ConditionFalse,
+					Reason:  gwv1beta1.RouteConditionReason(gwResult.error.Reason),
+					Message: gwResult.error.Message,
+				})
+			}
+
 			gw := types.NamespacedName{
 				Namespace: parent.ParentKey.Namespace,
 				Name:      parent.ParentKey.Name,
@@ -152,7 +167,7 @@ func (r RouteWithKey) Equals(o RouteWithKey) bool {
 	return r.Config.Equals(o.Config)
 }
 
-// buildGatewayRoutes contains common logic to build a set of routes with gateway semantics
+// buildGatewayRoutes contains common logic to build a set of routes with gwv1beta1 semantics
 func buildGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
 	return convertRules()
 }

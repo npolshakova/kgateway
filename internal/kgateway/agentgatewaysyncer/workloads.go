@@ -22,7 +22,6 @@ import (
 	"istio.io/istio/pkg/config/host"
 	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/config/schema/kind"
-	"istio.io/istio/pkg/config/schema/kubetypes"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
 	kubelabels "istio.io/istio/pkg/kube/labels"
@@ -274,9 +273,10 @@ func (a *index) serviceEntriesInfo(ctx krt.HandlerContext, s *networkingclient.S
 
 // MakeSource is a helper to turn an Object into a model.TypedObject.
 func MakeSource(o controllers.Object) TypedObject {
+	kind := o.GetObjectKind().GroupVersionKind().Kind
 	return TypedObject{
 		NamespacedName: config.NamespacedName(o),
-		Kind:           kubetypes.GvkFromObject(o).Kind,
+		Kind:           kind,
 	}
 }
 
