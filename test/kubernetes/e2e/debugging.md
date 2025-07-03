@@ -202,3 +202,7 @@ go-test-args: '-v -timeout=25m'
 ```bash
 TEST_PKG=./test/kubernetes/e2e/... GO_TEST_USER_ARGS='-v -timeout=25m -run \(^TestKgateway$$/\)' make go-test
 ```
+4. Run a specific test with:
+```bash
+TEST_PKG=./test/kubernetes/e2e/... GO_TEST_USER_ARGS='-v -timeout=25m -run ^TestKgateway$$/JWT' make go-test
+```

@@ -21,10 +21,14 @@ var (
 	}
 	gatewayService    = &corev1.Service{ObjectMeta: gatewayObjectMeta}
 	gatewayDeployment = &appsv1.Deployment{ObjectMeta: gatewayObjectMeta}
+	httpbinRoute      = &metav1.ObjectMeta{
+		Name:      "httpbin-route",
+		Namespace: "default",
+	}
 
 	httpbinObjectMeta = metav1.ObjectMeta{
 		Name:      "httpbin",
-		Namespace: "httpbin",
+		Namespace: "default",
 	}
 	httpbinDeployment = &appsv1.Deployment{ObjectMeta: httpbinObjectMeta}
 )
