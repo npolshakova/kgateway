@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/agentgateway/agentgateway/go/api/workloadapi"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/api/annotation"
 	"istio.io/api/label"
@@ -158,12 +158,12 @@ func (a *index) podWorkloadBuilder(
 		services = append(services, a.matchingServicesWithoutSelectors(ctx, p, services, workloadServices, endpointSlices, endpointSlicesAddressIndex)...)
 		// Logic from https://github.com/kubernetes/kubernetes/blob/7c873327b679a70337288da62b96dd610858181d/staging/src/k8s.io/endpointslice/utils.go#L37
 		// Kubernetes has Ready, Serving, and Terminating. We only have a boolean, which is sufficient for our cases
-		status := api.WorkloadStatus_HEALTHY
+		status := workloadapi.WorkloadStatus_HEALTHY
 		if !p.Ready || p.DeletionTimestamp != nil {
-			status = api.WorkloadStatus_UNHEALTHY
+			status = workloadapi.WorkloadStatus_UNHEALTHY
 		}
 
-		w := &api.Workload{
+		w := &workloadapi.Workload{
 			Uid:       a.generatePodUID(p),
 			Name:      p.Name,
 			Namespace: p.Namespace,
@@ -179,11 +179,11 @@ func (a *index) podWorkloadBuilder(
 		}
 
 		if p.HostNetwork {
-			w.NetworkMode = api.NetworkMode_HOST_NETWORK
+			w.NetworkMode = workloadapi.NetworkMode_HOST_NETWORK
 		}
 
 		w.WorkloadName = p.WorkloadNameForPod
-		w.WorkloadType = api.WorkloadType_POD // backwards compatibility
+		w.WorkloadType = workloadapi.WorkloadType_POD // backwards compatibility
 		w.CanonicalName, w.CanonicalRevision = kubelabels.CanonicalService(p.Labels, w.WorkloadName)
 
 		setTunnelProtocol(p.Labels, p.Annotations, w)
@@ -261,7 +261,7 @@ func (a *index) serviceEntriesInfo(ctx krt.HandlerContext, s *networkingclient.S
 			PortName: p.Name,
 		}
 	}
-	return slices.Map(a.constructServiceEntries(ctx, s), func(e *api.Service) ServiceInfo {
+	return slices.Map(a.constructServiceEntries(ctx, s), func(e *workloadapi.Service) ServiceInfo {
 		return precomputeService(ServiceInfo{
 			Service:       e,
 			PortNames:     portNames,
@@ -294,28 +294,28 @@ func precomputeService(w ServiceInfo) ServiceInfo {
 	return w
 }
 
-func serviceToAddress(s *api.Service) *api.Address {
-	return &api.Address{
-		Type: &api.Address_Service{
+func serviceToAddress(s *workloadapi.Service) *workloadapi.Address {
+	return &workloadapi.Address{
+		Type: &workloadapi.Address_Service{
 			Service: s,
 		},
 	}
 }
 
-func toAppProtocolFromIstio(p *networkingv1alpha3.ServicePort) api.AppProtocol {
+func toAppProtocolFromIstio(p *networkingv1alpha3.ServicePort) workloadapi.AppProtocol {
 	return toAppProtocolFromProtocol(p.Protocol)
 }
 
-func toAppProtocolFromProtocol(p string) api.AppProtocol {
+func toAppProtocolFromProtocol(p string) workloadapi.AppProtocol {
 	switch p {
 	case "HTTP":
-		return api.AppProtocol_HTTP11
+		return workloadapi.AppProtocol_HTTP11
 	case "HTTP2":
-		return api.AppProtocol_HTTP2
+		return workloadapi.AppProtocol_HTTP2
 	case "GRPC":
-		return api.AppProtocol_GRPC
+		return workloadapi.AppProtocol_GRPC
 	}
-	return api.AppProtocol_UNKNOWN
+	return workloadapi.AppProtocol_UNKNOWN
 }
 
 func GetHostAddressesFromServiceEntry(se *networkingclient.ServiceEntry) map[string][]netip.Addr {
@@ -339,9 +339,9 @@ func getHostAddressesFromServiceEntryStatus(status *apiv1.ServiceEntryStatus) ma
 	return results
 }
 
-func (a *index) constructServiceEntries(ctx krt.HandlerContext, svc *networkingclient.ServiceEntry) []*api.Service {
+func (a *index) constructServiceEntries(ctx krt.HandlerContext, svc *networkingclient.ServiceEntry) []*workloadapi.Service {
 	var autoassignedHostAddresses map[string][]netip.Addr
-	addresses, err := slices.MapErr(svc.Spec.Addresses, func(e string) (*api.NetworkAddress, error) {
+	addresses, err := slices.MapErr(svc.Spec.Addresses, func(e string) (*workloadapi.NetworkAddress, error) {
 		return a.toNetworkAddressFromCidr(ctx, e)
 	})
 	if err != nil {
@@ -352,13 +352,13 @@ func (a *index) constructServiceEntries(ctx krt.HandlerContext, svc *networkingc
 	if ShouldV2AutoAllocateIP(svc) {
 		autoassignedHostAddresses = GetHostAddressesFromServiceEntry(svc)
 	}
-	ports := make([]*api.Port, 0, len(svc.Spec.Ports))
+	ports := make([]*workloadapi.Port, 0, len(svc.Spec.Ports))
 	for _, p := range svc.Spec.Ports {
 		target := p.TargetPort
 		if target == 0 {
 			target = p.Number
 		}
-		ports = append(ports, &api.Port{
+		ports = append(ports, &workloadapi.Port{
 			ServicePort: p.Number,
 			TargetPort:  target,
 			AppProtocol: toAppProtocolFromIstio(p),
@@ -366,19 +366,19 @@ func (a *index) constructServiceEntries(ctx krt.HandlerContext, svc *networkingc
 	}
 
 	// TODO this is only checking one controller - we may be missing service vips for instances in another cluster
-	res := make([]*api.Service, 0, len(svc.Spec.Hosts))
+	res := make([]*workloadapi.Service, 0, len(svc.Spec.Hosts))
 	for _, h := range svc.Spec.Hosts {
 		// if we have no user-provided hostsAddresses and h is not wildcarded and we have hostsAddresses supported resolution
 		// we can try to use autoassigned hostsAddresses
 		hostsAddresses := addresses
 		if len(hostsAddresses) == 0 && !host.Name(h).IsWildCarded() && svc.Spec.Resolution != networkingv1beta1.ServiceEntry_NONE {
 			if hostsAddrs, ok := autoassignedHostAddresses[h]; ok {
-				hostsAddresses = slices.Map(hostsAddrs, func(e netip.Addr) *api.NetworkAddress {
+				hostsAddresses = slices.Map(hostsAddrs, func(e netip.Addr) *workloadapi.NetworkAddress {
 					return a.toNetworkAddressFromIP(ctx, e)
 				})
 			}
 		}
-		res = append(res, &api.Service{
+		res = append(res, &workloadapi.Service{
 			Name:            svc.Name,
 			Namespace:       svc.Namespace,
 			Hostname:        h,
@@ -460,7 +460,7 @@ func (a *index) serviceEntryWorkloadBuilder() krt.TransformationMulti[*networkin
 				services = []ServiceInfo{allServices[i]}
 			}
 
-			w := &api.Workload{
+			w := &workloadapi.Workload{
 				Uid:       a.generateServiceEntryUID(se.Namespace, se.Name, wle.Address),
 				Name:      se.Name,
 				Namespace: se.Namespace,
@@ -468,7 +468,7 @@ func (a *index) serviceEntryWorkloadBuilder() krt.TransformationMulti[*networkin
 				ClusterId:      a.ClusterID,
 				ServiceAccount: wle.ServiceAccount,
 				Services:       constructServicesFromWorkloadEntry(wle, services),
-				Status:         api.WorkloadStatus_HEALTHY,
+				Status:         workloadapi.WorkloadStatus_HEALTHY,
 				Locality:       getWorkloadEntryLocality(wle),
 			}
 			if wle.Weight > 0 {
@@ -481,7 +481,7 @@ func (a *index) serviceEntryWorkloadBuilder() krt.TransformationMulti[*networkin
 				w.Hostname = wle.Address
 			}
 
-			w.WorkloadName, w.WorkloadType = se.Name, api.WorkloadType_POD // XXX(shashankram): HACK to impersonate pod
+			w.WorkloadName, w.WorkloadType = se.Name, workloadapi.WorkloadType_POD // XXX(shashankram): HACK to impersonate pod
 			w.CanonicalName, w.CanonicalRevision = kubelabels.CanonicalService(se.Labels, w.WorkloadName)
 
 			setTunnelProtocol(se.Labels, se.Annotations, w)
@@ -530,7 +530,7 @@ func (a *index) endpointSlicesBuilder(
 		svc := svcs[0]
 
 		// Translate slice ports to our port.
-		pl := &api.PortList{Ports: make([]*api.Port, 0, len(es.Ports))}
+		pl := &workloadapi.PortList{Ports: make([]*workloadapi.Port, 0, len(es.Ports))}
 		for _, p := range es.Ports {
 			// We must have name and port (Kubernetes should always set these)
 			if p.Name == nil {
@@ -550,14 +550,14 @@ func (a *index) endpointSlicesBuilder(
 				if portName.PortName != *p.Name {
 					continue
 				}
-				pl.Ports = append(pl.Ports, &api.Port{
+				pl.Ports = append(pl.Ports, &workloadapi.Port{
 					ServicePort: svcPort.ServicePort,
 					TargetPort:  uint32(*p.Port),
 				})
 				break
 			}
 		}
-		services := map[string]*api.PortList{
+		services := map[string]*workloadapi.PortList{
 			serviceKey: pl,
 		}
 
@@ -578,9 +578,9 @@ func (a *index) endpointSlicesBuilder(
 				log.Warnf("IP address %v seen twice in %v/%v", key, es.Namespace, es.Name)
 				continue
 			}
-			health := api.WorkloadStatus_UNHEALTHY
+			health := workloadapi.WorkloadStatus_UNHEALTHY
 			if ep.Conditions.Ready == nil || *ep.Conditions.Ready {
-				health = api.WorkloadStatus_HEALTHY
+				health = workloadapi.WorkloadStatus_HEALTHY
 			}
 			// Translate our addresses.
 			// Note: users may put arbitrary addresses here. It is recommended by Kubernetes to not
@@ -597,7 +597,7 @@ func (a *index) endpointSlicesBuilder(
 				// If any invalid, skip
 				continue
 			}
-			w := &api.Workload{
+			w := &workloadapi.Workload{
 				Uid:       a.ClusterID + "/discovery.k8s.io/EndpointSlice/" + es.Namespace + "/" + es.Name + "/" + key,
 				Name:      es.Name,
 				Namespace: es.Namespace,
@@ -609,7 +609,7 @@ func (a *index) endpointSlicesBuilder(
 				ClusterId: string(a.ClusterID),
 				// For opaque endpoints, we do not know anything about them. They could be overlapping with other IPs, so treat it
 				// as a shared address rather than a unique one.
-				NetworkMode:           api.NetworkMode_HOST_NETWORK,
+				NetworkMode:           workloadapi.NetworkMode_HOST_NETWORK,
 				AuthorizationPolicies: nil, // Not support. This can only be used for outbound, so not relevant
 				ServiceAccount:        "",  // Unknown.
 				Locality:              nil, // Not supported. We could maybe, there is a "zone", but it doesn't seem to be well supported
@@ -626,27 +626,27 @@ func (a *index) endpointSlicesBuilder(
 	}
 }
 
-func setTunnelProtocol(labels, annotations map[string]string, w *api.Workload) {
+func setTunnelProtocol(labels, annotations map[string]string, w *workloadapi.Workload) {
 	if annotations[annotation.AmbientRedirection.Name] == constants.AmbientRedirectionEnabled {
 		// Configured for override
-		w.TunnelProtocol = api.TunnelProtocol_HBONE
+		w.TunnelProtocol = workloadapi.TunnelProtocol_HBONE
 	}
 	// Otherwise supports tunnel directly
 	if SupportsTunnel(labels, TunnelHTTP) {
-		w.TunnelProtocol = api.TunnelProtocol_HBONE
+		w.TunnelProtocol = workloadapi.TunnelProtocol_HBONE
 		w.NativeTunnel = true
 	}
-	if w.TunnelProtocol == api.TunnelProtocol_NONE &&
+	if w.TunnelProtocol == workloadapi.TunnelProtocol_NONE &&
 		GetTLSModeFromEndpointLabels(labels) == MutualTLSModeLabel {
-		w.TunnelProtocol = api.TunnelProtocol_LEGACY_ISTIO_MTLS
+		w.TunnelProtocol = workloadapi.TunnelProtocol_LEGACY_ISTIO_MTLS
 	}
 }
 
-func constructServicesFromWorkloadEntry(p *networkingv1alpha3.WorkloadEntry, services []ServiceInfo) map[string]*api.PortList {
-	res := map[string]*api.PortList{}
+func constructServicesFromWorkloadEntry(p *networkingv1alpha3.WorkloadEntry, services []ServiceInfo) map[string]*workloadapi.PortList {
+	res := map[string]*workloadapi.PortList{}
 	for _, svc := range services {
 		n := namespacedHostname(svc.Service.Namespace, svc.Service.Hostname)
-		pl := &api.PortList{}
+		pl := &workloadapi.PortList{}
 		res[n] = pl
 		for _, port := range svc.Service.Ports {
 			targetPort := port.TargetPort
@@ -676,7 +676,7 @@ func constructServicesFromWorkloadEntry(p *networkingv1alpha3.WorkloadEntry, ser
 					}
 				}
 			}
-			pl.Ports = append(pl.Ports, &api.Port{
+			pl.Ports = append(pl.Ports, &workloadapi.Port{
 				ServicePort: port.ServicePort,
 				TargetPort:  targetPort,
 			})
@@ -685,17 +685,17 @@ func constructServicesFromWorkloadEntry(p *networkingv1alpha3.WorkloadEntry, ser
 	return res
 }
 
-func constructServices(p krtcollections.WrappedPod, services []ServiceInfo) map[string]*api.PortList {
-	res := map[string]*api.PortList{}
+func constructServices(p krtcollections.WrappedPod, services []ServiceInfo) map[string]*workloadapi.PortList {
+	res := map[string]*workloadapi.PortList{}
 	for _, svc := range services {
 		n := namespacedHostname(svc.Service.Namespace, svc.Service.Hostname)
-		pl := &api.PortList{
-			Ports: make([]*api.Port, 0, len(svc.Service.Ports)),
+		pl := &workloadapi.PortList{
+			Ports: make([]*workloadapi.Port, 0, len(svc.Service.Ports)),
 		}
 		res[n] = pl
 		for _, port := range svc.Service.Ports {
 			targetPort := port.TargetPort
-			// The svc.Ports represents the api.Service, which drops the port name info and just has numeric target Port.
+			// The svc.Ports represents the workloadapi.Service, which drops the port name info and just has numeric target Port.
 			// TargetPort can be 0 which indicates its a named port. Check if its a named port and replace with the real targetPort if so.
 			if named, f := svc.PortNames[int32(port.ServicePort)]; f && named.TargetPortName != "" {
 				// Pods only match on TargetPort names
@@ -707,7 +707,7 @@ func constructServices(p krtcollections.WrappedPod, services []ServiceInfo) map[
 				targetPort = uint32(tp)
 			}
 
-			pl.Ports = append(pl.Ports, &api.Port{
+			pl.Ports = append(pl.Ports, &workloadapi.Port{
 				ServicePort: port.ServicePort,
 				TargetPort:  targetPort,
 			})
@@ -716,12 +716,12 @@ func constructServices(p krtcollections.WrappedPod, services []ServiceInfo) map[
 	return res
 }
 
-func getWorkloadEntryLocality(p *networkingv1alpha3.WorkloadEntry) *api.Locality {
+func getWorkloadEntryLocality(p *networkingv1alpha3.WorkloadEntry) *workloadapi.Locality {
 	region, zone, subzone := labelutil.SplitLocalityLabel(p.GetLocality())
 	if region == "" && zone == "" && subzone == "" {
 		return nil
 	}
-	return &api.Locality{
+	return &workloadapi.Locality{
 		Region:  region,
 		Zone:    zone,
 		Subzone: subzone,
@@ -784,9 +784,9 @@ func precomputeWorkload(w WorkloadInfo) WorkloadInfo {
 	return w
 }
 
-func workloadToAddress(w *api.Workload) *api.Address {
-	return &api.Address{
-		Type: &api.Address_Workload{
+func workloadToAddress(w *workloadapi.Workload) *workloadapi.Address {
+	return &workloadapi.Address{
+		Type: &workloadapi.Address_Workload{
 			Workload: w,
 		},
 	}
@@ -797,30 +797,30 @@ func mustByteIPToString(b []byte) string {
 	return ip.String()
 }
 
-func (a *index) toNetworkAddress(ctx krt.HandlerContext, vip string) (*api.NetworkAddress, error) {
+func (a *index) toNetworkAddress(ctx krt.HandlerContext, vip string) (*workloadapi.NetworkAddress, error) {
 	ip, err := netip.ParseAddr(vip)
 	if err != nil {
 		return nil, fmt.Errorf("parse %v: %v", vip, err)
 	}
-	return &api.NetworkAddress{
+	return &workloadapi.NetworkAddress{
 		// TODO: calculate network
 		Address: ip.AsSlice(),
 	}, nil
 }
 
-func (a *index) toNetworkAddressFromIP(ctx krt.HandlerContext, ip netip.Addr) *api.NetworkAddress {
-	return &api.NetworkAddress{
+func (a *index) toNetworkAddressFromIP(ctx krt.HandlerContext, ip netip.Addr) *workloadapi.NetworkAddress {
+	return &workloadapi.NetworkAddress{
 		// TODO: calculate network
 		Address: ip.AsSlice(),
 	}
 }
 
-func (a *index) toNetworkAddressFromCidr(ctx krt.HandlerContext, vip string) (*api.NetworkAddress, error) {
+func (a *index) toNetworkAddressFromCidr(ctx krt.HandlerContext, vip string) (*workloadapi.NetworkAddress, error) {
 	ip, err := parseCidrOrIP(vip)
 	if err != nil {
 		return nil, err
 	}
-	return &api.NetworkAddress{
+	return &workloadapi.NetworkAddress{
 		// TODO: calculate network
 		Address: ip.AsSlice(),
 	}, nil

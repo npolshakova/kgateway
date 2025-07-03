@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/agentgateway/agentgateway/go/api/workloadapi"
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"google.golang.org/grpc"
@@ -173,10 +174,10 @@ func testAgentGatewayScenario(
 
 		for _, resource := range dump.Addresses {
 			switch resource.Type.(type) {
-			case *api.Address_Workload:
+			case *workloadapi.Address_Workload:
 				worklodCount++
 				t.Logf("workload resource: %+v", resource.GetWorkload())
-			case *api.Address_Service:
+			case *workloadapi.Address_Service:
 				serviceCount++
 				t.Logf("service resource: %+v", resource.GetService())
 			}
@@ -228,12 +229,12 @@ func testAgentGatewayScenario(
 
 		for _, addr := range dump.Addresses {
 			switch x := addr.GetType().(type) {
-			case *api.Address_Workload:
+			case *workloadapi.Address_Workload:
 				name := x.Workload.GetName()
 				if _, ok := expectedWorkloads[name]; ok {
 					expectedWorkloads[name] = true
 				}
-			case *api.Address_Service:
+			case *workloadapi.Address_Service:
 				host := x.Service.GetHostname()
 				if _, ok := expectedServices[host]; ok {
 					expectedServices[host] = true
@@ -321,7 +322,7 @@ func newAgentGatewayXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gw
 
 type agentGwDump struct {
 	Resources []*api.Resource
-	Addresses []*api.Address
+	Addresses []*workloadapi.Address
 }
 
 func (x xdsDumper) DumpAgentGateway(t *testing.T, ctx context.Context) agentGwDump {
@@ -377,11 +378,11 @@ func (x xdsDumper) GetResources(t *testing.T, ctx context.Context) []*api.Resour
 	return resources
 }
 
-func (x xdsDumper) GetAddress(t *testing.T, ctx context.Context) []*api.Address {
+func (x xdsDumper) GetAddress(t *testing.T, ctx context.Context) []*workloadapi.Address {
 	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
 	dr.TypeUrl = agentgatewaysyncer.TargetTypeAddressUrl
 	x.adsClient.Send(dr)
-	var address []*api.Address
+	var address []*workloadapi.Address
 	// run this in parallel with a 5s timeout
 	done := make(chan struct{})
 	go func() {
@@ -395,7 +396,7 @@ func (x xdsDumper) GetAddress(t *testing.T, ctx context.Context) []*api.Address 
 			t.Logf("got address response: %s len: %d", dresp.GetTypeUrl(), len(dresp.GetResources()))
 			if dresp.GetTypeUrl() == agentgatewaysyncer.TargetTypeAddressUrl {
 				for _, anyResource := range dresp.GetResources() {
-					var resource api.Address
+					var resource workloadapi.Address
 					if err := anyResource.UnmarshalTo(&resource); err != nil {
 						t.Errorf("failed to unmarshal resource: %v", err)
 					}

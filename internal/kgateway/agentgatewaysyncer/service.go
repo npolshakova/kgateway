@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/agentgateway/agentgateway/go/api/workloadapi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
@@ -99,14 +99,14 @@ func (a *index) inferencePoolBuilder(
 ) krt.TransformationSingle[*inf.InferencePool, ServiceInfo] {
 	return func(ctx krt.HandlerContext, s *inf.InferencePool) *ServiceInfo {
 		portNames := map[int32]ServicePortName{}
-		ports := []*api.Port{{
+		ports := []*workloadapi.Port{{
 			ServicePort: uint32(s.Spec.TargetPortNumber),
 			TargetPort:  uint32(s.Spec.TargetPortNumber),
-			AppProtocol: api.AppProtocol_HTTP11,
+			AppProtocol: workloadapi.AppProtocol_HTTP11,
 		}}
 
 		// TODO this is only checking one controller - we may be missing service vips for instances in another cluster
-		svc := &api.Service{
+		svc := &workloadapi.Service{
 			Name:      s.Name,
 			Namespace: s.Namespace,
 			Hostname:  string(InferenceHostname(s.Name, s.Namespace, a.DomainSuffix)),
@@ -140,21 +140,21 @@ func (a *index) serviceEntryServiceBuilder(
 	}
 }
 
-func toAppProtocolFromKube(p v1.ServicePort) api.AppProtocol {
+func toAppProtocolFromKube(p v1.ServicePort) workloadapi.AppProtocol {
 	return toAppProtocolFromProtocol(string(kubeutil.ConvertProtocol(p.Port, p.Name, p.Protocol, p.AppProtocol)))
 }
 
-func (a *index) constructService(ctx krt.HandlerContext, svc *v1.Service) *api.Service {
-	ports := make([]*api.Port, 0, len(svc.Spec.Ports))
+func (a *index) constructService(ctx krt.HandlerContext, svc *v1.Service) *workloadapi.Service {
+	ports := make([]*workloadapi.Port, 0, len(svc.Spec.Ports))
 	for _, p := range svc.Spec.Ports {
-		ports = append(ports, &api.Port{
+		ports = append(ports, &workloadapi.Port{
 			ServicePort: uint32(p.Port),
 			TargetPort:  uint32(p.TargetPort.IntVal),
 			AppProtocol: toAppProtocolFromKube(p),
 		})
 	}
 
-	addresses, err := slices.MapErr(getVIPs(svc), func(e string) (*api.NetworkAddress, error) {
+	addresses, err := slices.MapErr(getVIPs(svc), func(e string) (*workloadapi.NetworkAddress, error) {
 		return a.toNetworkAddress(ctx, e)
 	})
 	if err != nil {
@@ -162,7 +162,7 @@ func (a *index) constructService(ctx krt.HandlerContext, svc *v1.Service) *api.S
 		return nil
 	}
 
-	var lb *api.LoadBalancing
+	var lb *workloadapi.LoadBalancing
 
 	// The TrafficDistribution field is quite new, so we allow a legacy annotation option as well
 	preferClose := strings.EqualFold(svc.Annotations[apiannotation.NetworkingTrafficDistribution.Name], v1.ServiceTrafficDistributionPreferClose)
@@ -173,34 +173,34 @@ func (a *index) constructService(ctx krt.HandlerContext, svc *v1.Service) *api.S
 		lb = preferCloseLoadBalancer
 	}
 	if itp := svc.Spec.InternalTrafficPolicy; itp != nil && *itp == v1.ServiceInternalTrafficPolicyLocal {
-		lb = &api.LoadBalancing{
+		lb = &workloadapi.LoadBalancing{
 			// Only allow endpoints on the same node.
-			RoutingPreference: []api.LoadBalancing_Scope{
-				api.LoadBalancing_NODE,
+			RoutingPreference: []workloadapi.LoadBalancing_Scope{
+				workloadapi.LoadBalancing_NODE,
 			},
-			Mode: api.LoadBalancing_STRICT,
+			Mode: workloadapi.LoadBalancing_STRICT,
 		}
 	}
 	if svc.Spec.PublishNotReadyAddresses {
 		if lb == nil {
-			lb = &api.LoadBalancing{}
+			lb = &workloadapi.LoadBalancing{}
 		}
-		lb.HealthPolicy = api.LoadBalancing_ALLOW_ALL
+		lb.HealthPolicy = workloadapi.LoadBalancing_ALLOW_ALL
 	}
 
-	ipFamily := api.IPFamilies_AUTOMATIC
+	ipFamily := workloadapi.IPFamilies_AUTOMATIC
 	if len(svc.Spec.IPFamilies) == 2 {
-		ipFamily = api.IPFamilies_DUAL
+		ipFamily = workloadapi.IPFamilies_DUAL
 	} else if len(svc.Spec.IPFamilies) == 1 {
 		family := svc.Spec.IPFamilies[0]
 		if family == v1.IPv4Protocol {
-			ipFamily = api.IPFamilies_IPV4_ONLY
+			ipFamily = workloadapi.IPFamilies_IPV4_ONLY
 		} else {
-			ipFamily = api.IPFamilies_IPV6_ONLY
+			ipFamily = workloadapi.IPFamilies_IPV6_ONLY
 		}
 	}
 	// TODO this is only checking one controller - we may be missing service vips for instances in another cluster
-	return &api.Service{
+	return &workloadapi.Service{
 		Name:          svc.Name,
 		Namespace:     svc.Namespace,
 		Hostname:      string(kube.ServiceHostname(svc.Name, svc.Namespace, a.DomainSuffix)),
@@ -211,15 +211,15 @@ func (a *index) constructService(ctx krt.HandlerContext, svc *v1.Service) *api.S
 	}
 }
 
-var preferCloseLoadBalancer = &api.LoadBalancing{
+var preferCloseLoadBalancer = &workloadapi.LoadBalancing{
 	// Prefer endpoints in close zones, but allow spilling over to further endpoints where required.
-	RoutingPreference: []api.LoadBalancing_Scope{
-		api.LoadBalancing_NETWORK,
-		api.LoadBalancing_REGION,
-		api.LoadBalancing_ZONE,
-		api.LoadBalancing_SUBZONE,
+	RoutingPreference: []workloadapi.LoadBalancing_Scope{
+		workloadapi.LoadBalancing_NETWORK,
+		workloadapi.LoadBalancing_REGION,
+		workloadapi.LoadBalancing_ZONE,
+		workloadapi.LoadBalancing_SUBZONE,
 	},
-	Mode: api.LoadBalancing_FAILOVER,
+	Mode: workloadapi.LoadBalancing_FAILOVER,
 }
 
 func getVIPs(svc *v1.Service) []string {
@@ -631,7 +631,7 @@ func (s *ServiceAttributes) Equals(other *ServiceAttributes) bool {
 }
 
 type AddressInfo struct {
-	*api.Address
+	*workloadapi.Address
 	Marshaled *anypb.Any
 }
 
@@ -641,7 +641,7 @@ func (i AddressInfo) Equals(other AddressInfo) bool {
 
 func (i AddressInfo) Aliases() []string {
 	switch addr := i.Type.(type) {
-	case *api.Address_Workload:
+	case *workloadapi.Address_Workload:
 		aliases := make([]string, 0, len(addr.Workload.GetAddresses()))
 		network := addr.Workload.GetNetwork()
 		for _, workloadAddr := range addr.Workload.GetAddresses() {
@@ -649,7 +649,7 @@ func (i AddressInfo) Aliases() []string {
 			aliases = append(aliases, network+"/"+ip.String())
 		}
 		return aliases
-	case *api.Address_Service:
+	case *workloadapi.Address_Service:
 		aliases := make([]string, 0, len(addr.Service.GetAddresses()))
 		for _, networkAddr := range addr.Service.GetAddresses() {
 			ip, _ := netip.AddrFromSlice(networkAddr.GetAddress())
@@ -663,9 +663,9 @@ func (i AddressInfo) Aliases() []string {
 func (i AddressInfo) ResourceName() string {
 	var name string
 	switch addr := i.Type.(type) {
-	case *api.Address_Workload:
+	case *workloadapi.Address_Workload:
 		name = workloadResourceName(addr.Workload)
-	case *api.Address_Service:
+	case *workloadapi.Address_Service:
 		name = serviceResourceName(addr.Service)
 	}
 	return name
@@ -682,7 +682,7 @@ type ServicePortName struct {
 }
 
 type ServiceInfo struct {
-	Service *api.Service
+	Service *workloadapi.Service
 	// LabelSelectors for the Service. Note these are only used internally, not sent over XDS
 	LabelSelector LabelSelector
 	// PortNames provides a mapping of ServicePort -> port names. Note these are only used internally, not sent over XDS
@@ -729,13 +729,13 @@ func (i ServiceInfo) ResourceName() string {
 	return serviceResourceName(i.Service)
 }
 
-func serviceResourceName(s *api.Service) string {
+func serviceResourceName(s *workloadapi.Service) string {
 	// TODO: check prepending svc
 	return s.GetNamespace() + "/" + s.GetHostname()
 }
 
 type WorkloadInfo struct {
-	Workload *api.Workload
+	Workload *workloadapi.Workload
 	// Labels for the workload. Note these are only used internally, not sent over XDS
 	Labels map[string]string
 	// Source is the type that introduced this workload.
@@ -757,7 +757,7 @@ func (i WorkloadInfo) Equals(other WorkloadInfo) bool {
 		i.CreationTime == other.CreationTime
 }
 
-func workloadResourceName(w *api.Workload) string {
+func workloadResourceName(w *workloadapi.Workload) string {
 	return w.GetUid()
 }
 
