@@ -8,7 +8,7 @@ spec:
       enabled: true
       logLevel: debug
       image:
-        tag: fd98c99-dirty
+        tag: bc92714
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1

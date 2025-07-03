@@ -40,7 +40,6 @@ spec:
             {{- toYaml $gateway.resources | nindent 12 }}
           {{- end }} {{/* if $gateway.resources */}}
           args:
-            - gateway
             - -f
             - /config/config.json
           env:
