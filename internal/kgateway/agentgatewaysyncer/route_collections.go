@@ -171,36 +171,3 @@ func (r RouteWithKey) Equals(o RouteWithKey) bool {
 func buildGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
 	return convertRules()
 }
-
-// RouteResult holds the result of a route collection
-type RouteResult[I, IStatus any] struct {
-	// VirtualServices are the primary output that configures the internal routing logic
-	VirtualServices krt.Collection[*Config]
-	// RouteAttachments holds information about parent attachment to routes, used for computed the `attachedRoutes` count.
-	RouteAttachments krt.Collection[*RouteAttachment]
-}
-
-type GatewayAndListener struct {
-	// To is assumed to be a Gateway
-	To           types.NamespacedName
-	ListenerName string
-}
-
-func (g GatewayAndListener) String() string {
-	return g.To.String() + "/" + g.ListenerName
-}
-
-type RouteAttachment struct {
-	From TypedResource
-	// To is assumed to be a Gateway
-	To           types.NamespacedName
-	ListenerName string
-}
-
-func (r *RouteAttachment) ResourceName() string {
-	return r.From.Kind.String() + "/" + r.From.Name.String() + "/" + r.To.String() + "/" + r.ListenerName
-}
-
-func (r *RouteAttachment) Equals(other RouteAttachment) bool {
-	return r.From == other.From && r.To == other.To && r.ListenerName == other.ListenerName
-}

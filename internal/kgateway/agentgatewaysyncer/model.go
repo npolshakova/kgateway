@@ -1,24 +1,19 @@
 package agentgatewaysyncer
 
 import (
-	"cmp"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
 	"slices"
-	"sort"
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	udpa "github.com/cncf/xds/go/udpa/type/v1"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	gogoproto "github.com/gogo/protobuf/proto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"istio.io/istio/pkg/config/schema/kind"
 	"istio.io/istio/pkg/util/hash"
-	"istio.io/istio/pkg/util/protomarshal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,23 +50,6 @@ func (key ConfigKey) String() string {
 	return key.Kind.String() + "/" + key.Namespace + "/" + key.Name
 }
 
-// sortConfigByCreationTime sorts the list of config objects in ascending order by their creation time (if available)
-func sortConfigByCreationTime(configs []Config) []Config {
-	sort.Slice(configs, func(i, j int) bool {
-		if r := configs[i].CreationTimestamp.Compare(configs[j].CreationTimestamp); r != 0 {
-			return r == -1 // -1 means i is less than j, so return true
-		}
-		// If creation time is the same, then behavior is nondeterministic. In this case, we can
-		// pick an arbitrary but consistent ordering based on name and namespace, which is unique.
-		// CreationTimestamp is stored in seconds, so this is not uncommon.
-		if r := cmp.Compare(configs[i].Name, configs[j].Name); r != 0 {
-			return r == -1
-		}
-		return cmp.Compare(configs[i].Namespace, configs[j].Namespace) == -1
-	})
-	return configs
-}
-
 type ADPCacheResource struct {
 	Gateway types.NamespacedName `json:"gateway"`
 	reports reports.ReportMap
@@ -93,7 +71,10 @@ func (r ADPCacheResource) Equals(in ADPCacheResource) bool {
 
 type ADPCacheAddress struct {
 	NamespacedName types.NamespacedName
-	Address        envoycache.Resources `json:"address"`
+
+	Address             proto.Message
+	AddressResourceName string
+	AddressVersion      uint64
 
 	reports    reports.ReportMap
 	VersionMap map[string]map[string]string
@@ -105,7 +86,9 @@ func (r ADPCacheAddress) ResourceName() string {
 
 func (r ADPCacheAddress) Equals(in ADPCacheAddress) bool {
 	return report{r.reports}.Equals(report{in.reports}) &&
-		r.Address.Version == in.Address.Version
+		proto.Equal(r.Address, in.Address) &&
+		r.AddressVersion == in.AddressVersion &&
+		r.AddressResourceName == in.AddressResourceName
 }
 
 type ADPResource struct {
@@ -314,73 +297,19 @@ func (meta *Meta) ToObjectMeta() metav1.ObjectMeta {
 	}
 }
 
-func (c Config) DeepCopy() Config {
-	var clone Config
-	clone.Meta = c.Meta
-	clone.Labels = maps.Clone(c.Labels)
-	clone.Annotations = maps.Clone(clone.Annotations)
-	clone.Spec = DeepCopy(c.Spec)
-	if c.Status != nil {
-		clone.Status = DeepCopy(c.Status)
-	}
-	return clone
-}
-
-type deepCopier interface {
-	DeepCopyInterface() any
-}
-
-func DeepCopy(s any) any {
-	if s == nil {
-		return nil
-	}
-	// If deep copy is defined, use that
-	if dc, ok := s.(deepCopier); ok {
-		return dc.DeepCopyInterface()
-	}
-
-	// golang protobuf. Use protoreflect.ProtoMessage to distinguish from gogo
-	// golang/protobuf 1.4+ will have this interface. Older golang/protobuf are gogo compatible
-	// but also not used by Istio at all.
-	if _, ok := s.(protoreflect.ProtoMessage); ok {
-		if pb, ok := s.(proto.Message); ok {
-			return protomarshal.Clone(pb)
-		}
-	}
-
-	// gogo protobuf
-	if pb, ok := s.(gogoproto.Message); ok {
-		return gogoproto.Clone(pb)
-	}
-
-	// If we don't have a deep copy method, we will have to do some reflection magic. Its not ideal,
-	// but all Istio types have an efficient deep copy.
-	js, err := json.Marshal(s)
-	if err != nil {
-		return nil
-	}
-
-	data := reflect.New(reflect.TypeOf(s)).Interface()
-	if err := json.Unmarshal(js, data); err != nil {
-		return nil
-	}
-	data = reflect.ValueOf(data).Elem().Interface()
-	return data
-}
-
-func (c Config) GetName() string {
+func (c *Config) GetName() string {
 	return c.Name
 }
 
-func (c Config) GetNamespace() string {
+func (c *Config) GetNamespace() string {
 	return c.Namespace
 }
 
-func (c Config) GetCreationTimestamp() time.Time {
+func (c *Config) GetCreationTimestamp() time.Time {
 	return c.CreationTimestamp
 }
 
-func (c Config) NamespacedName() types.NamespacedName {
+func (c *Config) NamespacedName() types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: c.Namespace,
 		Name:      c.Name,

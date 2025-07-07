@@ -3,16 +3,15 @@ package agentgatewaysyncer
 import (
 	"fmt"
 
+	creds "istio.io/istio/pilot/pkg/model/credentials"
+	"istio.io/istio/pkg/config"
+	"istio.io/istio/pkg/kube/krt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
-	creds "istio.io/istio/pilot/pkg/model/credentials"
-	"istio.io/istio/pkg/config"
-	"istio.io/istio/pkg/kube/krt"
 )
 
 // Reference stores a reference to a namespaced GVK, as used by ReferencePolicy

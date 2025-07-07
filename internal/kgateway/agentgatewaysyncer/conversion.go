@@ -23,6 +23,7 @@ import (
 	"istio.io/istio/pkg/config/constants"
 	"istio.io/istio/pkg/config/host"
 	"istio.io/istio/pkg/config/protocol"
+	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/config/schema/kind"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/krt"
@@ -389,8 +390,17 @@ func referenceAllowed(
 		out:
 			for _, routeHostname := range hostnames {
 				for _, parentHostNamespace := range parent.Hostnames {
-					spl := strings.Split(parentHostNamespace, "/")
-					parentNamespace, parentHostname := spl[0], spl[1]
+					var parentNamespace, parentHostname string
+					// When parentHostNamespace lacks a '/', it was likely sanitized from '*/host' to 'host'
+					// by sanitizeServerHostNamespace. Set parentNamespace to '*' to reflect the wildcard namespace
+					// and parentHostname to the sanitized host to prevent an index out of range panic.
+					if strings.Contains(parentHostNamespace, "/") {
+						spl := strings.Split(parentHostNamespace, "/")
+						parentNamespace, parentHostname = spl[0], spl[1]
+					} else {
+						parentNamespace, parentHostname = "*", parentHostNamespace
+					}
+
 					hostnameMatch := host.Name(parentHostname).Matches(host.Name(routeHostname))
 					namespaceMatch := parentNamespace == "*" || parentNamespace == localNamespace
 					hostMatched = hostMatched || hostnameMatch
@@ -423,7 +433,7 @@ func referenceAllowed(
 	// Also make sure this route kind is allowed
 	matched := false
 	for _, ak := range parent.AllowedKinds {
-		if string(ak.Kind) == routeKind.Kind && ptr.OrDefault((*string)(ak.Group), wellknown.GatewayClassGVK.Group) == routeKind.Group {
+		if string(ak.Kind) == routeKind.Kind && ptr.OrDefault((*string)(ak.Group), gvk.GatewayClass.Group) == routeKind.Group {
 			matched = true
 			break
 		}

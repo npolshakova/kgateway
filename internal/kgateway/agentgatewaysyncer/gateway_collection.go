@@ -107,8 +107,9 @@ func (g Gateway) ResourceName() string {
 }
 
 func (g Gateway) Equals(other Gateway) bool {
+	// TODO: ok to ignore parent/parentInfo?
 	return g.Config.Equals(other.Config) &&
-		g.Valid == other.Valid // TODO: ok to ignore parent/parentInfo?
+		g.Valid == other.Valid
 }
 
 func GatewayCollection(
