@@ -381,7 +381,7 @@ func (s *ProxySyncer) Start(ctx context.Context) error {
 	latestReportQueue := utils.NewAsyncQueue[reports.ReportMap]()
 	s.statusReport.Register(func(o krt.Event[report]) {
 		if o.Event == controllers.EventDelete {
-			// TODO: handle garbage collection (see: https://github.com/solo-io/solo-projects/issues/7086)
+			// TODO: handle garbage collection
 			return
 		}
 		latestReportQueue.Enqueue(o.Latest().reportMap)

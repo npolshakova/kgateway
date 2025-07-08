@@ -26,14 +26,23 @@ func toResourcep(gw types.NamespacedName, t any) *ADPResource {
 	return &res
 }
 
+func toResourcepWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) *ADPResource {
+	res := toResourceWithReports(gw, t, reportMap)
+	return &res
+}
+
 func toResource(gw types.NamespacedName, t any) ADPResource {
+	return toResourceWithReports(gw, t, reports.NewReportMap())
+}
+
+func toResourceWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) ADPResource {
 	switch tt := t.(type) {
 	case Bind:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{tt.Bind}}, Gateway: gw}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{tt.Bind}}, Gateway: gw, reports: reportMap}
 	case ADPListener:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{tt.Listener}}, Gateway: gw}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{tt.Listener}}, Gateway: gw, reports: reportMap}
 	case ADPRoute:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{tt.Route}}, Gateway: gw}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{tt.Route}}, Gateway: gw, reports: reportMap}
 	}
 	panic("unknown resource kind")
 }
@@ -121,10 +130,10 @@ func GatewayCollection(
 	secrets krt.Collection[*corev1.Secret],
 	domainSuffix string,
 	krtopts krtutil.KrtOptions,
+	statusReporter reporter.Reporter,
 ) krt.Collection[Gateway] {
 	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gwv1.Gateway) []Gateway {
-		rm := reports.NewReportMap()
-		r := reports.NewReporter(&rm)
+		gwReporter := statusReporter.Gateway(obj)
 		logger.Debug("translating Gateway", "gw_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
 
 		if string(obj.Spec.GatewayClassName) != agentGatewayClassName {
@@ -146,7 +155,7 @@ func GatewayCollection(
 		if len(gatewayServices) == 0 && err != nil {
 			// Short circuit if its a hard failure
 			logger.Error("failed to translate gwv1", "name", obj.GetName(), "namespace", obj.GetNamespace(), "err", err.Message)
-			r.Gateway(obj).SetCondition(reporter.GatewayCondition{
+			gwReporter.SetCondition(reporter.GatewayCondition{
 				Type:    gwv1.GatewayConditionAccepted,
 				Status:  metav1.ConditionFalse,
 				Reason:  gwv1.GatewayReasonInvalid, // TODO: check reason
@@ -157,6 +166,23 @@ func GatewayCollection(
 
 		for i, l := range kgw.Listeners {
 			server, tlsInfo, programmed := buildListener(ctx, secrets, grants, namespaces, obj, status, l, i, controllerName)
+			lstatus := status.Listeners[i]
+
+			// Generate supported kinds for the listener
+			allowed, _ := generateSupportedKinds(l)
+
+			// Set all listener conditions from the actual status
+			for _, condition := range lstatus.Conditions {
+				gwReporter.Listener(&l).SetCondition(reporter.ListenerCondition{
+					Type:    gwv1.ListenerConditionType(condition.Type),
+					Status:  condition.Status,
+					Reason:  gwv1.ListenerConditionReason(condition.Reason),
+					Message: condition.Message,
+				})
+			}
+
+			// Set supported kinds for the listener
+			gwReporter.Listener(&l).SetSupportedKinds(allowed)
 
 			servers = append(servers, server)
 			meta := parentMeta(obj, &l.Name)
@@ -175,8 +201,6 @@ func GatewayCollection(
 					Servers: []*istio.Server{server},
 				},
 			}
-
-			allowed, _ := generateSupportedKinds(l)
 			ref := parentKey{
 				Kind:      wellknown.GatewayGVK,
 				Name:      obj.Name,
@@ -202,7 +226,7 @@ func GatewayCollection(
 			result = append(result, res)
 		}
 
-		r.Gateway(obj).SetCondition(reporter.GatewayCondition{
+		gwReporter.SetCondition(reporter.GatewayCondition{
 			Type:   gwv1.GatewayConditionAccepted,
 			Status: metav1.ConditionTrue,
 			Reason: gwv1.GatewayReasonAccepted,

@@ -41,6 +41,8 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	gwxv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
 
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
@@ -93,6 +95,7 @@ type AgentGwSyncer struct {
 
 	// Status reporting
 	statusReport krt.Singleton[report]
+	reportMap    *reports.ReportMap
 
 	// Synchronization
 	waitForSync []cache.InformerSynced
@@ -193,9 +196,13 @@ func (r report) ResourceName() string {
 }
 
 func (r report) Equals(in report) bool {
-	return maps.Equal(r.reportMap.Gateways, in.reportMap.Gateways) &&
-		maps.Equal(r.reportMap.HTTPRoutes, in.reportMap.HTTPRoutes) &&
-		maps.Equal(r.reportMap.TCPRoutes, in.reportMap.TCPRoutes)
+	if !maps.Equal(r.reportMap.Gateways, in.reportMap.Gateways) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.HTTPRoutes, in.reportMap.HTTPRoutes) {
+		return false
+	}
+	return true
 }
 
 // Inputs holds all the input collections needed for the syncer
@@ -224,7 +231,10 @@ func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 
 	s.setupInferenceExtensionClient()
 	inputs := s.buildInputCollections(krtopts)
-	s.buildResourceCollections(inputs, krtopts)
+	rm := reports.NewReportMap()
+	r := reports.NewReporter(&rm)
+	s.reportMap = &rm // Store the report map in the struct
+	s.buildResourceCollections(inputs, krtopts, r)
 }
 
 func (s *AgentGwSyncer) setupInferenceExtensionClient() {
@@ -283,14 +293,14 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 	return inputs
 }
 
-func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.KrtOptions) {
+func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.KrtOptions, reporter reporter.Reporter) {
 	// Build core collections
 	gatewayClasses := GatewayClassesCollection(inputs.GatewayClasses, krtopts)
 	refGrants := BuildReferenceGrants(ReferenceGrantsCollection(inputs.ReferenceGrants, krtopts))
-	gateways := s.buildGatewayCollection(inputs, gatewayClasses, refGrants, krtopts)
+	gateways := s.buildGatewayCollection(inputs, gatewayClasses, refGrants, krtopts, reporter)
 
 	// Build ADP resources
-	adpResources := s.buildADPResources(gateways, inputs, refGrants, krtopts)
+	adpResources := s.buildADPResources(gateways, inputs, refGrants, krtopts, reporter)
 
 	// Build address collections
 	addresses := s.buildAddressCollections(inputs, krtopts)
@@ -305,7 +315,13 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	s.setupSyncDependencies(gateways, adpResources, addresses, inputs)
 }
 
-func (s *AgentGwSyncer) buildGatewayCollection(inputs Inputs, gatewayClasses krt.Collection[GatewayClass], refGrants ReferenceGrants, krtopts krtutil.KrtOptions) krt.Collection[Gateway] {
+func (s *AgentGwSyncer) buildGatewayCollection(
+	inputs Inputs,
+	gatewayClasses krt.Collection[GatewayClass],
+	refGrants ReferenceGrants,
+	krtopts krtutil.KrtOptions,
+	reporter reporter.Reporter,
+) krt.Collection[Gateway] {
 	return GatewayCollection(
 		s.agentGatewayClassName,
 		inputs.Gateways,
@@ -315,10 +331,24 @@ func (s *AgentGwSyncer) buildGatewayCollection(inputs Inputs, gatewayClasses krt
 		inputs.Secrets,
 		s.domainSuffix,
 		krtopts,
+		reporter,
 	)
 }
 
-func (s *AgentGwSyncer) buildADPResources(gateways krt.Collection[Gateway], inputs Inputs, refGrants ReferenceGrants, krtopts krtutil.KrtOptions) krt.Collection[ADPResource] {
+func (s *AgentGwSyncer) buildADPResources(
+	gateways krt.Collection[Gateway],
+	inputs Inputs,
+	refGrants ReferenceGrants,
+	krtopts krtutil.KrtOptions,
+	rep reporter.Reporter,
+) krt.Collection[ADPResource] {
+	// Use the report map from the syncer - pass the original map, not a copy
+	reportMap := s.reportMap
+	if reportMap == nil {
+		newMap := reports.NewReportMap()
+		reportMap = &newMap
+	}
+
 	// Build ports and binds
 	ports := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj Gateway) *IndexObject[string, Gateway] {
 		port := fmt.Sprint(obj.parentInfo.Port)
@@ -338,6 +368,7 @@ func (s *AgentGwSyncer) buildADPResources(gateways krt.Collection[Gateway], inpu
 			})
 		}
 		var binds []ADPResource
+
 		for _, obj := range uniq.UnsortedList() {
 			bind := Bind{
 				Bind: &api.Bind{
@@ -345,7 +376,7 @@ func (s *AgentGwSyncer) buildADPResources(gateways krt.Collection[Gateway], inpu
 					Port: uint32(port),
 				},
 			}
-			binds = append(binds, toResource(obj, bind))
+			binds = append(binds, toResourceWithReports(obj, bind, *reportMap))
 		}
 		return binds
 	}, krtopts.ToOptions("Binds")...)
@@ -363,7 +394,7 @@ func (s *AgentGwSyncer) buildADPResources(gateways krt.Collection[Gateway], inpu
 		Namespaces:     inputs.Namespaces,
 		InferencePools: inputs.InferencePools,
 	}
-	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, routeInputs, krtopts)
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, routeInputs, krtopts, *reportMap, rep)
 
 	return krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
 }
@@ -387,10 +418,17 @@ func (s *AgentGwSyncer) buildListenerFromGateway(ctx krt.HandlerContext, obj Gat
 	l.Protocol = protocol
 	l.Tls = tlsConfig
 
-	return toResourcep(types.NamespacedName{
+	// Use the report map from the syncer
+	reportMap := s.reportMap
+	if reportMap == nil {
+		newMap := reports.NewReportMap()
+		reportMap = &newMap
+	}
+
+	return toResourcepWithReports(types.NamespacedName{
 		Namespace: obj.parent.Namespace,
 		Name:      obj.parent.Name,
-	}, ADPListener{l})
+	}, ADPListener{l}, *reportMap)
 }
 
 // getProtocolAndTLSConfig extracts protocol and TLS configuration from a gateway
@@ -513,12 +551,23 @@ func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResour
 		var cacheResources []envoytypes.Resource
 		// Use index to fetch only resources for this gateway instead of all resources
 		resourceList := krt.Fetch(kctx, adpResources, krt.FilterIndex(adpResourcesByGateway, gwNamespacedName))
+
+		// Collect and merge reports from all resources for this gateway
+		mergedReports := reports.NewReportMap()
 		for _, resource := range resourceList {
 			cacheResources = append(cacheResources, &envoyResourceWithCustomName{
 				Message: resource.Resource,
 				Name:    resource.ResourceName(),
 				version: utils.HashProto(resource.Resource),
 			})
+
+			// Merge reports from this resource into the merged reports
+			maps.Copy(mergedReports.Gateways, resource.reports.Gateways)
+			maps.Copy(mergedReports.ListenerSets, resource.reports.ListenerSets)
+			mergeRouteReports(mergedReports.HTTPRoutes, resource.reports.HTTPRoutes)
+			mergeRouteReports(mergedReports.TCPRoutes, resource.reports.TCPRoutes)
+			mergeRouteReports(mergedReports.TLSRoutes, resource.reports.TLSRoutes)
+			mergeRouteReports(mergedReports.GRPCRoutes, resource.reports.GRPCRoutes)
 		}
 
 		// Create the resource wrappers
@@ -534,6 +583,7 @@ func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResour
 
 		result := &agentGwXdsResources{
 			NamespacedName: gwNamespacedName,
+			reports:        mergedReports,
 			ResourceConfig: envoycache.NewResources(fmt.Sprintf("%d", resourceVersion), cacheResources),
 			AddressConfig:  envoycache.NewResources(fmt.Sprintf("%d", addrVersion), envoytypesAddresses),
 		}
@@ -600,7 +650,7 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 	latestReportQueue := utils.NewAsyncQueue[reports.ReportMap]()
 	s.statusReport.Register(func(o krt.Event[report]) {
 		if o.Event == controllers.EventDelete {
-			// TODO: handle garbage collection (see: https://github.com/solo-io/solo-projects/issues/7086)
+			// TODO: handle garbage collection
 			return
 		}
 		latestReportQueue.Enqueue(o.Latest().reportMap)
@@ -612,6 +662,7 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 		for {
 			latestReport, err := latestReportQueue.Dequeue(ctx)
 			if err != nil {
+				logger.Error("failed to dequeue latest report", "error", err)
 				return
 			}
 			s.syncGatewayStatus(ctx, gatewayStatusLogger, latestReport)

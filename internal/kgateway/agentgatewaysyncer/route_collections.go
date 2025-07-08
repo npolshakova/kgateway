@@ -18,6 +18,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
@@ -27,13 +28,14 @@ func ADPRouteCollection(
 	httpRoutes krt.Collection[*gwv1.HTTPRoute],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
+	rm reports.ReportMap,
+	rep reporter.Reporter,
 ) krt.Collection[ADPResource] {
 	routes := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
-		rm := reports.NewReportMap()
-		rep := reports.NewReporter(&rm)
 		logger.Debug("translating HTTPRoute", "route_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
 
 		ctx := inputs.WithCtx(krtctx)
+		routeReporter := rep.Route(obj)
 		route := obj.Spec
 		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gwv1.HTTPRoute) iter.Seq2[ADPRoute, *ConfigError] {
 			return func(yield func(ADPRoute, *ConfigError) bool) {
@@ -58,14 +60,18 @@ func ADPRouteCollection(
 
 		var res []ADPResource
 		for _, parent := range filteredReferences(parentRefs) {
+			// Always create a route reporter entry for the parent ref
+			parentRefReporter := routeReporter.ParentRef(&parent.OriginalReference)
+
 			// for gwv1beta1 routes, build one VS per gwv1beta1+host
 			routes := gwResult.routes
 			if len(routes) == 0 {
+				logger.Debug("no routes for parent", "route_name", obj.GetName(), "parent", parent.ParentKey)
 				continue
 			}
 			if gwResult.error != nil {
-				rep.Route(obj).ParentRef(&parent.OriginalReference).SetCondition(reporter.RouteCondition{
-					Type:    gwv1beta1.RouteConditionResolvedRefs, // TODO: check type
+				parentRefReporter.SetCondition(reporter.RouteCondition{
+					Type:    gwv1beta1.RouteConditionResolvedRefs, // TODO: fix
 					Status:  metav1.ConditionFalse,
 					Reason:  gwv1beta1.RouteConditionReason(gwResult.error.Reason),
 					Message: gwResult.error.Message,
@@ -81,7 +87,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResource(gw, ADPRoute{Route: inner})
+				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
 			})...)
 		}
 		return res

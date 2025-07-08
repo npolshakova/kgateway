@@ -16,6 +16,8 @@ import (
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
@@ -647,7 +649,9 @@ func TestADPRouteCollection(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes := ADPRouteCollection(httpRoutes, routeInputs, krtopts)
+			rm := reports.NewReportMap()
+			rep := reports.NewReporter(&rm)
+			adpRoutes := ADPRouteCollection(httpRoutes, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -933,7 +937,9 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes := ADPRouteCollection(httpRoutes, routeInputs, krtopts)
+			rm := reports.NewReportMap()
+			rep := reports.NewReporter(&rm)
+			adpRoutes := ADPRouteCollection(httpRoutes, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
