@@ -23,13 +23,14 @@ import (
 
 // TODO: support other route collections (TCP, TLS, etc.)
 func ADPRouteCollection(
-	httpRoutes krt.Collection[*gwv1.HTTPRoute],
+	httpRouteCol krt.Collection[*gwv1.HTTPRoute],
+	grpcRouteCol krt.Collection[*gwv1.GRPCRoute],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
 	rm reports.ReportMap,
 	rep reporter.Reporter,
 ) krt.Collection[ADPResource] {
-	routes := krt.NewManyCollection(httpRoutes, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
+	httpRoutes := krt.NewManyCollection(httpRouteCol, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
 		logger.Debug("translating HTTPRoute", "route_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
 
 		ctx := inputs.WithCtx(krtctx)
@@ -84,8 +85,56 @@ func ADPRouteCollection(
 			})...)
 		}
 		return res
-	}, krtopts.ToOptions("ADPRoutes")...)
+	}, krtopts.ToOptions("ADPHTTPRoutes")...)
+	grpcRoutes := krt.NewManyCollection(grpcRouteCol, func(krtctx krt.HandlerContext, obj *gwv1.GRPCRoute) []ADPResource {
+		logger.Debug("translating GRPCRoute", "route_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
 
+		ctx := inputs.WithCtx(krtctx)
+		routeReporter := rep.Route(obj)
+		route := obj.Spec
+		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gwv1.GRPCRoute) iter.Seq2[ADPRoute, *reporter.RouteCondition] {
+			return func(yield func(ADPRoute, *reporter.RouteCondition) bool) {
+				for n, r := range route.Rules {
+					// Convert the entire rule with all matches at once
+					res, err := convertGRPCRouteToADP(ctx, r, obj, n)
+					if !yield(ADPRoute{Route: res}, err) {
+						return
+					}
+				}
+			}
+		})
+
+		var res []ADPResource
+		for _, parent := range filteredReferences(parentRefs) {
+			// Always create a route reporter entry for the parent ref
+			parentRefReporter := routeReporter.ParentRef(&parent.OriginalReference)
+
+			// for gwv1beta1 routes, build one VS per gwv1beta1+host
+			routes := gwResult.routes
+			if len(routes) == 0 {
+				logger.Debug("no routes for parent", "route_name", obj.GetName(), "parent", parent.ParentKey)
+				continue
+			}
+			if gwResult.error != nil {
+				parentRefReporter.SetCondition(*gwResult.error)
+			}
+
+			gw := types.NamespacedName{
+				Namespace: parent.ParentKey.Namespace,
+				Name:      parent.ParentKey.Name,
+			}
+			res = append(res, slices.Map(routes, func(e ADPRoute) ADPResource {
+				inner := protomarshal.Clone(e.Route)
+				_, name, _ := strings.Cut(parent.InternalName, "/")
+				inner.ListenerKey = name
+				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
+				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+			})...)
+		}
+		return res
+	}, krtopts.ToOptions("ADPGRPCRoutes")...)
+
+	routes := krt.JoinCollection([]krt.Collection[ADPResource]{httpRoutes, grpcRoutes}, krtopts.ToOptions("ADPRoutes")...)
 	return routes
 }
 

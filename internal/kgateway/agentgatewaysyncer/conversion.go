@@ -11,7 +11,6 @@ import (
 
 	"github.com/agentgateway/agentgateway/go/api"
 	"google.golang.org/protobuf/types/known/durationpb"
-	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/api/annotation"
 	istio "istio.io/api/networking/v1alpha3"
 	kubecreds "istio.io/istio/pilot/pkg/credentials/kube"
@@ -105,6 +104,62 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 
 	// Retry: todo
 	route, backendErr, err := buildADPHTTPDestination(ctx, r.BackendRefs, obj.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	res.Backends = route
+	res.Hostnames = slices.Map(obj.Spec.Hostnames, func(e gwv1.Hostname) string {
+		return string(e)
+	})
+	return res, backendErr
+}
+
+func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
+	obj *gwv1.GRPCRoute, pos int,
+) (*api.Route, *reporter.RouteCondition) {
+	res := &api.Route{
+		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos),
+		RouteName:   obj.Namespace + "/" + obj.Name,
+		ListenerKey: "",
+		RuleName:    defaultString(r.Name, ""),
+	}
+
+	// Convert GRPC matches to ADP format
+	for _, match := range r.Matches {
+		headers, err := createADPGRPCHeadersMatch(match)
+		if err != nil {
+			return nil, err
+		}
+		// For GRPC, we don't have path match in the traditional sense, so we'll derive it from method
+		var path *api.PathMatch
+		if match.Method != nil {
+			// Convert GRPC method to path for routing purposes
+			if match.Method.Service != nil && match.Method.Method != nil {
+				pathStr := fmt.Sprintf("/%s/%s", *match.Method.Service, *match.Method.Method)
+				path = &api.PathMatch{Kind: &api.PathMatch_Exact{Exact: pathStr}}
+			} else if match.Method.Service != nil {
+				pathStr := fmt.Sprintf("/%s/", *match.Method.Service)
+				path = &api.PathMatch{Kind: &api.PathMatch_Exact{Exact: pathStr}}
+			} else if match.Method.Method != nil {
+				// Convert wildcard to regex: "/*/{method}" becomes "/[^/]+/{method}"
+				pathStr := fmt.Sprintf("/[^/]+/%s", *match.Method.Method)
+				path = &api.PathMatch{Kind: &api.PathMatch_Regex{Regex: pathStr}}
+			}
+		}
+		res.Matches = append(res.GetMatches(), &api.RouteMatch{
+			Path:    path,
+			Headers: headers,
+			// note: the RouteMatch method field only applies for http methods
+		})
+	}
+
+	filters, err := buildADPGRPCFilters(ctx, obj.Namespace, r.Filters)
+	if err != nil {
+		return nil, err
+	}
+	res.Filters = filters
+
+	route, backendErr, err := buildADPGRPCDestination(ctx, r.BackendRefs, obj.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -642,170 +697,12 @@ func hostnamesToStringListWithWildcard(h []gwv1.Hostname) []string {
 	return res
 }
 
-func weightSum(forwardTo []gwv1.HTTPBackendRef) int {
-	sum := int32(0)
-	for _, w := range forwardTo {
-		sum += ptr.OrDefault(w.Weight, 1)
-	}
-	return int(sum)
-}
-
-func grpcWeightSum(forwardTo []gwv1.GRPCBackendRef) int {
-	sum := int32(0)
-	for _, w := range forwardTo {
-		sum += ptr.OrDefault(w.Weight, 1)
-	}
-	return int(sum)
-}
-
 func tcpWeightSum(forwardTo []gwv1.BackendRef) int {
 	sum := int32(0)
 	for _, w := range forwardTo {
 		sum += ptr.OrDefault(w.Weight, 1)
 	}
 	return int(sum)
-}
-
-func buildHTTPDestination(
-	ctx RouteContext,
-	forwardTo []gwv1.HTTPBackendRef,
-	ns string,
-) ([]*istio.HTTPRouteDestination, *reporter.RouteCondition, *reporter.RouteCondition) {
-	if forwardTo == nil {
-		return nil, nil, nil
-	}
-	weights := []int{}
-	action := []gwv1.HTTPBackendRef{}
-	for _, w := range forwardTo {
-		wt := int(ptr.OrDefault(w.Weight, 1))
-		if wt == 0 {
-			continue
-		}
-		action = append(action, w)
-		weights = append(weights, wt)
-	}
-	if len(weights) == 1 {
-		weights = []int{0}
-	}
-
-	var invalidBackendErr *reporter.RouteCondition
-	res := []*istio.HTTPRouteDestination{}
-	for i, fwd := range action {
-		dst, err := buildDestination(ctx, fwd.BackendRef, ns, wellknown.HTTPRouteGVK)
-		if err != nil {
-			if isInvalidBackend(err) {
-				invalidBackendErr = err
-				// keep going, we will gracefully drop invalid backends
-			} else {
-				return nil, nil, err
-			}
-		}
-		rd := &istio.HTTPRouteDestination{
-			Destination: dst,
-			Weight:      int32(weights[i]),
-		}
-		for _, filter := range fwd.Filters {
-			switch filter.Type {
-			case gwv1.HTTPRouteFilterRequestHeaderModifier:
-				h := createHeadersFilter(filter.RequestHeaderModifier)
-				if h == nil {
-					continue
-				}
-				if rd.GetHeaders() == nil {
-					rd.Headers = &istio.Headers{}
-				}
-				rd.GetHeaders().Request = h
-			case gwv1.HTTPRouteFilterResponseHeaderModifier:
-				h := createHeadersFilter(filter.ResponseHeaderModifier)
-				if h == nil {
-					continue
-				}
-				if rd.GetHeaders() == nil {
-					rd.Headers = &istio.Headers{}
-				}
-				rd.GetHeaders().Response = h
-			default:
-				return nil, nil, &reporter.RouteCondition{
-					Type:    gwv1.RouteConditionAccepted,
-					Status:  metav1.ConditionFalse,
-					Reason:  gwv1.RouteReasonIncompatibleFilters,
-					Message: fmt.Sprintf("unsupported filter type %q", filter.Type)}
-			}
-		}
-		res = append(res, rd)
-	}
-	return res, invalidBackendErr, nil
-}
-
-func buildGRPCDestination(
-	ctx RouteContext,
-	forwardTo []gwv1.GRPCBackendRef,
-	ns string,
-) ([]*istio.HTTPRouteDestination, *reporter.RouteCondition, *reporter.RouteCondition) {
-	if forwardTo == nil {
-		return nil, nil, nil
-	}
-	weights := []int{}
-	action := []gwv1.GRPCBackendRef{}
-	for _, w := range forwardTo {
-		wt := int(ptr.OrDefault(w.Weight, 1))
-		if wt == 0 {
-			continue
-		}
-		action = append(action, w)
-		weights = append(weights, wt)
-	}
-	if len(weights) == 1 {
-		weights = []int{0}
-	}
-
-	var invalidBackendErr *reporter.RouteCondition
-	var res []*istio.HTTPRouteDestination
-	for i, fwd := range action {
-		dst, err := buildDestination(ctx, fwd.BackendRef, ns, wellknown.GRPCRouteGVK)
-		if err != nil {
-			if isInvalidBackend(err) {
-				invalidBackendErr = err
-				// keep going, we will gracefully drop invalid backends
-			} else {
-				return nil, nil, err
-			}
-		}
-		rd := &istio.HTTPRouteDestination{
-			Destination: dst,
-			Weight:      int32(weights[i]),
-		}
-		for _, filter := range fwd.Filters {
-			switch filter.Type {
-			case gwv1.GRPCRouteFilterRequestHeaderModifier:
-				h := createHeadersFilter(filter.RequestHeaderModifier)
-				if h == nil {
-					continue
-				}
-				if rd.GetHeaders() == nil {
-					rd.Headers = &istio.Headers{}
-				}
-				rd.GetHeaders().Request = h
-			case gwv1.GRPCRouteFilterResponseHeaderModifier:
-				h := createHeadersFilter(filter.ResponseHeaderModifier)
-				if h == nil {
-					continue
-				}
-				if rd.GetHeaders() == nil {
-					rd.Headers = &istio.Headers{}
-				}
-				rd.GetHeaders().Response = h
-			default:
-				return nil, nil, &reporter.RouteCondition{
-					Type:    gwv1.RouteConditionAccepted,
-					Status:  metav1.ConditionFalse,
-					Reason:  gwv1.RouteReasonIncompatibleFilters,
-					Message: fmt.Sprintf("unsupported filter type %q", filter.Type)}
-			}
-		}
-		res = append(res, rd)
-	}
-	return res, invalidBackendErr, nil
 }
 
 func buildDestination(ctx RouteContext, to gwv1.BackendRef, ns string, k schema.GroupVersionKind) (*istio.Destination, *reporter.RouteCondition) {
@@ -918,359 +815,6 @@ func isInvalidBackend(err *reporter.RouteCondition) bool {
 	return err.Reason == gwv1.RouteReasonRefNotPermitted ||
 		err.Reason == gwv1.RouteReasonBackendNotFound ||
 		err.Reason == gwv1.RouteReasonInvalidKind
-}
-
-func headerListToMap(hl []gwv1.HTTPHeader) map[string]string {
-	if len(hl) == 0 {
-		return nil
-	}
-	res := map[string]string{}
-	for _, e := range hl {
-		k := strings.ToLower(string(e.Name))
-		if _, f := res[k]; f {
-			// "Subsequent entries with an equivalent header name MUST be ignored"
-			continue
-		}
-		res[k] = e.Value
-	}
-	return res
-}
-
-func createMirrorFilter(ctx RouteContext, filter *gwv1.HTTPRequestMirrorFilter, ns string,
-	k schema.GroupVersionKind,
-) (*istio.HTTPMirrorPolicy, *reporter.RouteCondition) {
-	if filter == nil {
-		return nil, nil
-	}
-	var weightOne int32 = 1
-	dst, err := buildDestination(ctx, gwv1.BackendRef{
-		BackendObjectReference: filter.BackendRef,
-		Weight:                 &weightOne,
-	}, ns, k)
-	if err != nil {
-		return nil, err
-	}
-	var percent *istio.Percent
-	if f := filter.Fraction; f != nil {
-		percent = &istio.Percent{Value: (100 * float64(f.Numerator)) / float64(ptr.OrDefault(f.Denominator, int32(100)))}
-	} else if p := filter.Percent; p != nil {
-		percent = &istio.Percent{Value: float64(*p)}
-	}
-	return &istio.HTTPMirrorPolicy{Destination: dst, Percentage: percent}, nil
-}
-
-func createRewriteFilter(filter *gwv1.HTTPURLRewriteFilter) *istio.HTTPRewrite {
-	if filter == nil {
-		return nil
-	}
-	rewrite := &istio.HTTPRewrite{}
-	if filter.Path != nil {
-		switch filter.Path.Type {
-		case gwv1.PrefixMatchHTTPPathModifier:
-			rewrite.Uri = strings.TrimSuffix(*filter.Path.ReplacePrefixMatch, "/")
-			if rewrite.GetUri() == "" {
-				// `/` means removing the prefix
-				rewrite.Uri = "/"
-			}
-		case gwv1.FullPathHTTPPathModifier:
-			rewrite.UriRegexRewrite = &istio.RegexRewrite{
-				Match:   "/.*",
-				Rewrite: *filter.Path.ReplaceFullPath,
-			}
-		}
-	}
-	if filter.Hostname != nil {
-		rewrite.Authority = string(*filter.Hostname)
-	}
-	// Nothing done
-	if rewrite.GetUri() == "" && rewrite.GetUriRegexRewrite() == nil && rewrite.GetAuthority() == "" {
-		return nil
-	}
-	return rewrite
-}
-
-func createCorsFilter(filter *gwv1.HTTPCORSFilter) *istio.CorsPolicy {
-	if filter == nil {
-		return nil
-	}
-	res := &istio.CorsPolicy{}
-	for _, r := range filter.AllowOrigins {
-		rs := string(r)
-		if len(rs) == 0 {
-			continue // Not valid anyways, but double check
-		}
-
-		// TODO: support wildcards (https://github.com/kubernetes-sigs/gateway-api/issues/3648)
-		res.AllowOrigins = append(res.GetAllowOrigins(), &istio.StringMatch{
-			MatchType: &istio.StringMatch_Exact{Exact: string(r)},
-		})
-	}
-	if filter.AllowCredentials {
-		res.AllowCredentials = wrappers.Bool(true)
-	}
-	for _, r := range filter.AllowMethods {
-		res.AllowMethods = append(res.GetAllowMethods(), string(r))
-	}
-	for _, r := range filter.AllowHeaders {
-		res.AllowHeaders = append(res.GetAllowHeaders(), string(r))
-	}
-	for _, r := range filter.ExposeHeaders {
-		res.ExposeHeaders = append(res.GetExposeHeaders(), string(r))
-	}
-	if filter.MaxAge > 0 {
-		res.MaxAge = durationpb.New(time.Duration(filter.MaxAge) * time.Second)
-	}
-
-	return res
-}
-
-func createRedirectFilter(filter *gwv1.HTTPRequestRedirectFilter) *istio.HTTPRedirect {
-	if filter == nil {
-		return nil
-	}
-	resp := &istio.HTTPRedirect{}
-	if filter.StatusCode != nil {
-		// Istio allows 301, 302, 303, 307, 308.
-		// Gateway allows only 301 and 302.
-		resp.RedirectCode = uint32(*filter.StatusCode)
-	}
-	if filter.Hostname != nil {
-		resp.Authority = string(*filter.Hostname)
-	}
-	if filter.Scheme != nil {
-		// Both allow http and https
-		resp.Scheme = *filter.Scheme
-	}
-	if filter.Port != nil {
-		resp.RedirectPort = &istio.HTTPRedirect_Port{Port: uint32(*filter.Port)}
-	} else {
-		// "When empty, port (if specified) of the request is used."
-		// this differs from Istio default
-		if filter.Scheme != nil {
-			resp.RedirectPort = &istio.HTTPRedirect_DerivePort{DerivePort: istio.HTTPRedirect_FROM_PROTOCOL_DEFAULT}
-		} else {
-			resp.RedirectPort = &istio.HTTPRedirect_DerivePort{DerivePort: istio.HTTPRedirect_FROM_REQUEST_PORT}
-		}
-	}
-	if filter.Path != nil {
-		switch filter.Path.Type {
-		case gwv1.FullPathHTTPPathModifier:
-			resp.Uri = *filter.Path.ReplaceFullPath
-		case gwv1.PrefixMatchHTTPPathModifier:
-			resp.Uri = fmt.Sprintf("%%PREFIX()%%%s", *filter.Path.ReplacePrefixMatch)
-		}
-	}
-	return resp
-}
-
-func createHeadersFilter(filter *gwv1.HTTPHeaderFilter) *istio.Headers_HeaderOperations {
-	if filter == nil {
-		return nil
-	}
-	return &istio.Headers_HeaderOperations{
-		Add:    headerListToMap(filter.Add),
-		Remove: filter.Remove,
-		Set:    headerListToMap(filter.Set),
-	}
-}
-
-// nolint: unparam
-func createMethodMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *reporter.RouteCondition) {
-	if match.Method == nil {
-		return nil, nil
-	}
-	return &istio.StringMatch{
-		MatchType: &istio.StringMatch_Exact{Exact: string(*match.Method)},
-	}, nil
-}
-
-func createQueryParamsMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatch, *reporter.RouteCondition) {
-	res := map[string]*istio.StringMatch{}
-	for _, qp := range match.QueryParams {
-		tp := gwv1.QueryParamMatchExact
-		if qp.Type != nil {
-			tp = *qp.Type
-		}
-		switch tp {
-		case gwv1.QueryParamMatchExact:
-			res[string(qp.Name)] = &istio.StringMatch{
-				MatchType: &istio.StringMatch_Exact{Exact: qp.Value},
-			}
-		case gwv1.QueryParamMatchRegularExpression:
-			res[string(qp.Name)] = &istio.StringMatch{
-				MatchType: &istio.StringMatch_Regex{Regex: qp.Value},
-			}
-		default:
-			// Should never happen, unless a new field is added
-			return nil, &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionAccepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonUnsupportedValue,
-				Message: fmt.Sprintf("unknown type: %q is not supported QueryParams type", tp)}
-		}
-	}
-
-	if len(res) == 0 {
-		return nil, nil
-	}
-	return res, nil
-}
-
-func createHeadersMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatch, *reporter.RouteCondition) {
-	res := map[string]*istio.StringMatch{}
-	for _, header := range match.Headers {
-		tp := gwv1.HeaderMatchExact
-		if header.Type != nil {
-			tp = *header.Type
-		}
-		switch tp {
-		case gwv1.HeaderMatchExact:
-			res[string(header.Name)] = &istio.StringMatch{
-				MatchType: &istio.StringMatch_Exact{Exact: header.Value},
-			}
-		case gwv1.HeaderMatchRegularExpression:
-			res[string(header.Name)] = &istio.StringMatch{
-				MatchType: &istio.StringMatch_Regex{Regex: header.Value},
-			}
-		default:
-			// Should never happen, unless a new field is added
-			return nil, &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionAccepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonUnsupportedValue,
-				Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
-		}
-	}
-
-	if len(res) == 0 {
-		return nil, nil
-	}
-	return res, nil
-}
-
-func createGRPCHeadersMatch(match gwv1.GRPCRouteMatch) (map[string]*istio.StringMatch, *reporter.RouteCondition) {
-	res := map[string]*istio.StringMatch{}
-	for _, header := range match.Headers {
-		tp := gwv1.GRPCHeaderMatchExact
-		if header.Type != nil {
-			tp = *header.Type
-		}
-		switch tp {
-		case gwv1.GRPCHeaderMatchExact:
-			res[string(header.Name)] = &istio.StringMatch{
-				MatchType: &istio.StringMatch_Exact{Exact: header.Value},
-			}
-		case gwv1.GRPCHeaderMatchRegularExpression:
-			res[string(header.Name)] = &istio.StringMatch{
-				MatchType: &istio.StringMatch_Regex{Regex: header.Value},
-			}
-		default:
-			// Should never happen, unless a new field is added
-			return nil, &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionAccepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonUnsupportedValue,
-				Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
-		}
-	}
-
-	if len(res) == 0 {
-		return nil, nil
-	}
-	return res, nil
-}
-
-func createURIMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *reporter.RouteCondition) {
-	tp := gwv1.PathMatchPathPrefix
-	if match.Path.Type != nil {
-		tp = *match.Path.Type
-	}
-	dest := "/"
-	if match.Path.Value != nil {
-		dest = *match.Path.Value
-	}
-	switch tp {
-	case gwv1.PathMatchPathPrefix:
-		// "When specified, a trailing `/` is ignored."
-		if dest != "/" {
-			dest = strings.TrimSuffix(dest, "/")
-		}
-		return &istio.StringMatch{
-			MatchType: &istio.StringMatch_Prefix{Prefix: dest},
-		}, nil
-	case gwv1.PathMatchExact:
-		return &istio.StringMatch{
-			MatchType: &istio.StringMatch_Exact{Exact: dest},
-		}, nil
-	case gwv1.PathMatchRegularExpression:
-		return &istio.StringMatch{
-			MatchType: &istio.StringMatch_Regex{Regex: dest},
-		}, nil
-	default:
-		// Should never happen, unless a new field is added
-		return nil, &reporter.RouteCondition{
-			Type:    gwv1.RouteConditionAccepted,
-			Status:  metav1.ConditionFalse,
-			Reason:  gwv1.RouteReasonUnsupportedValue,
-			Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
-	}
-}
-
-func createGRPCURIMatch(match gwv1.GRPCRouteMatch) (*istio.StringMatch, *reporter.RouteCondition) {
-	m := match.Method
-	if m == nil {
-		return nil, nil
-	}
-	tp := gwv1.GRPCMethodMatchExact
-	if m.Type != nil {
-		tp = *m.Type
-	}
-	if m.Method == nil && m.Service == nil {
-		// Should never happen, invalid per spec
-		return nil, &reporter.RouteCondition{
-			Type:    gwv1.RouteConditionAccepted,
-			Status:  metav1.ConditionFalse,
-			Reason:  gwv1.RouteReasonUnsupportedValue,
-			Message: "gRPC match must have method or service defined"}
-	}
-	// gRPC format is /<Service>/<Method>. Since we don't natively understand this, convert to various string matches
-	switch tp {
-	case gwv1.GRPCMethodMatchExact:
-		if m.Method == nil {
-			return &istio.StringMatch{
-				MatchType: &istio.StringMatch_Prefix{Prefix: fmt.Sprintf("/%s/", *m.Service)},
-			}, nil
-		}
-		if m.Service == nil {
-			return &istio.StringMatch{
-				MatchType: &istio.StringMatch_Regex{Regex: fmt.Sprintf("/[^/]+/%s", *m.Method)},
-			}, nil
-		}
-		return &istio.StringMatch{
-			MatchType: &istio.StringMatch_Exact{Exact: fmt.Sprintf("/%s/%s", *m.Service, *m.Method)},
-		}, nil
-	case gwv1.GRPCMethodMatchRegularExpression:
-		if m.Method == nil {
-			return &istio.StringMatch{
-				MatchType: &istio.StringMatch_Regex{Regex: fmt.Sprintf("/%s/.+", *m.Service)},
-			}, nil
-		}
-		if m.Service == nil {
-			return &istio.StringMatch{
-				MatchType: &istio.StringMatch_Regex{Regex: fmt.Sprintf("/[^/]+/%s", *m.Method)},
-			}, nil
-		}
-		return &istio.StringMatch{
-			MatchType: &istio.StringMatch_Regex{Regex: fmt.Sprintf("/%s/%s", *m.Service, *m.Method)},
-		}, nil
-	default:
-		// Should never happen, unless a new field is added
-		return nil, &reporter.RouteCondition{
-			Type:    gwv1.RouteConditionAccepted,
-			Status:  metav1.ConditionFalse,
-			Reason:  gwv1.RouteReasonUnsupportedValue,
-			Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
-	}
 }
 
 // parentKey holds info about a parentRef (eg route binding to a Gateway). This is a mirror of

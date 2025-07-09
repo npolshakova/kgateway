@@ -92,7 +92,7 @@ func createADPPathMatch(match gwv1.HTTPRouteMatch) (*api.PathMatch, *reporter.Ro
 }
 
 func createADPHeadersMatch(match gwv1.HTTPRouteMatch) ([]*api.HeaderMatch, *reporter.RouteCondition) {
-	res := []*api.HeaderMatch{}
+	var res []*api.HeaderMatch
 	for _, header := range match.Headers {
 		tp := gwv1.HeaderMatchExact
 		if header.Type != nil {
@@ -277,4 +277,125 @@ func headerListToADP(hl []gwv1.HTTPHeader) []*api.Header {
 			Value: hl.Value,
 		}
 	})
+}
+
+// GRPC-specific ADP conversion functions
+
+func createADPGRPCHeadersMatch(match gwv1.GRPCRouteMatch) ([]*api.HeaderMatch, *reporter.RouteCondition) {
+	var res []*api.HeaderMatch
+	for _, header := range match.Headers {
+		tp := gwv1.GRPCHeaderMatchExact
+		if header.Type != nil {
+			tp = *header.Type
+		}
+		switch tp {
+		case gwv1.GRPCHeaderMatchExact:
+			res = append(res, &api.HeaderMatch{
+				Name:  string(header.Name),
+				Value: &api.HeaderMatch_Exact{Exact: header.Value},
+			})
+		case gwv1.GRPCHeaderMatchRegularExpression:
+			res = append(res, &api.HeaderMatch{
+				Name:  string(header.Name),
+				Value: &api.HeaderMatch_Regex{Regex: header.Value},
+			})
+		default:
+			// Should never happen, unless a new field is added
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
+		}
+	}
+
+	if len(res) == 0 {
+		return nil, nil
+	}
+	return res, nil
+}
+
+func buildADPGRPCFilters(
+	ctx RouteContext,
+	ns string,
+	inputFilters []gwv1.GRPCRouteFilter,
+) ([]*api.RouteFilter, *reporter.RouteCondition) {
+	var filters []*api.RouteFilter
+	var mirrorBackendErr *reporter.RouteCondition
+	for _, filter := range inputFilters {
+		switch filter.Type {
+		case gwv1.GRPCRouteFilterRequestHeaderModifier:
+			h := createADPHeadersFilter(filter.RequestHeaderModifier)
+			if h == nil {
+				continue
+			}
+			filters = append(filters, h)
+		case gwv1.GRPCRouteFilterResponseHeaderModifier:
+			h := createADPResponseHeadersFilter(filter.ResponseHeaderModifier)
+			if h == nil {
+				continue
+			}
+			filters = append(filters, h)
+		case gwv1.GRPCRouteFilterRequestMirror:
+			h, err := createADPMirrorFilter(ctx, filter.RequestMirror, ns, schema.GroupVersionKind{
+				Group:   "gateway.networking.k8s.io",
+				Version: "v1",
+				Kind:    "GRPCRoute",
+			})
+			if err != nil {
+				mirrorBackendErr = err
+			} else {
+				filters = append(filters, h)
+			}
+		default:
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonIncompatibleFilters,
+				Message: fmt.Sprintf("unsupported filter type %q", filter.Type),
+			}
+		}
+	}
+	return filters, mirrorBackendErr
+}
+
+func buildADPGRPCDestination(
+	ctx RouteContext,
+	forwardTo []gwv1.GRPCBackendRef,
+	ns string,
+) ([]*api.RouteBackend, *reporter.RouteCondition, *reporter.RouteCondition) {
+	if forwardTo == nil {
+		return nil, nil, nil
+	}
+
+	var invalidBackendErr *reporter.RouteCondition
+	var res []*api.RouteBackend
+	for _, fwd := range forwardTo {
+		dst, err := buildADPDestination(ctx, gwv1.HTTPBackendRef{
+			BackendRef: fwd.BackendRef,
+			Filters:    nil, // GRPC filters are handled separately
+		}, ns, schema.GroupVersionKind{
+			Group:   "gateway.networking.k8s.io",
+			Version: "v1",
+			Kind:    "GRPCRoute",
+		})
+		if err != nil {
+			logger.Error("erroring building agent gateway destination", "error", err)
+			if isInvalidBackend(err) {
+				invalidBackendErr = err
+				// keep going, we will gracefully drop invalid backends
+			} else {
+				return nil, nil, err
+			}
+		}
+		if dst != nil {
+			filters, err := buildADPGRPCFilters(ctx, ns, fwd.Filters)
+			if err != nil {
+				return nil, nil, err
+			}
+			dst.Filters = filters
+		}
+		res = append(res, dst)
+	}
+	return res, invalidBackendErr, nil
 }

@@ -393,7 +393,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		Namespaces:     inputs.Namespaces,
 		InferencePools: inputs.InferencePools,
 	}
-	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, routeInputs, krtopts, *reportMap, rep)
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, routeInputs, krtopts, *reportMap, rep)
 
 	return krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
 }
