@@ -76,6 +76,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ExtProcProvider":                           schema_kgateway_v2_api_v1alpha1_ExtProcProvider(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FieldDefault":                              schema_kgateway_v2_api_v1alpha1_FieldDefault(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FileSink":                                  schema_kgateway_v2_api_v1alpha1_FileSink(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterMatcher":                             schema_kgateway_v2_api_v1alpha1_FilterMatcher(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterType":                                schema_kgateway_v2_api_v1alpha1_FilterType(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GatewayExtension":                          schema_kgateway_v2_api_v1alpha1_GatewayExtension(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.GatewayExtensionList":                      schema_kgateway_v2_api_v1alpha1_GatewayExtensionList(ref),
@@ -117,6 +118,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReferenceWithSectionName": schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetReferenceWithSectionName(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetSelector":                 schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetSelector(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalRateLimitPolicy":                      schema_kgateway_v2_api_v1alpha1_LocalRateLimitPolicy(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP":                                       schema_kgateway_v2_api_v1alpha1_MCP(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpFilter":                                 schema_kgateway_v2_api_v1alpha1_McpFilter(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget":                                 schema_kgateway_v2_api_v1alpha1_McpTarget(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Message":                                   schema_kgateway_v2_api_v1alpha1_Message(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MetadataKey":                               schema_kgateway_v2_api_v1alpha1_MetadataKey(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MetadataPathSegment":                       schema_kgateway_v2_api_v1alpha1_MetadataPathSegment(ref),
@@ -1786,6 +1790,12 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DynamicForwardProxyBackend"),
 						},
 					},
+					"mcp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MCP is the mcp backend configuration.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -1798,6 +1808,7 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 								"ai":                  "AI",
 								"aws":                 "Aws",
 								"dynamicForwardProxy": "DynamicForwardProxy",
+								"mcp":                 "MCP",
 								"static":              "Static",
 							},
 						},
@@ -1806,7 +1817,7 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AIBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AwsBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DynamicForwardProxyBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StaticBackend"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AIBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AwsBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DynamicForwardProxyBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StaticBackend"},
 	}
 }
 
@@ -3085,6 +3096,54 @@ func schema_kgateway_v2_api_v1alpha1_FileSink(ref common.ReferenceCallback) comm
 		},
 		Dependencies: []string{
 			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_FilterMatcher(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "FilterMatcher defines different matching strategies for filters.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"exact": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Exact matches the exact string value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"prefix": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Prefix matches strings that start with the specified prefix.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"suffix": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Suffix matches strings that end with the specified suffix.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"contains": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Contains matches strings that contain the specified substring.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"regex": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Regex matches strings using the specified regular expression.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -4695,6 +4754,136 @@ func schema_kgateway_v2_api_v1alpha1_LocalRateLimitPolicy(ref common.ReferenceCa
 		},
 		Dependencies: []string{
 			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TokenBucket"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_MCP(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MCP configures mcp backends",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the backend name for this MCP configuration.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targets": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Targets is a list of MCP targets to use for this backend.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "targets"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_McpFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "McpFilter defines a filter configuration for MCP targets.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type specifies the type of filter to apply.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"match": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Match specifies the matching criteria for the filter.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterMatcher"),
+						},
+					},
+				},
+				Required: []string{"type", "match"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.FilterMatcher"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_McpTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "McpTarget defines a single MCP target configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of this MCP target.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"host": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Host is the hostname or IP address of the MCP target.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Port is the port number of the MCP target.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"enableTls": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EnableTls enables TLS for the connection to the MCP target.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"filters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Filters is a list of filters to apply to this target.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpFilter"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "host", "port"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpFilter"},
 	}
 }
 

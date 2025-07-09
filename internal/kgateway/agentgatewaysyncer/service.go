@@ -67,7 +67,7 @@ func (a *index) serviceServiceBuilder(
 			// ExternalName services are not implemented by ambient (but will still work).
 			// The DNS requests will forward to the upstream DNS server, then Ztunnel can handle the request based on the target
 			// hostname.
-			// In theory we could add support for native 'DNS alias' into Ztunnel's DNS proxy. This would give the same behavior
+			// In theory, we could add support for native 'DNS alias' into Ztunnel's DNS proxy. This would give the same behavior
 			// but let the DNS proxy handle it instead of forwarding upstream. However, at this time we do not do so.
 			return nil
 		}
@@ -89,7 +89,7 @@ func (a *index) serviceServiceBuilder(
 	}
 }
 
-// ServiceHostname produces FQDN for a k8s service
+// InferenceHostname produces FQDN for a k8s service
 func InferenceHostname(name, namespace, domainSuffix string) host.Name {
 	return host.Name(name + "." + namespace + "." + "inference" + "." + domainSuffix) // Format: "%s.%s.svc.%s"
 }

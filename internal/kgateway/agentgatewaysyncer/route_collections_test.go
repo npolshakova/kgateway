@@ -15,6 +15,7 @@ import (
 	"k8s.io/utils/ptr"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
@@ -619,6 +620,8 @@ func TestADPRouteCollection(t *testing.T) {
 			gateways := krttest.GetMockCollection[Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
+			tcpRoutes := krttest.GetMockCollection[*gwv1alpha2.TCPRoute](mock)
+			tlsRoutes := krttest.GetMockCollection[*gwv1alpha2.TLSRoute](mock)
 			refGrantsCollection := krttest.GetMockCollection[ReferenceGrant](mock)
 			services := krttest.GetMockCollection[*corev1.Service](mock)
 			namespaces := krttest.GetMockCollection[*corev1.Namespace](mock)
@@ -629,6 +632,8 @@ func TestADPRouteCollection(t *testing.T) {
 			gateways.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
+			tcpRoutes.WaitUntilSynced(context.Background().Done())
+			tlsRoutes.WaitUntilSynced(context.Background().Done())
 			refGrantsCollection.WaitUntilSynced(context.Background().Done())
 			services.WaitUntilSynced(context.Background().Done())
 			namespaces.WaitUntilSynced(context.Background().Done())
@@ -652,7 +657,7 @@ func TestADPRouteCollection(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1211,6 +1216,8 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			gateways := krttest.GetMockCollection[Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
+			tcpRoutes := krttest.GetMockCollection[*gwv1alpha2.TCPRoute](mock)
+			tlsRoutes := krttest.GetMockCollection[*gwv1alpha2.TLSRoute](mock)
 			refGrantsCollection := krttest.GetMockCollection[ReferenceGrant](mock)
 			services := krttest.GetMockCollection[*corev1.Service](mock)
 			namespaces := krttest.GetMockCollection[*corev1.Namespace](mock)
@@ -1221,6 +1228,8 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			gateways.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
+			tcpRoutes.WaitUntilSynced(context.Background().Done())
+			tlsRoutes.WaitUntilSynced(context.Background().Done())
 			refGrantsCollection.WaitUntilSynced(context.Background().Done())
 			services.WaitUntilSynced(context.Background().Done())
 			namespaces.WaitUntilSynced(context.Background().Done())
@@ -1244,7 +1253,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1501,6 +1510,8 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			gateways := krttest.GetMockCollection[Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
+			tcpRoutes := krttest.GetMockCollection[*gwv1alpha2.TCPRoute](mock)
+			tlsRoutes := krttest.GetMockCollection[*gwv1alpha2.TLSRoute](mock)
 			refGrantsCollection := krttest.GetMockCollection[ReferenceGrant](mock)
 			services := krttest.GetMockCollection[*corev1.Service](mock)
 			namespaces := krttest.GetMockCollection[*corev1.Namespace](mock)
@@ -1511,6 +1522,8 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			gateways.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
+			tcpRoutes.WaitUntilSynced(context.Background().Done())
+			tlsRoutes.WaitUntilSynced(context.Background().Done())
 			refGrantsCollection.WaitUntilSynced(context.Background().Done())
 			services.WaitUntilSynced(context.Background().Done())
 			namespaces.WaitUntilSynced(context.Background().Done())
@@ -1534,7 +1547,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())

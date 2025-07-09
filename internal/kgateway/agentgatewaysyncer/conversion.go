@@ -457,6 +457,9 @@ func buildADPDestination(
 				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
 		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
+	case wellknown.BackendGVK.GroupKind():
+		// check that the backend is of MCP kind
+		// TODO: support other kinds
 	default:
 		return nil, &reporter.RouteCondition{
 			Type:    gwv1.RouteConditionResolvedRefs,

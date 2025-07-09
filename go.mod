@@ -616,11 +616,7 @@ require (
 // Remove once https://github.com/kubernetes-sigs/controller-tools/pull/1224 merges
 replace sigs.k8s.io/controller-tools => github.com/shashankram/controller-tools v0.0.0-20250626172831-f7be064a9132
 
-replace (
-	// TODO: replace once https://github.com/agentgateway/agentgateway/pull/157/ merges
-	github.com/agentgateway/agentgateway => github.com/howardjohn/agentgateway v0.0.0-20250709153329-b02466b38629
-	github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
-)
+replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
 
 // Use a patched version of gengo to produce consistent zz_generated.openapi.go
 // Ref: https://github.com/kubernetes/gengo/issues/292

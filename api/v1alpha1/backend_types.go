@@ -37,6 +37,8 @@ const (
 	BackendTypeStatic BackendType = "Static"
 	// BackendTypeDynamicForwardProxy is the type for dynamic forward proxy backends.
 	BackendTypeDynamicForwardProxy BackendType = "DynamicForwardProxy"
+	// BackendTypeMCP is the type for MCP backends.
+	BackendTypeMCP BackendType = "MCP"
 )
 
 // BackendSpec defines the desired state of Backend.
@@ -45,11 +47,12 @@ const (
 // +kubebuilder:validation:XValidation:message="aws backend must be specified when type is 'AWS'",rule="self.type == 'AWS' ? has(self.aws) : true"
 // +kubebuilder:validation:XValidation:message="static backend must be specified when type is 'Static'",rule="self.type == 'Static' ? has(self.static) : true"
 // +kubebuilder:validation:XValidation:message="dynamicForwardProxy backend must be specified when type is 'DynamicForwardProxy'",rule="self.type == 'DynamicForwardProxy' ? has(self.dynamicForwardProxy) : true"
-// +kubebuilder:validation:ExactlyOneOf=ai;aws;static;dynamicForwardProxy
+// +kubebuilder:validation:XValidation:message="mcp backend must be specified when type is 'MCP'",rule="self.type == 'MCP' ? has(self.mcp) : true"
+// +kubebuilder:validation:ExactlyOneOf=ai;aws;static;dynamicForwardProxy;mcp
 type BackendSpec struct {
 	// Type indicates the type of the backend to be used.
 	// +unionDiscriminator
-	// +kubebuilder:validation:Enum=AI;AWS;Static;DynamicForwardProxy
+	// +kubebuilder:validation:Enum=AI;AWS;Static;DynamicForwardProxy;MCP
 	// +required
 	Type BackendType `json:"type"`
 	// AI is the AI backend configuration.
@@ -64,6 +67,8 @@ type BackendSpec struct {
 	// DynamicForwardProxy is the dynamic forward proxy backend configuration.
 	// +optional
 	DynamicForwardProxy *DynamicForwardProxyBackend `json:"dynamicForwardProxy,omitempty"`
+	// MCP is the mcp backend configuration.
+	MCP *MCP `json:"mcp,omitempty"`
 }
 
 // AppProtocol defines the application protocol to use when communicating with the backend.
