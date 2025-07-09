@@ -21,7 +21,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
-// TODO: support other route collections (TCP, TLS, etc.)
+// ADPRouteCollection creates the collection of translated routes
 func ADPRouteCollection(
 	httpRouteCol krt.Collection[*gwv1.HTTPRoute],
 	grpcRouteCol krt.Collection[*gwv1.GRPCRoute],
@@ -133,6 +133,8 @@ func ADPRouteCollection(
 		}
 		return res
 	}, krtopts.ToOptions("ADPGRPCRoutes")...)
+
+	// TODO: support other route collections (TCP, TLS, etc.)
 
 	routes := krt.JoinCollection([]krt.Collection[ADPResource]{httpRoutes, grpcRoutes}, krtopts.ToOptions("ADPRoutes")...)
 	return routes

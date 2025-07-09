@@ -17,7 +17,6 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
@@ -619,6 +618,7 @@ func TestADPRouteCollection(t *testing.T) {
 			mock := krttest.NewMock(t, inputs)
 			gateways := krttest.GetMockCollection[Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
+			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
 			refGrantsCollection := krttest.GetMockCollection[ReferenceGrant](mock)
 			services := krttest.GetMockCollection[*corev1.Service](mock)
 			namespaces := krttest.GetMockCollection[*corev1.Namespace](mock)
@@ -628,6 +628,7 @@ func TestADPRouteCollection(t *testing.T) {
 			// Wait for collections to sync
 			gateways.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
+			grpcRoutes.WaitUntilSynced(context.Background().Done())
 			refGrantsCollection.WaitUntilSynced(context.Background().Done())
 			services.WaitUntilSynced(context.Background().Done())
 			namespaces.WaitUntilSynced(context.Background().Done())
@@ -651,7 +652,7 @@ func TestADPRouteCollection(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -699,6 +700,598 @@ func TestADPRouteCollection(t *testing.T) {
 							actualPath, ok := actualMatch.GetPath().GetKind().(*api.PathMatch_Exact)
 							require.True(t, ok, "Expected Exact match")
 							assert.Equal(t, expectedPath.Exact, actualPath.Exact, "Exact path mismatch")
+						}
+					}
+
+					// Verify header matches
+					require.Equal(t, len(expectedMatch.GetHeaders()), len(actualMatch.GetHeaders()), "Header matches count mismatch")
+					for k, expectedHeader := range expectedMatch.GetHeaders() {
+						actualHeader := actualMatch.GetHeaders()[k]
+						assert.Equal(t, expectedHeader.GetName(), actualHeader.GetName(), "Header name mismatch")
+						switch expectedValue := expectedHeader.GetValue().(type) {
+						case *api.HeaderMatch_Exact:
+							actualValue, ok := actualHeader.GetValue().(*api.HeaderMatch_Exact)
+							require.True(t, ok, "Expected exact header match")
+							assert.Equal(t, expectedValue.Exact, actualValue.Exact, "Header exact value mismatch")
+						}
+					}
+				}
+
+				// Verify backends
+				require.Equal(t, len(expected.GetBackends()), len(routeResource.GetBackends()), "Backends count mismatch")
+				for j, expectedBackend := range expected.GetBackends() {
+					actualBackend := routeResource.GetBackends()[j]
+					assert.Equal(t, expectedBackend.GetPort(), actualBackend.GetPort(), "Backend port mismatch")
+
+					// Verify service backend
+					switch expectedKind := expectedBackend.GetKind().(type) {
+					case *api.RouteBackend_Service:
+						actualKind, ok := actualBackend.GetKind().(*api.RouteBackend_Service)
+						require.True(t, ok, "Expected service backend")
+						assert.Equal(t, expectedKind.Service, actualKind.Service, "Service mismatch")
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestADPRouteCollectionGRPC(t *testing.T) {
+	testCases := []struct {
+		name           string
+		grpcRoutes     []*gwv1.GRPCRoute
+		services       []*corev1.Service
+		namespaces     []*corev1.Namespace
+		gateways       []Gateway
+		refGrants      []ReferenceGrant
+		expectedCount  int
+		expectedRoutes []*api.Route
+	}{
+		{
+			name: "Simple gRPC route with single rule",
+			grpcRoutes: []*gwv1.GRPCRoute{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-grpc-route",
+						Namespace: "default",
+					},
+					Spec: gwv1.GRPCRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
+								{
+									Name: "test-gateway",
+								},
+							},
+						},
+						Hostnames: []gwv1.Hostname{"grpc.example.com"},
+						Rules: []gwv1.GRPCRouteRule{
+							{
+								Matches: []gwv1.GRPCRouteMatch{
+									{
+										Method: &gwv1.GRPCMethodMatch{
+											Service: ptr.To("example.Service"),
+											Method:  ptr.To("GetUser"),
+										},
+									},
+								},
+								BackendRefs: []gwv1.GRPCBackendRef{
+									{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
+												Name: "grpc-service",
+												Port: ptr.To(gwv1.PortNumber(9090)),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			services: []*corev1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "grpc-service",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Port: 9090,
+							},
+						},
+					},
+				},
+			},
+			namespaces: []*corev1.Namespace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "default",
+					},
+				},
+			},
+			gateways: []Gateway{
+				{
+					Config: &Config{
+						Meta: Meta{
+							Name:      "test-gateway",
+							Namespace: "default",
+						},
+					},
+					parent: parentKey{
+						Kind:      wellknown.GatewayGVK,
+						Name:      "test-gateway",
+						Namespace: "default",
+					},
+					parentInfo: parentInfo{
+						InternalName: "default/test-gateway",
+						Protocol:     gwv1.HTTPProtocolType,
+						Port:         9090,
+						SectionName:  "grpc",
+						AllowedKinds: []gwv1.RouteGroupKind{
+							{
+								Group: &groupName,
+								Kind:  gwv1.Kind(wellknown.GRPCRouteKind),
+							},
+						},
+					},
+					Valid: true,
+				},
+			},
+			refGrants:     []ReferenceGrant{},
+			expectedCount: 1,
+			expectedRoutes: []*api.Route{
+				{
+					Key:       "default.test-grpc-route.0.grpc",
+					RouteName: "default/test-grpc-route",
+					Hostnames: []string{"grpc.example.com"},
+					Matches: []*api.RouteMatch{
+						{
+							Path: &api.PathMatch{
+								Kind: &api.PathMatch_Exact{
+									Exact: "/example.Service/GetUser",
+								},
+							},
+						},
+					},
+					Backends: []*api.RouteBackend{
+						{
+							Kind: &api.RouteBackend_Service{
+								Service: "default/grpc-service.default.svc.cluster.local",
+							},
+							Port: 9090,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "gRPC route with multiple rules",
+			grpcRoutes: []*gwv1.GRPCRoute{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "multi-rule-grpc-route",
+						Namespace: "default",
+					},
+					Spec: gwv1.GRPCRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
+								{
+									Name: "test-gateway",
+								},
+							},
+						},
+						Hostnames: []gwv1.Hostname{"grpc.example.com"},
+						Rules: []gwv1.GRPCRouteRule{
+							{
+								Matches: []gwv1.GRPCRouteMatch{
+									{
+										Method: &gwv1.GRPCMethodMatch{
+											Service: ptr.To("user.Service"),
+											Method:  ptr.To("GetUser"),
+										},
+									},
+								},
+								BackendRefs: []gwv1.GRPCBackendRef{
+									{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
+												Name: "user-service",
+												Port: ptr.To(gwv1.PortNumber(9090)),
+											},
+										},
+									},
+								},
+							},
+							{
+								Matches: []gwv1.GRPCRouteMatch{
+									{
+										Method: &gwv1.GRPCMethodMatch{
+											Service: ptr.To("order.Service"),
+											Method:  ptr.To("CreateOrder"),
+										},
+									},
+								},
+								BackendRefs: []gwv1.GRPCBackendRef{
+									{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
+												Name: "order-service",
+												Port: ptr.To(gwv1.PortNumber(9091)),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			services: []*corev1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "user-service",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Port: 9090,
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "order-service",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Port: 9091,
+							},
+						},
+					},
+				},
+			},
+			namespaces: []*corev1.Namespace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "default",
+					},
+				},
+			},
+			gateways: []Gateway{
+				{
+					Config: &Config{
+						Meta: Meta{
+							Name:      "test-gateway",
+							Namespace: "default",
+						},
+					},
+					parent: parentKey{
+						Kind:      wellknown.GatewayGVK,
+						Name:      "test-gateway",
+						Namespace: "default",
+					},
+					parentInfo: parentInfo{
+						InternalName: "default/test-gateway",
+						Protocol:     gwv1.HTTPProtocolType,
+						Port:         9090,
+						SectionName:  "grpc",
+						AllowedKinds: []gwv1.RouteGroupKind{
+							{
+								Group: &groupName,
+								Kind:  gwv1.Kind(wellknown.GRPCRouteKind),
+							},
+						},
+					},
+					Valid: true,
+				},
+			},
+			refGrants:     []ReferenceGrant{},
+			expectedCount: 2,
+			expectedRoutes: []*api.Route{
+				{
+					Key:       "default.multi-rule-grpc-route.0.grpc",
+					RouteName: "default/multi-rule-grpc-route",
+					Hostnames: []string{"grpc.example.com"},
+					Matches: []*api.RouteMatch{
+						{
+							Path: &api.PathMatch{
+								Kind: &api.PathMatch_Exact{
+									Exact: "/user.Service/GetUser",
+								},
+							},
+						},
+					},
+					Backends: []*api.RouteBackend{
+						{
+							Kind: &api.RouteBackend_Service{
+								Service: "default/user-service.default.svc.cluster.local",
+							},
+							Port: 9090,
+						},
+					},
+				},
+				{
+					Key:       "default.multi-rule-grpc-route.1.grpc",
+					RouteName: "default/multi-rule-grpc-route",
+					Hostnames: []string{"grpc.example.com"},
+					Matches: []*api.RouteMatch{
+						{
+							Path: &api.PathMatch{
+								Kind: &api.PathMatch_Exact{
+									Exact: "/order.Service/CreateOrder",
+								},
+							},
+						},
+					},
+					Backends: []*api.RouteBackend{
+						{
+							Kind: &api.RouteBackend_Service{
+								Service: "default/order-service.default.svc.cluster.local",
+							},
+							Port: 9091,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "gRPC route with header match",
+			grpcRoutes: []*gwv1.GRPCRoute{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "grpc-header-route",
+						Namespace: "default",
+					},
+					Spec: gwv1.GRPCRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
+								{
+									Name: "test-gateway",
+								},
+							},
+						},
+						Hostnames: []gwv1.Hostname{"grpc.example.com"},
+						Rules: []gwv1.GRPCRouteRule{
+							{
+								Matches: []gwv1.GRPCRouteMatch{
+									{
+										Method: &gwv1.GRPCMethodMatch{
+											Service: ptr.To("example.Service"),
+											Method:  ptr.To("GetUser"),
+										},
+										Headers: []gwv1.GRPCHeaderMatch{
+											{
+												Type:  ptr.To(gwv1.GRPCHeaderMatchExact),
+												Name:  "authorization",
+												Value: "Bearer token",
+											},
+										},
+									},
+								},
+								BackendRefs: []gwv1.GRPCBackendRef{
+									{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
+												Name: "grpc-service",
+												Port: ptr.To(gwv1.PortNumber(9090)),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			services: []*corev1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "grpc-service",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Port: 9090,
+							},
+						},
+					},
+				},
+			},
+			namespaces: []*corev1.Namespace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "default",
+					},
+				},
+			},
+			gateways: []Gateway{
+				{
+					Config: &Config{
+						Meta: Meta{
+							Name:      "test-gateway",
+							Namespace: "default",
+						},
+					},
+					parent: parentKey{
+						Kind:      wellknown.GatewayGVK,
+						Name:      "test-gateway",
+						Namespace: "default",
+					},
+					parentInfo: parentInfo{
+						InternalName: "default/test-gateway",
+						Protocol:     gwv1.HTTPProtocolType,
+						Port:         9090,
+						SectionName:  "grpc",
+						AllowedKinds: []gwv1.RouteGroupKind{
+							{
+								Group: &groupName,
+								Kind:  gwv1.Kind(wellknown.GRPCRouteKind),
+							},
+						},
+					},
+					Valid: true,
+				},
+			},
+			refGrants:     []ReferenceGrant{},
+			expectedCount: 1,
+			expectedRoutes: []*api.Route{
+				{
+					Key:       "default.grpc-header-route.0.grpc",
+					RouteName: "default/grpc-header-route",
+					Hostnames: []string{"grpc.example.com"},
+					Matches: []*api.RouteMatch{
+						{
+							Path: &api.PathMatch{
+								Kind: &api.PathMatch_Exact{
+									Exact: "/example.Service/GetUser",
+								},
+							},
+							Headers: []*api.HeaderMatch{
+								{
+									Name: "authorization",
+									Value: &api.HeaderMatch_Exact{
+										Exact: "Bearer token",
+									},
+								},
+							},
+						},
+					},
+					Backends: []*api.RouteBackend{
+						{
+							Kind: &api.RouteBackend_Service{
+								Service: "default/grpc-service.default.svc.cluster.local",
+							},
+							Port: 9090,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "No gRPC routes",
+			grpcRoutes:     []*gwv1.GRPCRoute{},
+			services:       []*corev1.Service{},
+			namespaces:     []*corev1.Namespace{},
+			gateways:       []Gateway{},
+			refGrants:      []ReferenceGrant{},
+			expectedCount:  0,
+			expectedRoutes: []*api.Route{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Prepare inputs
+			var inputs []any
+			for _, route := range tc.grpcRoutes {
+				inputs = append(inputs, route)
+			}
+			for _, svc := range tc.services {
+				inputs = append(inputs, svc)
+			}
+			for _, ns := range tc.namespaces {
+				inputs = append(inputs, ns)
+			}
+			for _, gw := range tc.gateways {
+				inputs = append(inputs, gw)
+			}
+			for _, gw := range tc.refGrants {
+				inputs = append(inputs, gw)
+			}
+
+			// Create mock collections
+			mock := krttest.NewMock(t, inputs)
+			gateways := krttest.GetMockCollection[Gateway](mock)
+			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
+			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
+			refGrantsCollection := krttest.GetMockCollection[ReferenceGrant](mock)
+			services := krttest.GetMockCollection[*corev1.Service](mock)
+			namespaces := krttest.GetMockCollection[*corev1.Namespace](mock)
+			serviceEntries := krttest.GetMockCollection[*networkingclient.ServiceEntry](mock)
+			inferencePools := krttest.GetMockCollection[*inf.InferencePool](mock)
+
+			// Wait for collections to sync
+			gateways.WaitUntilSynced(context.Background().Done())
+			httpRoutes.WaitUntilSynced(context.Background().Done())
+			grpcRoutes.WaitUntilSynced(context.Background().Done())
+			refGrantsCollection.WaitUntilSynced(context.Background().Done())
+			services.WaitUntilSynced(context.Background().Done())
+			namespaces.WaitUntilSynced(context.Background().Done())
+
+			routeParents := BuildRouteParents(gateways)
+			refGrants := BuildReferenceGrants(refGrantsCollection)
+			// Create route context inputs
+			routeInputs := RouteContextInputs{
+				Grants:         refGrants,
+				RouteParents:   routeParents,
+				DomainSuffix:   "cluster.local",
+				Services:       services,
+				Namespaces:     namespaces,
+				ServiceEntries: serviceEntries,
+				InferencePools: inferencePools,
+			}
+
+			// Create KRT options
+			krtopts := krtutil.KrtOptions{}
+
+			// Call ADPRouteCollection
+			rm := reports.NewReportMap()
+			rep := reports.NewReporter(&rm)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, routeInputs, krtopts, rm, rep)
+
+			// Wait for the collection to process
+			adpRoutes.WaitUntilSynced(context.Background().Done())
+
+			// Get results
+			results := adpRoutes.List()
+
+			// Verify expected count
+			assert.Equal(t, tc.expectedCount, len(results), "Expected %d routes but got %d", tc.expectedCount, len(results))
+
+			// Create a map of actual routes by key for easy lookup
+			actualRoutes := make(map[string]*api.Route)
+			for _, result := range results {
+				require.NotNil(t, result.Resource, "Resource should not be nil")
+				routeResource := result.Resource.GetRoute()
+				require.NotNil(t, routeResource, "Route resource should not be nil")
+				actualRoutes[routeResource.GetKey()] = routeResource
+			}
+
+			// Verify each expected route exists in the actual results
+			for _, expectedRoute := range tc.expectedRoutes {
+				expected := expectedRoute
+				routeResource, found := actualRoutes[expected.GetKey()]
+				require.True(t, found, "Expected route with key %s not found", expected.GetKey())
+
+				// Verify route properties using the expected api.Route
+				assert.Equal(t, expected.GetKey(), routeResource.GetKey(), "Route key mismatch")
+				assert.Equal(t, expected.GetRouteName(), routeResource.GetRouteName(), "Route name mismatch")
+				assert.Equal(t, expected.GetHostnames(), routeResource.GetHostnames(), "Hostnames mismatch")
+
+				// Verify matches
+				require.Equal(t, len(expected.GetMatches()), len(routeResource.GetMatches()), "Matches count mismatch")
+				for j, expectedMatch := range expected.GetMatches() {
+					actualMatch := routeResource.GetMatches()[j]
+
+					// Verify path match (gRPC service/method is converted to path)
+					if expectedMatch.GetPath() != nil {
+						require.NotNil(t, actualMatch.GetPath(), "Path match should not be nil")
+						switch expectedPath := expectedMatch.GetPath().GetKind().(type) {
+						case *api.PathMatch_Exact:
+							actualPath, ok := actualMatch.GetPath().GetKind().(*api.PathMatch_Exact)
+							require.True(t, ok, "Expected Exact path match")
+							assert.Equal(t, expectedPath.Exact, actualPath.Exact, "Exact path mismatch")
+						case *api.PathMatch_Regex:
+							actualPath, ok := actualMatch.GetPath().GetKind().(*api.PathMatch_Regex)
+							require.True(t, ok, "Expected Regex path match")
+							assert.Equal(t, expectedPath.Regex, actualPath.Regex, "Regex path mismatch")
 						}
 					}
 
@@ -907,6 +1500,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			mock := krttest.NewMock(t, inputs)
 			gateways := krttest.GetMockCollection[Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
+			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
 			refGrantsCollection := krttest.GetMockCollection[ReferenceGrant](mock)
 			services := krttest.GetMockCollection[*corev1.Service](mock)
 			namespaces := krttest.GetMockCollection[*corev1.Namespace](mock)
@@ -916,6 +1510,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Wait for collections to sync
 			gateways.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
+			grpcRoutes.WaitUntilSynced(context.Background().Done())
 			refGrantsCollection.WaitUntilSynced(context.Background().Done())
 			services.WaitUntilSynced(context.Background().Done())
 			namespaces.WaitUntilSynced(context.Background().Done())
@@ -939,7 +1534,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())

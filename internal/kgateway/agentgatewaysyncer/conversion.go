@@ -14,7 +14,6 @@ import (
 	"istio.io/api/annotation"
 	istio "istio.io/api/networking/v1alpha3"
 	kubecreds "istio.io/istio/pilot/pkg/credentials/kube"
-	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
 	creds "istio.io/istio/pilot/pkg/model/credentials"
 	"istio.io/istio/pilot/pkg/model/kstatus"
@@ -37,9 +36,8 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
 const (
@@ -586,106 +584,6 @@ func extractParentReferenceInfo(ctx RouteContext, parents RouteParents, obj cont
 	return parentRefs
 }
 
-func convertTCPRoute(ctx RouteContext, r gwv1alpha2.TCPRouteRule, obj *gwv1alpha2.TCPRoute) (*istio.TCPRoute, *reporter.RouteCondition) {
-	if tcpWeightSum(r.BackendRefs) == 0 {
-		// The spec requires us to reject connections when there are no >0 weight backends
-		// We don't have a great way to do it. TODO: add a fault injection API for TCP?
-		return &istio.TCPRoute{
-			Route: []*istio.RouteDestination{{
-				Destination: &istio.Destination{
-					Host:   "internal.cluster.local",
-					Subset: "zero-weight",
-					Port:   &istio.PortSelector{Number: 65535},
-				},
-				Weight: 0,
-			}},
-		}, nil
-	}
-	dest, backendErr, err := buildTCPDestination(ctx, r.BackendRefs, obj.Namespace, wellknown.TCPRouteGVK)
-	if err != nil {
-		return nil, err
-	}
-	return &istio.TCPRoute{
-		Route: dest,
-	}, backendErr
-}
-
-func convertTLSRoute(ctx RouteContext, r gwv1alpha2.TLSRouteRule, obj *gwv1alpha2.TLSRoute) (*istio.TLSRoute, *reporter.RouteCondition) {
-	if tcpWeightSum(r.BackendRefs) == 0 {
-		// The spec requires us to reject connections when there are no >0 weight backends
-		// We don't have a great way to do it. TODO: add a fault injection API for TCP?
-		return &istio.TLSRoute{
-			Route: []*istio.RouteDestination{{
-				Destination: &istio.Destination{
-					Host:   "internal.cluster.local",
-					Subset: "zero-weight",
-					Port:   &istio.PortSelector{Number: 65535},
-				},
-				Weight: 0,
-			}},
-		}, nil
-	}
-	dest, backendErr, err := buildTCPDestination(ctx, r.BackendRefs, obj.Namespace, wellknown.TLSRouteGVK)
-	if err != nil {
-		return nil, err
-	}
-	return &istio.TLSRoute{
-		Match: buildTLSMatch(obj.Spec.Hostnames),
-		Route: dest,
-	}, backendErr
-}
-
-func buildTCPDestination(
-	ctx RouteContext,
-	forwardTo []gwv1.BackendRef,
-	ns string,
-	k schema.GroupVersionKind,
-) ([]*istio.RouteDestination, *reporter.RouteCondition, *reporter.RouteCondition) {
-	if forwardTo == nil {
-		return nil, nil, nil
-	}
-
-	weights := []int{}
-	var action []gwv1.BackendRef
-	for _, w := range forwardTo {
-		wt := int(ptr.OrDefault(w.Weight, 1))
-		if wt == 0 {
-			continue
-		}
-		action = append(action, w)
-		weights = append(weights, wt)
-	}
-	if len(weights) == 1 {
-		weights = []int{0}
-	}
-
-	var invalidBackendErr *reporter.RouteCondition
-	var res []*istio.RouteDestination
-	for i, fwd := range action {
-		dst, err := buildDestination(ctx, fwd, ns, k)
-		if err != nil {
-			if isInvalidBackend(err) {
-				invalidBackendErr = err
-				// keep going, we will gracefully drop invalid backends
-			} else {
-				return nil, nil, err
-			}
-		}
-		res = append(res, &istio.RouteDestination{
-			Destination: dst,
-			Weight:      int32(weights[i]),
-		})
-	}
-	return res, invalidBackendErr, nil
-}
-
-func buildTLSMatch(hostnames []gwv1.Hostname) []*istio.TLSMatchAttributes {
-	// Currently, the spec only supports extensions beyond hostname, which are not currently implemented by Istio.
-	return []*istio.TLSMatchAttributes{{
-		SniHosts: hostnamesToStringListWithWildcard(hostnames),
-	}}
-}
-
 func hostnamesToStringListWithWildcard(h []gwv1.Hostname) []string {
 	if len(h) == 0 {
 		return []string{"*"}
@@ -695,119 +593,6 @@ func hostnamesToStringListWithWildcard(h []gwv1.Hostname) []string {
 		res = append(res, string(i))
 	}
 	return res
-}
-
-func tcpWeightSum(forwardTo []gwv1.BackendRef) int {
-	sum := int32(0)
-	for _, w := range forwardTo {
-		sum += ptr.OrDefault(w.Weight, 1)
-	}
-	return int(sum)
-}
-
-func buildDestination(ctx RouteContext, to gwv1.BackendRef, ns string, k schema.GroupVersionKind) (*istio.Destination, *reporter.RouteCondition) {
-	// check if the reference is allowed
-	if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
-		if !ctx.Grants.BackendAllowed(ctx.Krt, k, to.Name, *toNs, ns) {
-			return &istio.Destination{}, &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionResolvedRefs,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonRefNotPermitted,
-				Message: fmt.Sprintf("backendRef %v/%v not accessible to a %s in namespace %q (missing a ReferenceGrant?)", to.Name, *toNs, k.Kind, ns),
-			}
-		}
-	}
-
-	namespace := ptr.OrDefault((*string)(to.Namespace), ns)
-	var invalidBackendErr *reporter.RouteCondition
-	var hostname string
-	ref := normalizeReference(to.Group, to.Kind, wellknown.ServiceGVK)
-	switch ref {
-	case wellknown.InferencePoolGVK: // TODO: add validation
-		if strings.Contains(string(to.Name), ".") {
-			return nil, &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionResolvedRefs,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonUnsupportedValue,
-				Message: "service name invalid; the name of the Service must be used, not the hostname."}
-		}
-		hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
-		key := namespace + "/" + string(to.Name)
-		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
-		if svc == nil {
-			invalidBackendErr = &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionResolvedRefs,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonBackendNotFound,
-				Message: fmt.Sprintf("backend(%s) not found", hostname)}
-		}
-	case wellknown.ServiceGVK:
-		if strings.Contains(string(to.Name), ".") {
-			return nil, &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionAccepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonUnsupportedValue,
-				Message: "service name invalid; the name of the Service must be used, not the hostname."}
-		}
-		hostname = fmt.Sprintf("%s.%s.svc.%s", to.Name, namespace, ctx.DomainSuffix)
-		key := namespace + "/" + string(to.Name)
-		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Services, krt.FilterKey(key)))
-		if svc == nil {
-			invalidBackendErr = &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionResolvedRefs,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonBackendNotFound,
-				Message: fmt.Sprintf("backend(%s) not found", hostname)}
-		}
-	case schema.GroupVersionKind{Group: wellknown.ServiceEntryGVK.Group, Kind: "Hostname"}:
-		if to.Namespace != nil {
-			return nil, &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionAccepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonUnsupportedValue,
-				Message: "namespace may not be set with Hostname type"}
-		}
-		hostname = string(to.Name)
-		// TODO: check hostname is valid
-	case schema.GroupVersionKind{Group: features.MCSAPIGroup, Kind: "ServiceImport"}:
-		hostname = fmt.Sprintf("%s.%s.svc.clusterset.local", to.Name, namespace)
-		if !features.EnableMCSHost {
-			// They asked for ServiceImport, but actually don't have full support enabled...
-			// No problem, we can just treat it as Service, which is already cross-cluster in this mode anyways
-			hostname = fmt.Sprintf("%s.%s.svc.%s", to.Name, namespace, ctx.DomainSuffix)
-		}
-		// TODO: currently we are always looking for Service. We should be looking for ServiceImport when features.EnableMCSHost
-		key := namespace + "/" + string(to.Name)
-		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Services, krt.FilterKey(key)))
-		if svc == nil {
-			invalidBackendErr = &reporter.RouteCondition{
-				Type:    gwv1.RouteConditionResolvedRefs,
-				Status:  metav1.ConditionFalse,
-				Reason:  gwv1.RouteReasonBackendNotFound,
-				Message: fmt.Sprintf("backend(%s) not found", hostname)}
-		}
-	default:
-		return &istio.Destination{}, &reporter.RouteCondition{
-			Type:    gwv1.RouteConditionResolvedRefs,
-			Status:  metav1.ConditionFalse,
-			Reason:  gwv1.RouteReasonInvalidKind,
-			Message: fmt.Sprintf("referencing unsupported backendRef: group %q kind %q", ptr.OrEmpty(to.Group), ptr.OrEmpty(to.Kind)),
-		}
-	}
-	// All types currently require a Port, so we do this for everything; consider making this per-type if we have future types
-	// that do not require port.
-	if to.Port == nil {
-		// "Port is required when the referent is a Kubernetes Service."
-		return nil, &reporter.RouteCondition{
-			Type:    gwv1.RouteConditionAccepted,
-			Status:  metav1.ConditionFalse,
-			Reason:  gwv1.RouteReasonUnsupportedValue,
-			Message: "port is required in backendRef"}
-	}
-	return &istio.Destination{
-		Host: hostname,
-		Port: &istio.PortSelector{Number: uint32(*to.Port)},
-	}, invalidBackendErr
 }
 
 // https://github.com/kubernetes-sigs/gateway-api/blob/cea484e38e078a2c1997d8c7a62f410a1540f519/apis/v1beta1/httproute_types.go#L207-L212
@@ -1090,9 +875,7 @@ func listenerProtocolToAgentgateway(name gwv1.GatewayController, p gwv1.Protocol
 	case gwv1.HTTPSProtocolType:
 		return string(p), nil
 	case gwv1.TLSProtocolType, gwv1.TCPProtocolType:
-		if !features.EnableAlphaGatewayAPI {
-			return "", fmt.Errorf("protocol %q is supported, but only when %v=true is configured", p, features.EnableAlphaGatewayAPIName)
-		}
+		// TODO: check if TLS/TCP alpha features are supported
 		return string(p), nil
 	}
 	up := gwv1.ProtocolType(strings.ToUpper(string(p)))
