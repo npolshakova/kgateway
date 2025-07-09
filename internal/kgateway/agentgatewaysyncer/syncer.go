@@ -3,58 +3,139 @@ package agentgatewaysyncer
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"maps"
-	"regexp"
-	"slices"
-	"strings"
+	"strconv"
+	"time"
 
-	agentgateway "github.com/agentgateway/agentgateway/go/api"
-	"github.com/agentgateway/agentgateway/go/api/a2a"
-	"github.com/agentgateway/agentgateway/go/api/mcp"
+	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/avast/retry-go/v4"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
+	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
+	"istio.io/istio/pilot/pkg/features"
+	"istio.io/istio/pkg/config/schema/kubeclient"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
+	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
+	"istio.io/istio/pkg/kube/kubetypes"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
+	"sigs.k8s.io/gateway-api-inference-extension/client-go/clientset/versioned"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwxv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/xds"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
 var logger = logging.New("agentgateway/syncer")
 
+const (
+	// Retry configuration constants
+	maxRetryAttempts = 5
+	retryDelay       = 100 * time.Millisecond
+
+	// Resource name format strings
+	resourceNameFormat = "%s~%s"
+	bindKeyFormat      = "%s/%s"
+	gatewayNameFormat  = "%s/%s"
+
+	// Log message keys
+	logKeyControllerName = "controllername"
+	logKeyError          = "error"
+	logKeyGateway        = "gateway"
+	logKeyResourceRef    = "resource_ref"
+	logKeyRouteType      = "route_type"
+)
+
 // AgentGwSyncer synchronizes Kubernetes Gateway API resources with xDS for agentgateway proxies.
 // It watches Gateway resources with the agentgateway class and translates them to agentgateway configuration.
 type AgentGwSyncer struct {
-	commonCols            *common.CommonCollections
+	// Core collections and dependencies
+	commonCols *common.CommonCollections
+	mgr        manager.Manager
+	client     kube.Client
+
+	// Configuration
 	controllerName        string
 	agentGatewayClassName string
-	xDS                   krt.Collection[agentGwXdsResources]
-	xdsCache              envoycache.SnapshotCache
-	istioClient           kube.Client
+	domainSuffix          string
+	systemNamespace       string
+	clusterID             string
 
+	// XDS and caching
+	xDS                 krt.Collection[agentGwXdsResources]
+	xdsCache            envoycache.SnapshotCache
+	xdsSnapshotsMetrics krtcollections.CollectionMetricsRecorder
+
+	// Status reporting
+	statusReport krt.Singleton[report]
+	reportMap    *reports.ReportMap
+
+	// Synchronization
 	waitForSync []cache.InformerSynced
 }
 
+// agentGwXdsResources represents XDS resources for a single agent gateway
+type agentGwXdsResources struct {
+	types.NamespacedName
+
+	// Status reports for this gateway
+	reports reports.ReportMap
+
+	// Resources config for gateway (Bind, Listener, Route)
+	ResourceConfig envoycache.Resources
+
+	// Address config (Services, Workloads)
+	AddressConfig envoycache.Resources
+}
+
+// ResourceName needs to match agentgateway role configured in client.rs (https://github.com/agentgateway/agentgateway/blob/main/crates/agentgateway/src/xds/client.rs)
+func (r agentGwXdsResources) ResourceName() string {
+	return fmt.Sprintf(resourceNameFormat, r.Namespace, r.Name)
+}
+
+func (r agentGwXdsResources) Equals(in agentGwXdsResources) bool {
+	return r.NamespacedName == in.NamespacedName &&
+		report{r.reports}.Equals(report{in.reports}) &&
+		r.ResourceConfig.Version == in.ResourceConfig.Version &&
+		r.AddressConfig.Version == in.AddressConfig.Version
+}
+
 func NewAgentGwSyncer(
-	ctx context.Context,
 	controllerName string,
 	agentGatewayClassName string,
-	mgr manager.Manager,
 	client kube.Client,
+	mgr manager.Manager,
 	commonCols *common.CommonCollections,
 	xdsCache envoycache.SnapshotCache,
+	domainSuffix string,
+	systemNamespace string,
+	clusterID string,
 ) *AgentGwSyncer {
 	// TODO: register types (auth, policy, etc.) if necessary
 	return &AgentGwSyncer{
@@ -62,29 +143,13 @@ func NewAgentGwSyncer(
 		controllerName:        controllerName,
 		agentGatewayClassName: agentGatewayClassName,
 		xdsCache:              xdsCache,
-		// mgr:            mgr,
-		istioClient: client,
+		client:                client,
+		mgr:                   mgr,
+		domainSuffix:          domainSuffix,
+		systemNamespace:       systemNamespace,
+		clusterID:             clusterID,
+		xdsSnapshotsMetrics:   krtcollections.NewCollectionMetricsRecorder("AgentGatewayXDSSnapshots"),
 	}
-}
-
-type agentGwXdsResources struct {
-	types.NamespacedName
-
-	reports            reports.ReportMap
-	AgentGwA2AServices envoycache.Resources
-	AgentGwMcpServices envoycache.Resources
-	Listeners          envoycache.Resources
-}
-
-func (r agentGwXdsResources) ResourceName() string {
-	return xds.OwnerNamespaceNameID(OwnerNodeId, r.Namespace, r.Name)
-}
-
-func (r agentGwXdsResources) Equals(in agentGwXdsResources) bool {
-	return r.NamespacedName == in.NamespacedName &&
-		report{r.reports}.Equals(report{in.reports}) &&
-		r.AgentGwA2AServices.Version == in.AgentGwA2AServices.Version &&
-		r.AgentGwMcpServices.Version == in.AgentGwMcpServices.Version
 }
 
 type envoyResourceWithName struct {
@@ -120,20 +185,6 @@ func (r envoyResourceWithCustomName) Equals(in envoyResourceWithCustomName) bool
 
 var _ envoytypes.ResourceWithName = envoyResourceWithCustomName{}
 
-type agentGwService struct {
-	krt.Named
-	ip       string
-	port     int
-	path     string
-	protocol string // currently only A2A and MCP
-	// The listeners which are allowed to connect to the target.
-	allowedListeners []string
-}
-
-func (r agentGwService) Equals(in agentGwService) bool {
-	return r.ip == in.ip && r.port == in.port && r.path == in.path && r.protocol == in.protocol && slices.Equal(r.allowedListeners, in.allowedListeners)
-}
-
 type report struct {
 	// lower case so krt doesn't error in debug handler
 	reportMap reports.ReportMap
@@ -144,174 +195,422 @@ func (r report) ResourceName() string {
 }
 
 func (r report) Equals(in report) bool {
-	return maps.Equal(r.reportMap.Gateways, in.reportMap.Gateways) &&
-		maps.Equal(r.reportMap.HTTPRoutes, in.reportMap.HTTPRoutes) &&
-		maps.Equal(r.reportMap.TCPRoutes, in.reportMap.TCPRoutes)
+	if !maps.Equal(r.reportMap.Gateways, in.reportMap.Gateways) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.HTTPRoutes, in.reportMap.HTTPRoutes) {
+		return false
+	}
+	return true
+}
+
+// Inputs holds all the input collections needed for the syncer
+type Inputs struct {
+	// Core Kubernetes resources
+	Namespaces krt.Collection[*corev1.Namespace]
+	Services   krt.Collection[*corev1.Service]
+	Secrets    krt.Collection[*corev1.Secret]
+
+	// Gateway API resources
+	GatewayClasses  krt.Collection[*gwv1.GatewayClass]
+	Gateways        krt.Collection[*gwv1.Gateway]
+	HTTPRoutes      krt.Collection[*gwv1.HTTPRoute]
+	GRPCRoutes      krt.Collection[*gwv1.GRPCRoute]
+	TCPRoutes       krt.Collection[*gwv1alpha2.TCPRoute]
+	TLSRoutes       krt.Collection[*gwv1alpha2.TLSRoute]
+	ReferenceGrants krt.Collection[*gwv1beta1.ReferenceGrant]
+
+	// Extended resources
+	ServiceEntries krt.Collection[*networkingclient.ServiceEntry]
+	InferencePools krt.Collection[*inf.InferencePool]
 }
 
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	logger.Debug("init agentgateway Syncer", "controllername", s.controllerName)
 
-	// TODO: convert auth to rbac json config for agentgateways
+	s.setupInferenceExtensionClient()
+	inputs := s.buildInputCollections(krtopts)
+	rm := reports.NewReportMap()
+	r := reports.NewReporter(&rm)
+	s.reportMap = &rm // Store the report map in the struct
+	s.buildResourceCollections(inputs, krtopts, r)
+}
 
-	gatewaysCol := krt.NewCollection(s.commonCols.GatewayIndex.Gateways, func(kctx krt.HandlerContext, gw ir.Gateway) *ir.Gateway {
-		if string(gw.Obj.Spec.GatewayClassName) != s.agentGatewayClassName {
-			return nil
-		}
-		return &gw
-	}, krtopts.ToOptions("agentgateway")...)
-
-	// TODO(npolshak): optimize this in the future with an index
-	agentGwServices := krt.NewManyCollection(s.commonCols.Services, func(kctx krt.HandlerContext, s *corev1.Service) []agentGwService {
-		var allowedA2AListeners, allowedMCPListeners []string
-
-		gws := krt.Fetch(kctx, gatewaysCol)
-		for _, gw := range gws {
-			for _, listener := range gw.Listeners {
-				if listener.Protocol != A2AProtocol && listener.Protocol != MCPProtocol {
-					continue
-				}
-				logger.Debug("found agentgateway service", "namespace", s.Namespace, "name", s.Name)
-				if listener.AllowedRoutes == nil {
-					// only allow agent services in same namespace
-					if s.Namespace == gw.Obj.Namespace {
-						if listener.Protocol == A2AProtocol {
-							allowedA2AListeners = append(allowedA2AListeners, string(listener.Name))
-						} else {
-							allowedMCPListeners = append(allowedMCPListeners, string(listener.Name))
-						}
-					}
-				} else if listener.AllowedRoutes.Namespaces.From != nil {
-					switch *listener.AllowedRoutes.Namespaces.From {
-					case gwv1.NamespacesFromAll:
-						if listener.Protocol == A2AProtocol {
-							allowedA2AListeners = append(allowedA2AListeners, string(listener.Name))
-						} else {
-							allowedMCPListeners = append(allowedMCPListeners, string(listener.Name))
-						}
-					case gwv1.NamespacesFromSame:
-						// only allow agent services in same namespace
-						if s.Namespace == gw.Obj.Namespace {
-							if listener.Protocol == A2AProtocol {
-								allowedA2AListeners = append(allowedA2AListeners, string(listener.Name))
-							} else {
-								allowedMCPListeners = append(allowedMCPListeners, string(listener.Name))
-							}
-						}
-					case gwv1.NamespacesFromSelector:
-						// TODO: implement namespace selectors with gateway index
-						logger.Error("namespace selectors not supported for agentgateways")
-						continue
-					}
-				}
-			}
-		}
-		return translateAgentService(s, allowedA2AListeners, allowedMCPListeners)
-	})
-	xdsA2AServices := krt.NewCollection(agentGwServices, func(kctx krt.HandlerContext, s agentGwService) *envoyResourceWithName {
-		if s.protocol != A2AProtocol {
-			return nil
-		}
-		t := &a2a.Target{
-			Name:      getTargetName(s.ResourceName()),
-			Host:      s.ip,
-			Port:      uint32(s.port),
-			Path:      s.path,
-			Listeners: s.allowedListeners,
-		}
-		return &envoyResourceWithName{inner: t, version: utils.HashProto(t)}
-	}, krtopts.ToOptions("a2a-target-xds")...)
-	xdsMcpServices := krt.NewCollection(agentGwServices, func(kctx krt.HandlerContext, s agentGwService) *envoyResourceWithName {
-		if s.protocol != MCPProtocol {
-			return nil
-		}
-		t := &mcp.Target{
-			// Note: No slashes allowed here (must match ^[a-zA-Z0-9-]+$)
-			Name: getTargetName(s.ResourceName()),
-			Target: &mcp.Target_Sse{
-				Sse: &mcp.Target_SseTarget{
-					Host: s.ip,
-					Port: uint32(s.port),
-					Path: s.path,
-				},
+func (s *AgentGwSyncer) setupInferenceExtensionClient() {
+	// TODO: share this in a common spot with the inference extension plugin
+	// Create the inference extension clientset.
+	inferencePoolGVR := wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools")
+	infCli, err := versioned.NewForConfig(s.commonCols.Client.RESTConfig())
+	if err != nil {
+		logger.Error("failed to create inference extension client", "error", err)
+	} else {
+		kubeclient.Register[*inf.InferencePool](
+			inferencePoolGVR,
+			wellknown.InferencePoolGVK,
+			func(c kubeclient.ClientGetter, namespace string, o metav1.ListOptions) (runtime.Object, error) {
+				return infCli.InferenceV1alpha2().InferencePools(namespace).List(context.Background(), o)
 			},
-			Listeners: s.allowedListeners,
+			func(c kubeclient.ClientGetter, namespace string, o metav1.ListOptions) (watch.Interface, error) {
+				return infCli.InferenceV1alpha2().InferencePools(namespace).Watch(context.Background(), o)
+			},
+		)
+	}
+}
+
+func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs {
+	inputs := Inputs{
+		Namespaces: krt.NewInformer[*corev1.Namespace](s.client),
+		Secrets: krt.WrapClient[*corev1.Secret](
+			kclient.NewFiltered[*corev1.Secret](s.client, kubetypes.Filter{
+				//FieldSelector: kubesecrets.SecretsFieldSelector,
+				ObjectFilter: s.client.ObjectFilter(),
+			}),
+		),
+		Services: krt.WrapClient[*corev1.Service](
+			kclient.NewFiltered[*corev1.Service](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}),
+			krtopts.ToOptions("informer/Services")...),
+
+		GatewayClasses: krt.WrapClient(kclient.NewFiltered[*gwv1.GatewayClass](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/GatewayClasses")...),
+		Gateways:       krt.WrapClient(kclient.NewFiltered[*gwv1.Gateway](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/Gateways")...),
+		HTTPRoutes:     krt.WrapClient(kclient.NewFiltered[*gwv1.HTTPRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/HTTPRoutes")...),
+		GRPCRoutes:     krt.WrapClient(kclient.NewFiltered[*gwv1.GRPCRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/GRPCRoutes")...),
+
+		ReferenceGrants: krt.WrapClient(kclient.NewFiltered[*gwv1beta1.ReferenceGrant](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/ReferenceGrants")...),
+		//ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
+		InferencePools: krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools"), kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...),
+	}
+
+	if features.EnableAlphaGatewayAPI {
+		inputs.TCPRoutes = krt.WrapClient(kclient.NewFiltered[*gwv1alpha2.TCPRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TCPRoutes")...)
+		inputs.TLSRoutes = krt.WrapClient(kclient.NewFiltered[*gwv1alpha2.TLSRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TLSRoutes")...)
+	} else {
+		// If disabled, still build a collection but make it always empty
+		inputs.TCPRoutes = krt.NewStaticCollection[*gwv1alpha2.TCPRoute](nil, krtopts.ToOptions("disable/TCPRoutes")...)
+		inputs.TLSRoutes = krt.NewStaticCollection[*gwv1alpha2.TLSRoute](nil, krtopts.ToOptions("disable/TLSRoutes")...)
+	}
+
+	return inputs
+}
+
+func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.KrtOptions, reporter reporter.Reporter) {
+	// Build core collections
+	gatewayClasses := GatewayClassesCollection(inputs.GatewayClasses, krtopts)
+	refGrants := BuildReferenceGrants(ReferenceGrantsCollection(inputs.ReferenceGrants, krtopts))
+	gateways := s.buildGatewayCollection(inputs, gatewayClasses, refGrants, krtopts, reporter)
+
+	// Build ADP resources
+	adpResources := s.buildADPResources(gateways, inputs, refGrants, krtopts, reporter)
+
+	// Build address collections
+	addresses := s.buildAddressCollections(inputs, krtopts)
+
+	// Build XDS collection
+	s.buildXDSCollection(adpResources, addresses, krtopts)
+
+	// Build status reporting
+	s.buildStatusReporting()
+
+	// Set up sync dependencies
+	s.setupSyncDependencies(gateways, adpResources, addresses, inputs)
+}
+
+func (s *AgentGwSyncer) buildGatewayCollection(
+	inputs Inputs,
+	gatewayClasses krt.Collection[GatewayClass],
+	refGrants ReferenceGrants,
+	krtopts krtutil.KrtOptions,
+	reporter reporter.Reporter,
+) krt.Collection[Gateway] {
+	return GatewayCollection(
+		s.agentGatewayClassName,
+		inputs.Gateways,
+		gatewayClasses,
+		inputs.Namespaces,
+		refGrants,
+		inputs.Secrets,
+		s.domainSuffix,
+		krtopts,
+		reporter,
+	)
+}
+
+func (s *AgentGwSyncer) buildADPResources(
+	gateways krt.Collection[Gateway],
+	inputs Inputs,
+	refGrants ReferenceGrants,
+	krtopts krtutil.KrtOptions,
+	rep reporter.Reporter,
+) krt.Collection[ADPResource] {
+	// Use the report map from the syncer - pass the original map, not a copy
+	reportMap := s.reportMap
+	if reportMap == nil {
+		newMap := reports.NewReportMap()
+		reportMap = &newMap
+	}
+
+	// Build ports and binds
+	ports := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj Gateway) *IndexObject[string, Gateway] {
+		port := fmt.Sprint(obj.parentInfo.Port)
+		return &IndexObject[string, Gateway]{
+			Key:     port,
+			Objects: []Gateway{obj},
 		}
-		return &envoyResourceWithName{inner: t, version: utils.HashProto(t)}
-	}, krtopts.ToOptions("mcp-target-xds")...)
+	}, krtopts.ToOptions("ports")...)
 
-	// translate gateways to xds
-	s.xDS = krt.NewCollection(gatewaysCol, func(kctx krt.HandlerContext, gw ir.Gateway) *agentGwXdsResources {
-		// listeners for the agentgateway
-		agwListeners := make([]envoytypes.Resource, 0, len(gw.Listeners))
-		var listenerVersion uint64
-		var listener *agentgateway.Listener
-		for _, gwListener := range gw.Listeners {
-			var protocol agentgateway.Listener_Protocol
-			switch string(gwListener.Protocol) {
-			case MCPProtocol:
-				protocol = agentgateway.Listener_MCP
-			case A2AProtocol:
-				protocol = agentgateway.Listener_A2A
-			default:
-				// Not a valid protocol for agentgateway
-				continue
-			}
+	binds := krt.NewManyCollection(ports, func(ctx krt.HandlerContext, object IndexObject[string, Gateway]) []ADPResource {
+		port, _ := strconv.Atoi(object.Key)
+		uniq := sets.New[types.NamespacedName]()
+		for _, gw := range object.Objects {
+			uniq.Insert(types.NamespacedName{
+				Namespace: gw.parent.Namespace,
+				Name:      gw.parent.Name,
+			})
+		}
+		var binds []ADPResource
 
-			listener = &agentgateway.Listener{
-				Name:     string(gwListener.Name),
-				Protocol: protocol,
-				// TODO: Add support for stdio listener
-				Listener: &agentgateway.Listener_Sse{
-					Sse: &agentgateway.SseListener{
-						Address: "[::]",
-						Port:    uint32(gwListener.Port),
-					},
+		for _, obj := range uniq.UnsortedList() {
+			bind := Bind{
+				Bind: &api.Bind{
+					Key:  object.Key + "/" + obj.String(),
+					Port: uint32(port),
 				},
 			}
+			binds = append(binds, toResourceWithReports(obj, bind, *reportMap))
+		}
+		return binds
+	}, krtopts.ToOptions("Binds")...)
 
-			// Update listenerVersion to be the result
-			listenerVersion ^= utils.HashProto(listener)
-			agwListeners = append(agwListeners, listener)
-		}
+	// Build listeners
+	listeners := krt.NewCollection(gateways, s.buildListenerFromGateway, krtopts.ToOptions("Listeners")...)
 
-		// a2a services
-		a2aServiceResources := krt.Fetch(kctx, xdsA2AServices)
-		logger.Debug("found A2A resources for gateway", "total_services", len(a2aServiceResources), "resource_ref", gw.ResourceName())
-		a2aResources := make([]envoytypes.Resource, len(a2aServiceResources))
-		var a2aVersion uint64
-		for i, res := range a2aServiceResources {
-			a2aVersion ^= res.version
-			target := res.inner.(*a2a.Target)
-			a2aResources[i] = target
+	// Build routes
+	routeParents := BuildRouteParents(gateways)
+	routeInputs := RouteContextInputs{
+		Grants:         refGrants,
+		RouteParents:   routeParents,
+		DomainSuffix:   s.domainSuffix,
+		Services:       inputs.Services,
+		Namespaces:     inputs.Namespaces,
+		InferencePools: inputs.InferencePools,
+	}
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, routeInputs, krtopts, *reportMap, rep)
+
+	return krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
+}
+
+// buildListenerFromGateway creates a listener resource from a gateway
+func (s *AgentGwSyncer) buildListenerFromGateway(ctx krt.HandlerContext, obj Gateway) *ADPResource {
+	l := &api.Listener{
+		Key:         obj.ResourceName(),
+		Name:        string(obj.parentInfo.SectionName),
+		BindKey:     fmt.Sprint(obj.parentInfo.Port) + "/" + obj.parent.Namespace + "/" + obj.parent.Name,
+		GatewayName: obj.parent.Namespace + "/" + obj.parent.Name,
+		Hostname:    obj.parentInfo.OriginalHostname,
+	}
+
+	// Set protocol and TLS configuration
+	protocol, tlsConfig, ok := s.getProtocolAndTLSConfig(obj)
+	if !ok {
+		return nil // Unsupported protocol or missing TLS config
+	}
+
+	l.Protocol = protocol
+	l.Tls = tlsConfig
+
+	// Use the report map from the syncer
+	reportMap := s.reportMap
+	if reportMap == nil {
+		newMap := reports.NewReportMap()
+		reportMap = &newMap
+	}
+
+	return toResourcepWithReports(types.NamespacedName{
+		Namespace: obj.parent.Namespace,
+		Name:      obj.parent.Name,
+	}, ADPListener{l}, *reportMap)
+}
+
+// getProtocolAndTLSConfig extracts protocol and TLS configuration from a gateway
+func (s *AgentGwSyncer) getProtocolAndTLSConfig(obj Gateway) (api.Protocol, *api.TLSConfig, bool) {
+	var tlsConfig *api.TLSConfig
+
+	// Build TLS config if needed
+	if obj.TLSInfo != nil {
+		tlsConfig = &api.TLSConfig{
+			Cert:       obj.TLSInfo.Cert,
+			PrivateKey: obj.TLSInfo.Key,
 		}
-		// mcp services
-		mcpServiceResources := krt.Fetch(kctx, xdsMcpServices)
-		logger.Debug("found MCP resources for gateway", "total_services", len(mcpServiceResources), "resource_ref", gw.ResourceName())
-		mcpResources := make([]envoytypes.Resource, len(mcpServiceResources))
-		var mcpVersion uint64
-		for i, res := range mcpServiceResources {
-			mcpVersion ^= res.version
-			target := res.inner.(*mcp.Target)
-			mcpResources[i] = target
+	}
+
+	switch obj.parentInfo.Protocol {
+	case gwv1.HTTPProtocolType:
+		return api.Protocol_HTTP, nil, true
+	case gwv1.HTTPSProtocolType:
+		if tlsConfig == nil {
+			return api.Protocol_HTTPS, nil, false // TLS required but not configured
 		}
-		result := &agentGwXdsResources{
-			NamespacedName:     types.NamespacedName{Namespace: gw.Namespace, Name: gw.Name},
-			AgentGwA2AServices: envoycache.NewResources(fmt.Sprintf("%d", a2aVersion), a2aResources),
-			AgentGwMcpServices: envoycache.NewResources(fmt.Sprintf("%d", mcpVersion), mcpResources),
-			Listeners:          envoycache.NewResources(fmt.Sprintf("%d", listenerVersion), agwListeners),
+		return api.Protocol_HTTPS, tlsConfig, true
+	case gwv1.TLSProtocolType:
+		if tlsConfig == nil {
+			return api.Protocol_TLS, nil, false // TLS required but not configured
 		}
-		logger.Debug("created XDS resources for with ID", "gwname", gw.Name, "resourceid", result.ResourceName())
+		return api.Protocol_TLS, tlsConfig, true
+	case gwv1.TCPProtocolType:
+		return api.Protocol_TCP, nil, true
+	default:
+		return api.Protocol_HTTP, nil, false // Unsupported protocol
+	}
+}
+
+func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.KrtOptions) krt.Collection[envoyResourceWithCustomName] {
+	// Build endpoint slices and namespaces
+	epSliceClient := kclient.NewFiltered[*discoveryv1.EndpointSlice](
+		s.commonCols.Client,
+		kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()},
+	)
+	endpointSlices := krt.WrapClient(epSliceClient, s.commonCols.KrtOpts.ToOptions("informer/EndpointSlices")...)
+
+	nsClient := kclient.NewFiltered[*corev1.Namespace](
+		s.commonCols.Client,
+		kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()},
+	)
+	namespaces := krt.WrapClient(nsClient, s.commonCols.KrtOpts.ToOptions("informer/Namespaces")...)
+
+	// Build workload index
+	workloadIndex := index{
+		namespaces:      s.commonCols.Namespaces,
+		SystemNamespace: s.systemNamespace,
+		ClusterID:       s.clusterID,
+		DomainSuffix:    s.domainSuffix,
+	}
+
+	// Build service and workload collections
+	workloadServices := workloadIndex.ServicesCollection(inputs.Services, nil, inputs.InferencePools, namespaces, krtopts)
+	workloads := workloadIndex.WorkloadsCollection(
+		s.commonCols.WrappedPods,
+		workloadServices,
+		nil, // serviceEntries,
+		endpointSlices,
+		namespaces,
+		krtopts,
+	)
+
+	// Build address collections
+	svcAddresses := krt.NewCollection(workloadServices, func(ctx krt.HandlerContext, obj ServiceInfo) *ADPCacheAddress {
+		addrMessage := obj.AsAddress.Address
+		resourceVersion := utils.HashProto(addrMessage)
+		result := &ADPCacheAddress{
+			NamespacedName:      types.NamespacedName{Name: obj.Service.GetName(), Namespace: obj.Service.GetNamespace()},
+			Address:             addrMessage,
+			AddressResourceName: obj.ResourceName(),
+			AddressVersion:      resourceVersion,
+		}
+		logger.Debug("created XDS resources for svc address with ID", "addr", fmt.Sprintf("%s,%s", obj.Service.GetName(), obj.Service.GetNamespace()), "resourceid", result.ResourceName())
 		return result
-	}, krtopts.ToOptions("agentgateway-xds")...)
+	})
 
+	workloadAddresses := krt.NewCollection(workloads, func(ctx krt.HandlerContext, obj WorkloadInfo) *ADPCacheAddress {
+		addrMessage := obj.AsAddress.Address
+		resourceVersion := utils.HashProto(addrMessage)
+		result := &ADPCacheAddress{
+			NamespacedName:      types.NamespacedName{Name: obj.Workload.GetName(), Namespace: obj.Workload.GetNamespace()},
+			Address:             addrMessage,
+			AddressVersion:      resourceVersion,
+			AddressResourceName: obj.ResourceName(),
+		}
+		logger.Debug("created XDS resources for workload address with ID", "addr", fmt.Sprintf("%s,%s", obj.Workload.GetName(), obj.Workload.GetNamespace()), "resourceid", result.ResourceName())
+		return result
+	})
+
+	adpAddresses := krt.JoinCollection([]krt.Collection[ADPCacheAddress]{svcAddresses, workloadAddresses}, krtopts.ToOptions("ADPAddresses")...)
+	return krt.NewCollection(adpAddresses, func(kctx krt.HandlerContext, obj ADPCacheAddress) *envoyResourceWithCustomName {
+		return &envoyResourceWithCustomName{
+			Message: obj.Address,
+			Name:    obj.AddressResourceName,
+			version: obj.AddressVersion,
+		}
+	}, krtopts.ToOptions("XDSAddresses")...)
+}
+
+func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], krtopts krtutil.KrtOptions) {
+	// Create an index on adpResources by Gateway to avoid fetching all resources
+	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResource) []types.NamespacedName {
+		return []types.NamespacedName{resource.Gateway}
+	})
+
+	s.xDS = krt.NewCollection(adpResources, func(kctx krt.HandlerContext, obj ADPResource) *agentGwXdsResources {
+		gwNamespacedName := obj.Gateway
+
+		cacheAddresses := krt.Fetch(kctx, xdsAddresses)
+		envoytypesAddresses := make([]envoytypes.Resource, 0, len(cacheAddresses))
+		for _, addr := range cacheAddresses {
+			envoytypesAddresses = append(envoytypesAddresses, addr)
+		}
+
+		var cacheResources []envoytypes.Resource
+		// Use index to fetch only resources for this gateway instead of all resources
+		resourceList := krt.Fetch(kctx, adpResources, krt.FilterIndex(adpResourcesByGateway, gwNamespacedName))
+
+		// Collect and merge reports from all resources for this gateway
+		mergedReports := reports.NewReportMap()
+		for _, resource := range resourceList {
+			cacheResources = append(cacheResources, &envoyResourceWithCustomName{
+				Message: resource.Resource,
+				Name:    resource.ResourceName(),
+				version: utils.HashProto(resource.Resource),
+			})
+
+			// Merge reports from this resource into the merged reports
+			maps.Copy(mergedReports.Gateways, resource.reports.Gateways)
+			maps.Copy(mergedReports.ListenerSets, resource.reports.ListenerSets)
+			mergeRouteReports(mergedReports.HTTPRoutes, resource.reports.HTTPRoutes)
+			mergeRouteReports(mergedReports.TCPRoutes, resource.reports.TCPRoutes)
+			mergeRouteReports(mergedReports.TLSRoutes, resource.reports.TLSRoutes)
+			mergeRouteReports(mergedReports.GRPCRoutes, resource.reports.GRPCRoutes)
+		}
+
+		// Create the resource wrappers
+		var resourceVersion uint64
+		for _, res := range cacheResources {
+			resourceVersion ^= res.(*envoyResourceWithCustomName).version
+		}
+		// Calculate address version
+		var addrVersion uint64
+		for _, res := range cacheAddresses {
+			addrVersion ^= res.version
+		}
+
+		result := &agentGwXdsResources{
+			NamespacedName: gwNamespacedName,
+			reports:        mergedReports,
+			ResourceConfig: envoycache.NewResources(fmt.Sprintf("%d", resourceVersion), cacheResources),
+			AddressConfig:  envoycache.NewResources(fmt.Sprintf("%d", addrVersion), envoytypesAddresses),
+		}
+		logger.Debug("created XDS resources for gateway with ID", "gwname", fmt.Sprintf("%s,%s", gwNamespacedName.Name, gwNamespacedName.Namespace), "resourceid", result.ResourceName())
+		return result
+	})
+}
+
+func (s *AgentGwSyncer) buildStatusReporting() {
+	// as proxies are created, they also contain a reportMap containing status for the Gateway and associated xRoutes (really parentRefs)
+	// here we will merge reports that are per-Proxy to a singleton Report used to persist to k8s on a timer
+	s.statusReport = krt.NewSingleton(func(kctx krt.HandlerContext) *report {
+		proxies := krt.Fetch(kctx, s.xDS)
+		merged := mergeProxyReports(proxies)
+		return &report{merged}
+	})
+}
+
+func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[Gateway], adpResources krt.Collection[ADPResource], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
-		xdsA2AServices.HasSynced,
-		xdsMcpServices.HasSynced,
-		gatewaysCol.HasSynced,
-		agentGwServices.HasSynced,
+		gateways.HasSynced,
+		// resources
+		adpResources.HasSynced,
 		s.xDS.HasSynced,
+		// addresses
+		addresses.HasSynced,
+		inputs.Namespaces.HasSynced,
 	}
 }
 
@@ -326,33 +625,58 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 
 	s.xDS.RegisterBatch(func(events []krt.Event[agentGwXdsResources], _ bool) {
 		for _, e := range events {
-			r := e.Latest()
+			snap := e.Latest()
 			if e.Event == controllers.EventDelete {
-				s.xdsCache.ClearSnapshot(r.ResourceName())
+				s.xdsCache.ClearSnapshot(snap.ResourceName())
 				continue
 			}
 			snapshot := &agentGwSnapshot{
-				AgentGwA2AServices: r.AgentGwA2AServices,
-				AgentGwMcpServices: r.AgentGwMcpServices,
-				Listeners:          r.Listeners,
+				Resources: snap.ResourceConfig,
+				Addresses: snap.AddressConfig,
 			}
-			logger.Debug("setting xds snapshot", "resourcename", r.ResourceName())
-			err := s.xdsCache.SetSnapshot(ctx, r.ResourceName(), snapshot)
+			logger.Debug("setting xds snapshot", "resource_name", snap.ResourceName())
+			logger.Debug("snapshot config", "resource_snapshot", snapshot.Resources, "workload_snapshot", snapshot.Addresses)
+			err := s.xdsCache.SetSnapshot(ctx, snap.ResourceName(), snapshot)
 			if err != nil {
-				logger.Error("failed to set xds snapshot", "resourcename", r.ResourceName(), "error", err.Error())
+				logger.Error("failed to set xds snapshot", "resource_name", snap.ResourceName(), "error", err.Error())
 				continue
 			}
 		}
 	}, true)
 
+	// latestReport will be constantly updated to contain the merged status report for Kube Gateway status
+	// when timer ticks, we will use the state of the mergedReports at that point in time to sync the status to k8s
+	latestReportQueue := utils.NewAsyncQueue[reports.ReportMap]()
+	s.statusReport.Register(func(o krt.Event[report]) {
+		if o.Event == controllers.EventDelete {
+			// TODO: handle garbage collection
+			return
+		}
+		latestReportQueue.Enqueue(o.Latest().reportMap)
+	})
+	routeStatusLogger := logger.With("subcomponent", "routeStatusSyncer")
+	listenerSetStatusLogger := logger.With("subcomponent", "listenerSetStatusSyncer")
+	gatewayStatusLogger := logger.With("subcomponent", "gatewayStatusSyncer")
+	go func() {
+		for {
+			latestReport, err := latestReportQueue.Dequeue(ctx)
+			if err != nil {
+				logger.Error("failed to dequeue latest report", "error", err)
+				return
+			}
+			s.syncGatewayStatus(ctx, gatewayStatusLogger, latestReport)
+			s.syncListenerSetStatus(ctx, listenerSetStatusLogger, latestReport)
+			s.syncRouteStatus(ctx, routeStatusLogger, latestReport)
+		}
+	}()
+
 	return nil
 }
 
 type agentGwSnapshot struct {
-	AgentGwA2AServices envoycache.Resources
-	AgentGwMcpServices envoycache.Resources
-	Listeners          envoycache.Resources
-	VersionMap         map[string]map[string]string
+	Resources  envoycache.Resources
+	Addresses  envoycache.Resources
+	VersionMap map[string]map[string]string
 }
 
 func (m *agentGwSnapshot) GetResources(typeURL string) map[string]envoytypes.Resource {
@@ -366,12 +690,10 @@ func (m *agentGwSnapshot) GetResources(typeURL string) map[string]envoytypes.Res
 
 func (m *agentGwSnapshot) GetResourcesAndTTL(typeURL string) map[string]envoytypes.ResourceWithTTL {
 	switch typeURL {
-	case TargetTypeA2AUrl:
-		return m.AgentGwA2AServices.Items
-	case TargetTypeMcpUrl:
-		return m.AgentGwMcpServices.Items
-	case TargetTypeListenerUrl:
-		return m.Listeners.Items
+	case TargetTypeResourceUrl:
+		return m.Resources.Items
+	case TargetTypeAddressUrl:
+		return m.Addresses.Items
 	default:
 		return nil
 	}
@@ -379,12 +701,10 @@ func (m *agentGwSnapshot) GetResourcesAndTTL(typeURL string) map[string]envoytyp
 
 func (m *agentGwSnapshot) GetVersion(typeURL string) string {
 	switch typeURL {
-	case TargetTypeA2AUrl:
-		return m.AgentGwA2AServices.Version
-	case TargetTypeMcpUrl:
-		return m.AgentGwMcpServices.Version
-	case TargetTypeListenerUrl:
-		return m.Listeners.Version
+	case TargetTypeResourceUrl:
+		return m.Resources.Version
+	case TargetTypeAddressUrl:
+		return m.Addresses.Version
 	default:
 		return ""
 	}
@@ -400,9 +720,8 @@ func (m *agentGwSnapshot) ConstructVersionMap() error {
 
 	m.VersionMap = make(map[string]map[string]string)
 	resources := map[string]map[string]envoytypes.ResourceWithTTL{
-		TargetTypeA2AUrl:      m.AgentGwA2AServices.Items,
-		TargetTypeMcpUrl:      m.AgentGwMcpServices.Items,
-		TargetTypeListenerUrl: m.Listeners.Items,
+		TargetTypeResourceUrl: m.Resources.Items,
+		TargetTypeAddressUrl:  m.Addresses.Items,
 	}
 
 	for typeUrl, items := range resources {
@@ -429,68 +748,308 @@ func (m *agentGwSnapshot) GetVersionMap(typeURL string) map[string]string {
 
 var _ envoycache.ResourceSnapshot = &agentGwSnapshot{}
 
-// getTargetName sanitizes the given resource name to ensure it matches the AgentGateway required pattern:
-// ^[a-zA-Z0-9-]+$ by replacing slashes and removing invalid characters.
-func getTargetName(resourceName string) string {
-	var (
-		invalidCharsRegex      = regexp.MustCompile(`[^a-zA-Z0-9-]+`)
-		consecutiveDashesRegex = regexp.MustCompile(`-+`)
-	)
-
-	// Replace all invalid characters with dashes
-	sanitized := invalidCharsRegex.ReplaceAllString(resourceName, "-")
-
-	// Remove leading/trailing dashes and collapse consecutive dashes
-	sanitized = strings.Trim(sanitized, "-")
-	sanitized = consecutiveDashesRegex.ReplaceAllString(sanitized, "-")
-
-	return sanitized
+type clustersWithErrors struct {
+	clusters            envoycache.Resources
+	erroredClusters     []string
+	erroredClustersHash uint64
+	clustersHash        uint64
+	resourceName        string
 }
 
-func translateAgentService(svc *corev1.Service, allowedA2AListeners, allowedMCPListeners []string) []agentGwService {
-	var svcs []agentGwService
+type addressesWithUccName struct {
+	addresses    envoycache.Resources
+	resourceName string
+}
 
-	if svc.Spec.ClusterIP == "" && svc.Spec.ExternalName == "" {
-		// Return early if there's no valid IP or external name set on the service
-		return svcs
-	}
+func (c clustersWithErrors) ResourceName() string {
+	return c.resourceName
+}
 
-	addr := svc.Spec.ClusterIP
-	if addr == "" {
-		addr = svc.Spec.ExternalName
-	}
+var _ krt.Equaler[clustersWithErrors] = new(clustersWithErrors)
 
-	for _, port := range svc.Spec.Ports {
-		if port.AppProtocol == nil {
-			continue
-		}
-		appProtocol := *port.AppProtocol
-		var path string
-		var allowedListeners []string
+func (c clustersWithErrors) Equals(k clustersWithErrors) bool {
+	return c.clustersHash == k.clustersHash && c.erroredClustersHash == k.erroredClustersHash
+}
 
-		switch appProtocol {
-		case A2AProtocol:
-			path = svc.Annotations[A2APathAnnotation]
-			allowedListeners = allowedA2AListeners
-		case MCPProtocol:
-			path = svc.Annotations[MCPPathAnnotation]
-			allowedListeners = allowedMCPListeners
-		default:
-			// Skip unsupported protocols
-			continue
-		}
+func (c addressesWithUccName) ResourceName() string {
+	return c.resourceName
+}
 
-		svcs = append(svcs, agentGwService{
-			Named: krt.Named{
-				Name:      svc.Name,
-				Namespace: svc.Namespace,
+var _ krt.Equaler[addressesWithUccName] = new(addressesWithUccName)
+
+func (c addressesWithUccName) Equals(k addressesWithUccName) bool {
+	return c.addresses.Version == k.addresses.Version
+}
+
+type UccWithAddress struct {
+	Client  ir.UniqlyConnectedClient
+	Address ADPCacheAddress
+}
+
+func (c UccWithAddress) ResourceName() string {
+	return fmt.Sprintf("%s/%s", c.Client.ResourceName(), c.Address.ResourceName())
+}
+
+func (c UccWithAddress) Equals(in UccWithAddress) bool {
+	return c.Client.Equals(in.Client) && c.Address.Equals(in.Address)
+}
+
+type PerClientAddresses struct {
+	addresses krt.Collection[UccWithAddress]
+	index     krt.Index[string, UccWithAddress]
+}
+
+func (ie *PerClientAddresses) FetchEndpointsForClient(kctx krt.HandlerContext, ucc ir.UniqlyConnectedClient) []UccWithAddress {
+	return krt.Fetch(kctx, ie.addresses, krt.FilterIndex(ie.index, ucc.ResourceName()))
+}
+
+func (s *AgentGwSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger, rm reports.ReportMap) {
+	stopwatch := utils.NewTranslatorStopWatch("RouteStatusSyncer")
+	stopwatch.Start()
+	defer stopwatch.Stop(ctx)
+
+	// TODO: add routeStatusMetrics
+
+	// Helper function to sync route status with retry
+	syncStatusWithRetry := func(
+		routeType string,
+		routeKey client.ObjectKey,
+		getRouteFunc func() client.Object,
+		statusUpdater func(route client.Object) error,
+	) error {
+		return retry.Do(
+			func() error {
+				route := getRouteFunc()
+				err := s.mgr.GetClient().Get(ctx, routeKey, route)
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						// the route is not found, we can't report status on it
+						// if it's recreated, we'll retranslate it anyway
+						return nil
+					}
+					logger.Error("error getting route", logKeyError, err, logKeyResourceRef, routeKey, logKeyRouteType, routeType)
+					return err
+				}
+				if err := statusUpdater(route); err != nil {
+					logger.Debug("error updating status for route", logKeyError, err, logKeyResourceRef, routeKey, logKeyRouteType, routeType)
+					return err
+				}
+				return nil
 			},
-			ip:               addr,
-			port:             int(port.Port),
-			path:             path,
-			protocol:         appProtocol,
-			allowedListeners: allowedListeners,
-		})
+			retry.Attempts(maxRetryAttempts),
+			retry.Delay(retryDelay),
+			retry.DelayType(retry.BackOffDelay),
+		)
 	}
-	return svcs
+
+	// Helper function to build route status and update if needed
+	buildAndUpdateStatus := func(route client.Object, routeType string) error {
+		var status *gwv1.RouteStatus
+		switch r := route.(type) {
+		case *gwv1.HTTPRoute: // TODO: beta1?
+			status = rm.BuildRouteStatus(ctx, r, s.controllerName)
+			if status == nil || isRouteStatusEqual(&r.Status.RouteStatus, status) {
+				return nil
+			}
+			r.Status.RouteStatus = *status
+		case *gwv1alpha2.TCPRoute:
+			status = rm.BuildRouteStatus(ctx, r, s.controllerName)
+			if status == nil || isRouteStatusEqual(&r.Status.RouteStatus, status) {
+				return nil
+			}
+			r.Status.RouteStatus = *status
+		case *gwv1alpha2.TLSRoute:
+			status = rm.BuildRouteStatus(ctx, r, s.controllerName)
+			if status == nil || isRouteStatusEqual(&r.Status.RouteStatus, status) {
+				return nil
+			}
+			r.Status.RouteStatus = *status
+		case *gwv1.GRPCRoute:
+			status = rm.BuildRouteStatus(ctx, r, s.controllerName)
+			if status == nil || isRouteStatusEqual(&r.Status.RouteStatus, status) {
+				return nil
+			}
+			r.Status.RouteStatus = *status
+		default:
+			logger.Warn("unsupported route type", logKeyRouteType, routeType, logKeyResourceRef, client.ObjectKeyFromObject(route))
+			return nil
+		}
+
+		// Update the status
+		return s.mgr.GetClient().Status().Update(ctx, route)
+	}
+
+	for rnn := range rm.HTTPRoutes {
+		err := syncStatusWithRetry(
+			wellknown.HTTPRouteKind,
+			rnn,
+			func() client.Object {
+				return new(gwv1.HTTPRoute)
+			},
+			func(route client.Object) error {
+				return buildAndUpdateStatus(route, wellknown.HTTPRouteKind)
+			},
+		)
+		if err != nil {
+			logger.Error("all attempts failed at updating HTTPRoute status", logKeyError, err, "route", rnn)
+		}
+	}
+}
+
+// syncGatewayStatus will build and update status for all Gateways in a reportMap
+func (s *AgentGwSyncer) syncGatewayStatus(ctx context.Context, logger *slog.Logger, rm reports.ReportMap) {
+	stopwatch := utils.NewTranslatorStopWatch("GatewayStatusSyncer")
+	stopwatch.Start()
+
+	// TODO: add gatewayStatusMetrics
+
+	// TODO: retry within loop per GW rather that as a full block
+	err := retry.Do(func() error {
+		for gwnn := range rm.Gateways {
+			gw := gwv1.Gateway{}
+			err := s.mgr.GetClient().Get(ctx, gwnn, &gw)
+			if err != nil {
+				logger.Info("error getting gw", logKeyError, err, logKeyGateway, gwnn.String())
+				return err
+			}
+
+			gwStatusWithoutAddress := gw.Status
+			gwStatusWithoutAddress.Addresses = nil
+			if status := rm.BuildGWStatus(ctx, gw); status != nil {
+				if !isGatewayStatusEqual(&gwStatusWithoutAddress, status) {
+					gw.Status = *status
+					if err := s.mgr.GetClient().Status().Patch(ctx, &gw, client.Merge); err != nil {
+						logger.Error("error patching gateway status", logKeyError, err, logKeyGateway, gwnn.String())
+						return err
+					}
+					logger.Info("patched gw status", logKeyGateway, gwnn.String())
+				} else {
+					logger.Info("skipping k8s gateway status update, status equal", logKeyGateway, gwnn.String())
+				}
+			}
+		}
+		return nil
+	},
+		retry.Attempts(maxRetryAttempts),
+		retry.Delay(retryDelay),
+		retry.DelayType(retry.BackOffDelay),
+	)
+	if err != nil {
+		logger.Error("all attempts failed at updating gateway statuses", logKeyError, err)
+	}
+	duration := stopwatch.Stop(ctx)
+	logger.Debug("synced gw status for gateways", "count", len(rm.Gateways), "duration", duration)
+}
+
+// syncListenerSetStatus will build and update status for all Listener Sets in a reportMap
+func (s *AgentGwSyncer) syncListenerSetStatus(ctx context.Context, logger *slog.Logger, rm reports.ReportMap) {
+	stopwatch := utils.NewTranslatorStopWatch("ListenerSetStatusSyncer")
+	stopwatch.Start()
+
+	// TODO: add listenerStatusMetrics
+
+	// TODO: retry within loop per LS rathen that as a full block
+	err := retry.Do(func() error {
+		for lsnn := range rm.ListenerSets {
+			ls := gwxv1a1.XListenerSet{}
+			err := s.mgr.GetClient().Get(ctx, lsnn, &ls)
+			if err != nil {
+				logger.Info("error getting ls", "erro", err.Error())
+				return err
+			}
+			lsStatus := ls.Status
+			if status := rm.BuildListenerSetStatus(ctx, ls); status != nil {
+				if !isListenerSetStatusEqual(&lsStatus, status) {
+					ls.Status = *status
+					if err := s.mgr.GetClient().Status().Patch(ctx, &ls, client.Merge); err != nil {
+						logger.Error("error patching listener set status", logKeyError, err, logKeyGateway, lsnn.String())
+						return err
+					}
+					logger.Info("patched ls status", "listenerset", lsnn.String())
+				} else {
+					logger.Info("skipping k8s ls status update, status equal", "listenerset", lsnn.String())
+				}
+			}
+		}
+		return nil
+	},
+		retry.Attempts(maxRetryAttempts),
+		retry.Delay(retryDelay),
+		retry.DelayType(retry.BackOffDelay),
+	)
+	if err != nil {
+		logger.Error("all attempts failed at updating listener set statuses", logKeyError, err)
+	}
+	duration := stopwatch.Stop(ctx)
+	logger.Debug("synced listener sets status for listener set", "count", len(rm.ListenerSets), "duration", duration.String())
+}
+
+// TODO: refactor proxy_syncer status syncing to use the same logic as agentgateway syncer
+
+var opts = cmp.Options{
+	cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
+	cmpopts.IgnoreMapEntries(func(k string, _ any) bool {
+		return k == "lastTransitionTime"
+	}),
+}
+
+// isRouteStatusEqual compares two RouteStatus objects directly
+func isRouteStatusEqual(objA, objB *gwv1.RouteStatus) bool {
+	return cmp.Equal(objA, objB, opts)
+}
+
+func isListenerSetStatusEqual(objA, objB *gwxv1a1.ListenerSetStatus) bool {
+	return cmp.Equal(objA, objB, opts)
+}
+
+func mergeProxyReports(proxies []agentGwXdsResources) reports.ReportMap {
+	merged := reports.NewReportMap()
+
+	for _, p := range proxies {
+		// 1. merge GW Reports for all Proxies' status reports
+		maps.Copy(merged.Gateways, p.reports.Gateways)
+
+		// 2. merge LS Reports for all Proxies' status reports
+		maps.Copy(merged.ListenerSets, p.reports.ListenerSets)
+
+		// 3. merge route parentRefs into RouteReports for all route types
+		mergeRouteReports(merged.HTTPRoutes, p.reports.HTTPRoutes)
+		mergeRouteReports(merged.TCPRoutes, p.reports.TCPRoutes)
+		mergeRouteReports(merged.TLSRoutes, p.reports.TLSRoutes)
+		mergeRouteReports(merged.GRPCRoutes, p.reports.GRPCRoutes)
+
+		// TODO: add back when policies are back
+		//for key, report := range p.reports.Policies {
+		//	// if we haven't encountered this policy, just copy it over completely
+		//	old := merged.Policies[key]
+		//	if old == nil {
+		//		merged.Policies[key] = report
+		//		continue
+		//	}
+		//	// else, let's merge our parentRefs into the existing map
+		//	// obsGen will stay as-is...
+		//	maps.Copy(merged.Policies[key].Ancestors, report.Ancestors)
+		//}
+	}
+
+	return merged
+}
+
+// mergeRouteReports is a helper function to merge route reports
+func mergeRouteReports(merged map[types.NamespacedName]*reports.RouteReport, source map[types.NamespacedName]*reports.RouteReport) {
+	for rnn, rr := range source {
+		// if we haven't encountered this route, just copy it over completely
+		old := merged[rnn]
+		if old == nil {
+			merged[rnn] = rr
+			continue
+		}
+		// else, this route has already been seen for a proxy, merge this proxy's parents
+		// into the merged report
+		maps.Copy(merged[rnn].Parents, rr.Parents)
+	}
+}
+
+func isGatewayStatusEqual(objA, objB *gwv1.GatewayStatus) bool {
+	return cmp.Equal(objA, objB, opts)
 }
