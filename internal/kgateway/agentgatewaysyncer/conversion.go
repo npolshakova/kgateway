@@ -112,6 +112,32 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	return res, backendErr
 }
 
+func convertTCPRouteToADP(ctx RouteContext, r gwv1alpha2.TCPRouteRule,
+	obj *gwv1alpha2.TCPRoute, pos int,
+) (*api.Route, *reporter.RouteCondition) {
+	res := &api.Route{
+		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos),
+		RouteName:   obj.Namespace + "/" + obj.Name,
+		ListenerKey: "",
+		RuleName:    defaultString(r.Name, ""),
+	}
+
+	res.Matches = []*api.RouteMatch{{
+		// TCP doesn't have path, headers, method, or query params
+		// This is essentially a catch-all match for TCP traffic
+	}}
+
+	// Build TCP destinations
+	route, backendErr, err := buildADPTCPDestination(ctx, r.BackendRefs, obj.Namespace)
+	if err != nil {
+		logger.Error("failed to translate tcp destination", "err", err)
+		return nil, err
+	}
+	res.Backends = route
+
+	return res, backendErr
+}
+
 func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 	obj *gwv1.GRPCRoute, pos int,
 ) (*api.Route, *reporter.RouteCondition) {
@@ -126,6 +152,7 @@ func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 	for _, match := range r.Matches {
 		headers, err := createADPGRPCHeadersMatch(match)
 		if err != nil {
+			logger.Error("failed to translate grpc header match", "err", err, "route_name", obj.Name, "route_ns", obj.Namespace)
 			return nil, err
 		}
 		// For GRPC, we don't have path match in the traditional sense, so we'll derive it from method
@@ -153,12 +180,14 @@ func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 
 	filters, err := buildADPGRPCFilters(ctx, obj.Namespace, r.Filters)
 	if err != nil {
+		logger.Error("failed to translate grpc filter", "err", err, "route_name", obj.Name, "route_ns", obj.Namespace)
 		return nil, err
 	}
 	res.Filters = filters
 
 	route, backendErr, err := buildADPGRPCDestination(ctx, r.BackendRefs, obj.Namespace)
 	if err != nil {
+		logger.Error("failed to translate grpc destination", "err", err, "route_name", obj.Name, "route_ns", obj.Namespace)
 		return nil, err
 	}
 	res.Backends = route
@@ -166,6 +195,99 @@ func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 		return string(e)
 	})
 	return res, backendErr
+}
+
+func convertTLSRouteToADP(ctx RouteContext, r gwv1alpha2.TLSRouteRule,
+	obj *gwv1alpha2.TLSRoute, pos int,
+) (*api.Route, *reporter.RouteCondition) {
+	res := &api.Route{
+		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos),
+		RouteName:   obj.Namespace + "/" + obj.Name,
+		ListenerKey: "",
+		RuleName:    defaultString(r.Name, ""),
+	}
+
+	// TLS routes match on SNI hostnames, but ADP RouteMatch doesn't have direct SNI support
+	// For TLS, we create a basic match that accepts all traffic (SNI matching happens at listener level)
+	res.Matches = []*api.RouteMatch{{
+		// TLS doesn't have path, headers, method, or query params
+		// SNI matching is handled at the listener/gateway level
+	}}
+
+	// Build TLS destinations
+	route, backendErr, err := buildADPTLSDestination(ctx, r.BackendRefs, obj.Namespace)
+	if err != nil {
+		logger.Error("failed to translate tls destination", "err", err, "route_name", obj.Name, "route_ns", obj.Namespace)
+		return nil, err
+	}
+	res.Backends = route
+
+	// TLS routes have hostnames in the spec (unlike TCP routes)
+	res.Hostnames = slices.Map(obj.Spec.Hostnames, func(e gwv1.Hostname) string {
+		return string(e)
+	})
+
+	return res, backendErr
+}
+
+func buildADPTCPDestination(
+	ctx RouteContext,
+	forwardTo []gwv1.BackendRef,
+	ns string,
+) ([]*api.RouteBackend, *reporter.RouteCondition, *reporter.RouteCondition) {
+	if forwardTo == nil {
+		return nil, nil, nil
+	}
+
+	var invalidBackendErr *reporter.RouteCondition
+	var res []*api.RouteBackend
+	for _, fwd := range forwardTo {
+		dst, err := buildADPDestination(ctx, gwv1.HTTPBackendRef{
+			BackendRef: fwd,
+			Filters:    nil, // TCP routes don't have per-backend filters?
+		}, ns, wellknown.TCPRouteGVK)
+		if err != nil {
+			logger.Error("error building agent gateway destination", "error", err)
+			if isInvalidBackend(err) {
+				invalidBackendErr = err
+				// keep going, we will gracefully drop invalid backends
+			} else {
+				return nil, nil, err
+			}
+		}
+		res = append(res, dst)
+	}
+	return res, invalidBackendErr, nil
+}
+
+func buildADPTLSDestination(
+	ctx RouteContext,
+	forwardTo []gwv1.BackendRef,
+	ns string,
+) ([]*api.RouteBackend, *reporter.RouteCondition, *reporter.RouteCondition) {
+	if forwardTo == nil {
+		return nil, nil, nil
+	}
+
+	var invalidBackendErr *reporter.RouteCondition
+	var res []*api.RouteBackend
+	for _, fwd := range forwardTo {
+		dst, err := buildADPDestination(ctx, gwv1.HTTPBackendRef{
+			BackendRef: fwd,
+			Filters:    nil, // TLS routes don't have per-backend filters
+		}, ns, wellknown.TLSRouteGVK)
+		if err != nil {
+			logger.Error("error building agent gateway destination", "error", err)
+			if isInvalidBackend(err) {
+				invalidBackendErr = err
+				// keep going, we will gracefully drop invalid backends
+			} else {
+				return nil, nil, err
+			}
+		}
+		res = append(res, dst)
+	}
+	return res, invalidBackendErr, nil
 }
 
 func buildADPFilters(

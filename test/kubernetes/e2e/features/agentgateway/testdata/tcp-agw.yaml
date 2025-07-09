@@ -1,0 +1,104 @@
+kind: GatewayParameters
+apiVersion: gateway.kgateway.dev/v1alpha1
+metadata:
+  name: kgateway
+spec:
+  kube:
+    agentGateway:
+      enabled: true
+      logLevel: debug
+      image:
+        tag: bc92714
+---
+kind: GatewayClass
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: agentgateway
+spec:
+  controllerName: kgateway.dev/kgateway
+  parametersRef:
+    group: gateway.kgateway.dev
+    kind: GatewayParameters
+    name: kgateway
+    namespace: default
+---
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: tcp-gw-for-test
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+    - name: foo
+      protocol: TCP
+      port: 8080
+      allowedRoutes:
+        kinds:
+          - kind: TCPRoute
+    - name: bar
+      protocol: TCP
+      port: 8090
+      allowedRoutes:
+        kinds:
+          - kind: TCPRoute
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: tcp-app-1
+spec:
+  parentRefs:
+    - name: tcp-gw-for-test
+      sectionName: foo
+  rules:
+    - backendRefs:
+        - name: tcp-backend
+          port: 3001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tcp-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tcp-backend
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: tcp-backend
+        version: v1
+    spec:
+      containers:
+        - image: gcr.io/k8s-staging-gateway-api/echo-basic:v20231214-v1.0.0-140-gf544a46e
+          imagePullPolicy: IfNotPresent
+          name: tcp-backend
+          ports:
+            - containerPort: 3000
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SERVICE_NAME
+              value: tcp-backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tcp-backend
+  labels:
+    app: tcp-backend
+spec:
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3000
+  selector:
+    app: tcp-backend

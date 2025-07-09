@@ -8,7 +8,7 @@
           "hostname": "gateway-pool-endpoint-picker.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAATQ=="
+              "address": "CgAALw=="
             }
           ],
           "ports": [
@@ -41,12 +41,33 @@
     {
       "Type": {
         "Service": {
+          "name": "http-grpcroute",
+          "namespace": "gwtest",
+          "hostname": "http-grpcroute.gwtest.svc.cluster.local",
+          "addresses": [
+            {
+              "address": "CgAArQ=="
+            }
+          ],
+          "ports": [
+            {
+              "service_port": 8080,
+              "target_port": 8080
+            }
+          ],
+          "ip_families": 1
+        }
+      }
+    },
+    {
+      "Type": {
+        "Service": {
           "name": "http-httproute",
           "namespace": "gwtest",
           "hostname": "http-httproute.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAbg=="
+              "address": "CgAAEw=="
             }
           ],
           "ports": [
@@ -67,7 +88,7 @@
           "hostname": "http-inferencepool.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAIQ=="
+              "address": "CgAAkw=="
             }
           ],
           "ports": [
@@ -94,7 +115,7 @@
           "ports": [
             {
               "service_port": 443,
-              "target_port": 59848
+              "target_port": 64190
             }
           ],
           "ip_families": 1

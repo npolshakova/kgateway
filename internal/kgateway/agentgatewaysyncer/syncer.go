@@ -16,7 +16,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
-	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pkg/config/schema/kubeclient"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
@@ -98,6 +97,9 @@ type AgentGwSyncer struct {
 
 	// Synchronization
 	waitForSync []cache.InformerSynced
+
+	// features
+	EnableAlphaGatewayAPI bool
 }
 
 // agentGwXdsResources represents XDS resources for a single agent gateway
@@ -136,6 +138,7 @@ func NewAgentGwSyncer(
 	domainSuffix string,
 	systemNamespace string,
 	clusterID string,
+	enableAlphaGwAPIs bool,
 ) *AgentGwSyncer {
 	// TODO: register types (auth, policy, etc.) if necessary
 	return &AgentGwSyncer{
@@ -149,6 +152,7 @@ func NewAgentGwSyncer(
 		systemNamespace:       systemNamespace,
 		clusterID:             clusterID,
 		xdsSnapshotsMetrics:   krtcollections.NewCollectionMetricsRecorder("AgentGatewayXDSSnapshots"),
+		EnableAlphaGatewayAPI: enableAlphaGwAPIs,
 	}
 }
 
@@ -280,10 +284,12 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 		InferencePools: krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools"), kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...),
 	}
 
-	if features.EnableAlphaGatewayAPI {
+	if s.EnableAlphaGatewayAPI {
+		logger.Debug("alpha gateway apis are enabled")
 		inputs.TCPRoutes = krt.WrapClient(kclient.NewFiltered[*gwv1alpha2.TCPRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TCPRoutes")...)
 		inputs.TLSRoutes = krt.WrapClient(kclient.NewFiltered[*gwv1alpha2.TLSRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TLSRoutes")...)
 	} else {
+		logger.Debug("alpha gateway apis are disabled")
 		// If disabled, still build a collection but make it always empty
 		inputs.TCPRoutes = krt.NewStaticCollection[*gwv1alpha2.TCPRoute](nil, krtopts.ToOptions("disable/TCPRoutes")...)
 		inputs.TLSRoutes = krt.NewStaticCollection[*gwv1alpha2.TLSRoute](nil, krtopts.ToOptions("disable/TLSRoutes")...)
@@ -393,7 +399,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		Namespaces:     inputs.Namespaces,
 		InferencePools: inputs.InferencePools,
 	}
-	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, routeInputs, krtopts, *reportMap, rep)
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, *reportMap, rep)
 
 	return krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
 }

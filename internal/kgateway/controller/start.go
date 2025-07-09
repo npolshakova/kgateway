@@ -223,6 +223,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			domainSuffix,
 			namespaces.GetPodNamespace(),
 			cfg.Client.ClusterID().String(),
+			cfg.SetupOpts.GlobalSettings.EnableAgentGatewayAlphaApis,
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)
 
