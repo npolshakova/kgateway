@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -18,6 +17,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/protoutils"
 
 	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -65,7 +65,7 @@ func LoadFromFiles(ctx context.Context, filename string, scheme *runtime.Scheme)
 		for _, obj := range objs {
 			clientObj, ok := obj.(client.Object)
 			if !ok {
-				return nil, fmt.Errorf("cannot convert runtime.Object to client.Object: %+v", obj)
+				return nil, errors.Errorf("cannot convert runtime.Object to client.Object: %+v", obj)
 			}
 
 			_, isGwc := clientObj.(*gwv1.GatewayClass)

@@ -3,7 +3,6 @@
 package helpers
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -312,7 +311,7 @@ func (s *SnapshotWriterImpl) waitForProxiesToBeDeleted(deleteOptions clients.Del
 			return err
 		}
 		if len(proxies) > 0 {
-			return fmt.Errorf("expected proxies to be deleted, but found %d", len(proxies))
+			return errors.Errorf("expected proxies to be deleted, but found %d", len(proxies))
 		}
 		return nil
 	},

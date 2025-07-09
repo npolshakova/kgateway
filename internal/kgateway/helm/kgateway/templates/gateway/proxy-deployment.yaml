@@ -299,10 +299,8 @@ spec:
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
-{{- if or $gateway.aiExtension.stats $gateway.aiExtension.tracing }}
-          - mountPath: /var/run/ai-otel-config
-            name: ai-otel-config
-{{- end }}
+          - mountPath: /var/run/stats
+            name: ai-stats-config
 {{- end }} {{/* if (($gateway.aiExtension).enabled) */}}
       {{- with $gateway.nodeSelector }}
       nodeSelector:
@@ -324,11 +322,9 @@ spec:
           name: {{ include "kgateway.gateway.fullname" . }}
         name: envoy-config
 {{- if (($gateway.aiExtension).enabled) }}
-{{- if or $gateway.aiExtension.stats $gateway.aiExtension.tracing }}
       - configMap:
-          name: {{ include "kgateway.gateway.fullname" . }}-ai-otel-config
-        name: ai-otel-config
-{{- end }}
+          name: {{ include "kgateway.gateway.fullname" . }}-ai-stats-config
+        name: ai-stats-config
 {{- end }} {{/* if (($gateway.aiExtension).enabled) */}}
 {{- if $gateway.istio.enabled }}
       - emptyDir:
@@ -406,23 +402,18 @@ spec:
     {{- include "kgateway.gateway.selectorLabels" . | nindent 4 }}
 ---
 {{- if (($gateway.aiExtension).enabled) }}
-{{- if or $gateway.aiExtension.stats $gateway.aiExtension.tracing }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "kgateway.gateway.fullname" . }}-ai-otel-config
+  name: {{ include "kgateway.gateway.fullname" . }}-ai-stats-config
   labels:
     {{- include "kgateway.gateway.constLabels" . | nindent 4 }}
     {{- include "kgateway.gateway.labels" . | nindent 4 }}
-data:
 {{- if $gateway.aiExtension.stats }}
-  stats.json: {{ $gateway.aiExtension.stats | toJson | quote }}
-{{- end }}
-{{- if $gateway.aiExtension.tracing }}
-  tracing.json: {{ $gateway.aiExtension.tracing | toJson | quote }}
-{{- end }}
-{{- end }} {{/* if or $gateway.aiExtension.stats $gateway.aiExtension.tracing */}}
-{{- end }} {{/* if (($gateway.aiExtension).enabled) */}}
+data:
+  stats.json: {{ $gateway.aiExtension.stats }}
+{{- end}}
+{{- end}}
 ---
 apiVersion: v1
 kind: ConfigMap

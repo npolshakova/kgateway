@@ -182,7 +182,6 @@ func (i *TestInstallation) InstallKgatewayCoreFromLocalChart(ctx context.Context
 			ValuesFiles:     []string{i.Metadata.ProfileValuesManifestFile, i.Metadata.ValuesManifestFile},
 			ReleaseName:     helmutils.ChartName,
 			ChartUri:        chartUri,
-			ExtraArgs:       i.Metadata.ExtraHelmArgs,
 		})
 	i.Assertions.Require.NoError(err)
 	i.Assertions.EventuallyKgatewayInstallSucceeded(ctx)

@@ -99,7 +99,7 @@ func translateTLSConfig(
 		return nil, errors.New("invalid TLS config: certChain and privateKey must both be provided")
 	}
 
-	sanMatchers := verifySanListToTypedMatchSanList(tlsConfig.VerifySubjectAltName)
+	sanList := verifySanListToMatchSanList(tlsConfig.VerifySubjectAltName)
 
 	if rootCaData != nil {
 		validationCtx := &envoyauth.CommonTlsContext_ValidationContext{
@@ -107,11 +107,11 @@ func translateTLSConfig(
 				TrustedCa: rootCaData,
 			},
 		}
-		if len(sanMatchers) != 0 {
-			validationCtx.ValidationContext.MatchTypedSubjectAltNames = sanMatchers
+		if len(sanList) != 0 {
+			validationCtx.ValidationContext.MatchSubjectAltNames = sanList
 		}
 		tlsContext.ValidationContextType = validationCtx
-	} else if len(sanMatchers) != 0 {
+	} else if len(sanList) != 0 {
 		return nil, errors.New("a root_ca must be provided if verify_subject_alt_name is not empty")
 	}
 
@@ -225,14 +225,11 @@ func stringDataSourceGenerator(inlineDataSource bool) func(s string) *corev3.Dat
 	}
 }
 
-func verifySanListToTypedMatchSanList(sanList []string) []*envoyauth.SubjectAltNameMatcher {
-	var matchSanList []*envoyauth.SubjectAltNameMatcher
+func verifySanListToMatchSanList(sanList []string) []*envoymatcher.StringMatcher {
+	var matchSanList []*envoymatcher.StringMatcher
 	for _, san := range sanList {
-		matchSan := &envoyauth.SubjectAltNameMatcher{
-			SanType: envoyauth.SubjectAltNameMatcher_DNS,
-			Matcher: &envoymatcher.StringMatcher{
-				MatchPattern: &envoymatcher.StringMatcher_Exact{Exact: san},
-			},
+		matchSan := &envoymatcher.StringMatcher{
+			MatchPattern: &envoymatcher.StringMatcher_Exact{Exact: san},
 		}
 		matchSanList = append(matchSanList, matchSan)
 	}

@@ -21,7 +21,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/metrics"
 	"github.com/kgateway-dev/kgateway/v2/pkg/metrics/metricstest"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
-	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 )
 
 func setupTest() {
@@ -285,8 +284,7 @@ func TestGatewaysCollectionMetrics(t *testing.T) {
 			mockGws := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			mockLss := krttest.GetMockCollection[*gwxv1a1.XListenerSet](mock)
 
-			idx := NewGatewayIndex(krtutil.KrtOptions{}, "test",
-				NewPolicyIndex(krtutil.KrtOptions{}, nil, settings.Settings{}), mockGws, mockLss, mockGwcs, mockNs)
+			idx := NewGatewayIndex(krtutil.KrtOptions{}, "test", NewPolicyIndex(krtutil.KrtOptions{}, nil), mockGws, mockLss, mockGwcs, mockNs)
 			idx.Gateways.WaitUntilSynced(context.Background().Done())
 
 			time.Sleep(5 * time.Millisecond) // Allow some time for events to process.

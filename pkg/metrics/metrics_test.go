@@ -11,12 +11,8 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/metrics/metricstest"
 )
 
-func setupTestRegistry() {
-	SetRegistry(false, prometheus.NewRegistry())
-}
-
 func TestCounterInterface(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := CounterOpts{
 		Name: "test_total",
@@ -52,7 +48,7 @@ func TestCounterInterface(t *testing.T) {
 }
 
 func TestCounterPartialLabels(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := CounterOpts{
 		Name: "test_total",
@@ -76,7 +72,7 @@ func TestCounterPartialLabels(t *testing.T) {
 }
 
 func TestCounterNoLabels(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := CounterOpts{
 		Name: "test_total",
@@ -96,7 +92,7 @@ func TestCounterNoLabels(t *testing.T) {
 }
 
 func TestCounterRegistrationPanic(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := CounterOpts{
 		Name: "test_total",
@@ -112,11 +108,12 @@ func TestCounterRegistrationPanic(t *testing.T) {
 }
 
 func TestHistogramInterface(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := HistogramOpts{
-		Name: "test_duration_seconds",
-		Help: "A test histogram metric",
+		Name:    "test_duration_seconds",
+		Help:    "A test histogram metric",
+		Buckets: prometheus.DefBuckets,
 	}
 
 	histogram := NewHistogram(opts, []string{"label1", "label2"})
@@ -133,42 +130,14 @@ func TestHistogramInterface(t *testing.T) {
 		{Name: "label1", Value: "value1"},
 		{Name: "label2", Value: "value2"},
 	})
-	gathered.AssertHistogramBuckets("kgateway_test_duration_seconds", DefaultBuckets)
 
 	histogram.Reset()
 	gathered = metricstest.MustGatherMetrics(t)
 	gathered.AssertMetricNotExists("kgateway_test_duration_seconds")
 }
 
-func TestHistogramBuckets(t *testing.T) {
-	setupTestRegistry()
-
-	testBuckets := []float64{0.1, 0.5, 1.0, 2.5, 5.0, 10.0}
-
-	opts := HistogramOpts{
-		Name:    "test_duration_seconds",
-		Help:    "A test histogram metric",
-		Buckets: testBuckets,
-	}
-
-	histogram := NewHistogram(opts, []string{"label1", "label2"})
-
-	histogram.Observe(1.5, Label{Name: "label1", Value: "value1"}, Label{Name: "label2", Value: "value2"})
-
-	gathered := metricstest.MustGatherMetrics(t)
-	gathered.AssertMetricHistogramValue("kgateway_test_duration_seconds", metricstest.HistogramMetricOutput{
-		SampleCount: 1,
-		SampleSum:   1.5,
-	})
-	gathered.AssertMetricLabels("kgateway_test_duration_seconds", []Label{
-		{Name: "label1", Value: "value1"},
-		{Name: "label2", Value: "value2"},
-	})
-	gathered.AssertHistogramBuckets("kgateway_test_duration_seconds", testBuckets)
-}
-
 func TestHistogramPartialLabels(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := HistogramOpts{
 		Name:    "test_duration_seconds_partial",
@@ -194,7 +163,7 @@ func TestHistogramPartialLabels(t *testing.T) {
 }
 
 func TestHistogramNoLabels(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := HistogramOpts{
 		Name:    "test_duration_seconds_no_labels",
@@ -216,7 +185,7 @@ func TestHistogramNoLabels(t *testing.T) {
 }
 
 func TestHistogramRegistrationPanic(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := HistogramOpts{
 		Name:    "test_duration_seconds_duplicate",
@@ -233,7 +202,7 @@ func TestHistogramRegistrationPanic(t *testing.T) {
 }
 
 func TestGaugeInterface(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := GaugeOpts{
 		Name: "tests",
@@ -275,7 +244,7 @@ func TestGaugeInterface(t *testing.T) {
 }
 
 func TestGaugePartialLabels(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := GaugeOpts{
 		Name: "tests_partial",
@@ -299,7 +268,7 @@ func TestGaugePartialLabels(t *testing.T) {
 }
 
 func TestGaugeNoLabels(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := GaugeOpts{
 		Name: "tests_no_labels",
@@ -320,7 +289,7 @@ func TestGaugeNoLabels(t *testing.T) {
 }
 
 func TestGaugeRegistrationPanic(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := GaugeOpts{
 		Name: "tests_duplicate",
@@ -336,7 +305,7 @@ func TestGaugeRegistrationPanic(t *testing.T) {
 }
 
 func TestGetPromCollector(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	counterOpts := CounterOpts{
 		Name: "test_collector_total",
@@ -371,7 +340,7 @@ func TestGetPromCollector(t *testing.T) {
 }
 
 func TestValidateLabelsOrder(t *testing.T) {
-	setupTestRegistry()
+	SetRegistry(prometheus.NewRegistry())
 
 	opts := CounterOpts{
 		Name: "test_label_order_total",

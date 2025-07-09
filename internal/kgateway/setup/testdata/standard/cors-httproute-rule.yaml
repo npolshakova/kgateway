@@ -112,10 +112,7 @@ spec:
     filters: # Filters that are applied at the rule level
       - cors:
           allowOrigins:
-          - "https://*.notexample.com"
-          - "https://a.b*"
-          - "https://exact.domain.com"
-          - "http://*"
+          - "https://notexample.com"
           allowMethods:
           - POST
         type: CORS

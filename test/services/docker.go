@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -39,7 +40,7 @@ func RunContainer(containerName string, args []string) error {
 	cmd.Stderr = ginkgo.GinkgoWriter
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("Unable to start %s container: %w", containerName, err)
+		return errors.Wrap(err, "Unable to start "+containerName+" container")
 	}
 	return nil
 }
@@ -60,7 +61,7 @@ func ExecOnContainer(containerName string, args []string) ([]byte, error) {
 	cmd := exec.Command("docker", arguments...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to execute command %v on [%s] container [%s]: %w", arguments, containerName, out, err)
+		return nil, errors.Wrapf(err, "Unable to execute command %v on [%s] container [%s]", arguments, containerName, out)
 	}
 	return out, nil
 }
@@ -97,7 +98,7 @@ func WaitUntilContainerRemoved(containerName string) error {
 		inspectErr := exec.Command("docker", "inspect", containerName).Run()
 		if inspectErr == nil {
 			// If there is no error, it means the container still exists, so we want to retry
-			return fmt.Errorf("container %s still exists", containerName)
+			return errors.Errorf("container %s still exists", containerName)
 		}
 		return nil
 	},

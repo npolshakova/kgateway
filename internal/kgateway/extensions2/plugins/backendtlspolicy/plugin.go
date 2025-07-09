@@ -28,6 +28,7 @@ import (
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/kube/kubetypes"
 
+	gwv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1a3 "sigs.k8s.io/gateway-api/apis/v1alpha3"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
@@ -35,7 +36,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	kgwellknown "github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-	pluginutils "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/utils"
 )
 
 var (
@@ -105,7 +105,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 			},
 			Policy:     i,
 			PolicyIR:   tlsPolicyIR,
-			TargetRefs: pluginutils.TargetRefsToPolicyRefsWithSectionNameV1Alpha2(i.Spec.TargetRefs),
+			TargetRefs: convertTargetRefs(i.Spec.TargetRefs),
 		}
 		if err != nil {
 			pol.Errors = []error{err}
@@ -206,6 +206,14 @@ func buildTranslateFunc(
 
 		return &policyIr, nil
 	}
+}
+
+func convertTargetRefs(targetRefs []gwv1a2.LocalPolicyTargetReferenceWithSectionName) []ir.PolicyRef {
+	return []ir.PolicyRef{{
+		Kind:  string(targetRefs[0].Kind),
+		Name:  string(targetRefs[0].Name),
+		Group: string(targetRefs[0].Group),
+	}}
 }
 
 func convertSubjectAltNames(validation gwv1a3.BackendTLSPolicyValidation) []*envoy_tls_v3.SubjectAltNameMatcher {

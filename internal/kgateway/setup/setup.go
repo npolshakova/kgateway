@@ -207,13 +207,14 @@ func StartKgatewayWithConfig(
 		return err
 	}
 
-	metrics.SetRegistry(setupOpts.GlobalSettings.EnableBuiltinDefaultMetrics, nil)
-	metrics.SetActive(!(setupOpts.MetricsBindAddress == "" || setupOpts.MetricsBindAddress == "0"))
+	if setupOpts.MetricsBindAddress == "" || setupOpts.MetricsBindAddress == "0" {
+		metrics.SetActive(false)
+	}
 
 	slog.Info("creating krt collections")
 	krtOpts := krtutil.NewKrtOptions(ctx.Done(), setupOpts.KrtDebugger)
 
-	augmentedPods := krtcollections.NewPodsCollection(kubeClient, krtOpts)
+	augmentedPods, _ := krtcollections.NewPodsCollection(kubeClient, krtOpts)
 	augmentedPodsForUcc := augmentedPods
 	if envutils.IsEnvTruthy("DISABLE_POD_LOCALITY_XDS") {
 		augmentedPodsForUcc = nil
