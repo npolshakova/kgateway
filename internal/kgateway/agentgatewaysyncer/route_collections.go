@@ -11,11 +11,9 @@ import (
 	"istio.io/istio/pkg/slices"
 	"istio.io/istio/pkg/util/protomarshal"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 
@@ -37,8 +35,8 @@ func ADPRouteCollection(
 		ctx := inputs.WithCtx(krtctx)
 		routeReporter := rep.Route(obj)
 		route := obj.Spec
-		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gwv1.HTTPRoute) iter.Seq2[ADPRoute, *ConfigError] {
-			return func(yield func(ADPRoute, *ConfigError) bool) {
+		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gwv1.HTTPRoute) iter.Seq2[ADPRoute, *reporter.RouteCondition] {
+			return func(yield func(ADPRoute, *reporter.RouteCondition) bool) {
 				for n, r := range route.Rules {
 					// split the rule to make sure each rule has up to one match
 					matches := slices.Reference(r.Matches)
@@ -70,12 +68,7 @@ func ADPRouteCollection(
 				continue
 			}
 			if gwResult.error != nil {
-				parentRefReporter.SetCondition(reporter.RouteCondition{
-					Type:    gwv1beta1.RouteConditionResolvedRefs, // TODO: fix
-					Status:  metav1.ConditionFalse,
-					Reason:  gwv1beta1.RouteConditionReason(gwResult.error.Reason),
-					Message: gwResult.error.Message,
-				})
+				parentRefReporter.SetCondition(*gwResult.error)
 			}
 
 			gw := types.NamespacedName{
@@ -97,7 +90,7 @@ func ADPRouteCollection(
 }
 
 type conversionResult[O any] struct {
-	error  *ConfigError
+	error  *reporter.RouteCondition
 	routes []O
 }
 
@@ -110,7 +103,7 @@ func IsNil[O comparable](o O) bool {
 // computeRoute holds the common route building logic shared amongst all types
 func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, translator func(
 	obj T,
-) iter.Seq2[O, *ConfigError],
+) iter.Seq2[O, *reporter.RouteCondition],
 ) ([]routeParentReference, conversionResult[O]) {
 	parentRefs := extractParentReferenceInfo(ctx, ctx.RouteParents, obj)
 

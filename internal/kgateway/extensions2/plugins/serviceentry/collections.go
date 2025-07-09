@@ -65,7 +65,7 @@ func (s seSelector) Equals(in seSelector) bool {
 	return metaEqual && proto.Equal(&s.ServiceEntry.Spec, &in.ServiceEntry.Spec)
 }
 
-// selectedWorkload adds the following to LocalityPod:
+// selectedWorkload adds the following to Pods:
 // * fields specific to workload entry (portMapping, network, weight)
 // * selectedBy pointers to the selecting ServiceEntries
 // Usable with FilterSelect
@@ -197,7 +197,7 @@ func selectedWorkloads(
 		return namespaces.UnsortedList()
 	})
 
-	// WorkloadEntries: selection logic and conver to LocalityPod
+	// WorkloadEntries: selection logic and convert to Pod
 	selectedWorkloadEntries := krt.NewCollection(WorkloadEntries, func(ctx krt.HandlerContext, we *networkingclient.WorkloadEntry) *selectedWorkload {
 		// find all the SEs that select this we
 		// if there are none, we can stop early
@@ -221,7 +221,7 @@ func selectedWorkloads(
 		return &workload
 	}, krt.WithName("ServiceEntrySelectWorkloadEntry"))
 
-	// LocalityPods: selection logic
+	// Pods: selection logic
 	selectedPods := krt.NewCollection(Pods, func(ctx krt.HandlerContext, workload krtcollections.LocalityPod) *selectedWorkload {
 		serviceEntries := krt.Fetch(
 			ctx,
@@ -241,7 +241,7 @@ func selectedWorkloads(
 		}
 	}, krt.WithName("ServiceEntrySelectPod"))
 
-	// consolidate LocalityPods and WorkloadEntries
+	// consolidate Pods and WorkloadEntries
 	allWorkloads := krt.JoinCollection([]krt.Collection[selectedWorkload]{selectedPods, selectedWorkloadEntries}, krt.WithName("ServiceEntrySelectWorkloads"))
 	workloadsByServiceEntry := krt.NewIndex(allWorkloads, func(o selectedWorkload) []string {
 		return slices.Map(o.selectedBy, func(n krt.Named) string {

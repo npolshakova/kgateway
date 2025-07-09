@@ -6,11 +6,14 @@ import (
 
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/istio/pkg/slices"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
-func createADPMethodMatch(match gwv1.HTTPRouteMatch) (*api.MethodMatch, *ConfigError) {
+func createADPMethodMatch(match gwv1.HTTPRouteMatch) (*api.MethodMatch, *reporter.RouteCondition) {
 	if match.Method == nil {
 		return nil, nil
 	}
@@ -19,7 +22,7 @@ func createADPMethodMatch(match gwv1.HTTPRouteMatch) (*api.MethodMatch, *ConfigE
 	}, nil
 }
 
-func createADPQueryMatch(match gwv1.HTTPRouteMatch) ([]*api.QueryMatch, *ConfigError) {
+func createADPQueryMatch(match gwv1.HTTPRouteMatch) ([]*api.QueryMatch, *reporter.RouteCondition) {
 	res := []*api.QueryMatch{}
 	for _, header := range match.QueryParams {
 		tp := gwv1.QueryParamMatchExact
@@ -39,7 +42,11 @@ func createADPQueryMatch(match gwv1.HTTPRouteMatch) ([]*api.QueryMatch, *ConfigE
 			})
 		default:
 			// Should never happen, unless a new field is added
-			return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported QueryMatch type", tp)}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: fmt.Sprintf("unknown type: %q is not supported QueryMatch type", tp)}
 		}
 	}
 	if len(res) == 0 {
@@ -48,7 +55,7 @@ func createADPQueryMatch(match gwv1.HTTPRouteMatch) ([]*api.QueryMatch, *ConfigE
 	return res, nil
 }
 
-func createADPPathMatch(match gwv1.HTTPRouteMatch) (*api.PathMatch, *ConfigError) {
+func createADPPathMatch(match gwv1.HTTPRouteMatch) (*api.PathMatch, *reporter.RouteCondition) {
 	tp := gwv1.PathMatchPathPrefix
 	if match.Path.Type != nil {
 		tp = *match.Path.Type
@@ -76,11 +83,15 @@ func createADPPathMatch(match gwv1.HTTPRouteMatch) (*api.PathMatch, *ConfigError
 		}}, nil
 	default:
 		// Should never happen, unless a new field is added
-		return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
+		return nil, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
+			Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
 	}
 }
 
-func createADPHeadersMatch(match gwv1.HTTPRouteMatch) ([]*api.HeaderMatch, *ConfigError) {
+func createADPHeadersMatch(match gwv1.HTTPRouteMatch) ([]*api.HeaderMatch, *reporter.RouteCondition) {
 	res := []*api.HeaderMatch{}
 	for _, header := range match.Headers {
 		tp := gwv1.HeaderMatchExact
@@ -100,7 +111,11 @@ func createADPHeadersMatch(match gwv1.HTTPRouteMatch) ([]*api.HeaderMatch, *Conf
 			})
 		default:
 			// Should never happen, unless a new field is added
-			return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
 		}
 	}
 
@@ -172,7 +187,7 @@ func createADPMirrorFilter(
 	filter *gwv1.HTTPRequestMirrorFilter,
 	ns string,
 	k schema.GroupVersionKind,
-) (*api.RouteFilter, *ConfigError) {
+) (*api.RouteFilter, *reporter.RouteCondition) {
 	if filter == nil {
 		return nil, nil
 	}

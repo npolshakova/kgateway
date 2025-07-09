@@ -316,7 +316,7 @@ func AugmentLabels(locality ir.PodLocality, labels map[string]string) {
 
 // technically the plural PodIPs isn't a required field.
 // we don't use it yet, but it will be useful to support ipv6
-// "LocalityPods may be allocated at most 1 value for each of IPv4 and IPv6."
+// "Pods may be allocated at most 1 value for each of IPv4 and IPv6."
 //   - k8s docs
 func extractPodIPs(pod *corev1.Pod) []string {
 	if len(pod.Status.PodIPs) > 0 {

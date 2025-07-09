@@ -144,7 +144,7 @@ func recordKubeState(ctx context.Context, kubectlCli *kubectl.Cli, f *os.File) {
 		return
 	}
 
-	// Describe everything to identify the reason for issues such as LocalityPods, LoadBalancers stuck in pending state
+	// Describe everything to identify the reason for issues such as Pods, LoadBalancers stuck in pending state
 	// (insufficient resources, unable to acquire an IP), etc.
 	// Ie: More context around the output of the previous command `kubectl get all -A`
 	kubeDescribe, err := kubectlCli.RunCommandWithOutput(ctx, "describe", "all", "-A")

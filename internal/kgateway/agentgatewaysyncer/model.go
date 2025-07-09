@@ -86,6 +86,7 @@ func (r ADPCacheAddress) ResourceName() string {
 
 func (r ADPCacheAddress) Equals(in ADPCacheAddress) bool {
 	return report{r.reports}.Equals(report{in.reports}) &&
+		r.NamespacedName.Name == in.NamespacedName.Name && r.NamespacedName.Namespace == in.NamespacedName.Namespace &&
 		proto.Equal(r.Address, in.Address) &&
 		r.AddressVersion == in.AddressVersion &&
 		r.AddressResourceName == in.AddressResourceName
@@ -111,7 +112,8 @@ func (g ADPResource) ResourceName() string {
 }
 
 func (g ADPResource) Equals(other ADPResource) bool {
-	return proto.Equal(g.Resource, other.Resource) && g.Gateway == other.Gateway
+	return proto.Equal(g.Resource, other.Resource) && g.Gateway == other.Gateway &&
+		report{g.reports}.Equals(report{other.reports})
 }
 
 // Meta is metadata attached to each configuration unit.

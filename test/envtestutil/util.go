@@ -190,7 +190,7 @@ func addApiServerLogs(t *testing.T, testEnv *envtest.Environment) {
 }
 
 // applyPodStatusFromFile reads a YAML file, looks for Pod resources with a Status set,
-// and patches their status into the cluster. Skips any LocalityPods not found or lacking a status.
+// and patches their status into the cluster. Skips any Pods not found or lacking a status.
 // This is needed because the other places that apply yaml will only apply spec.
 // We now have tests (ServiceEntry) that rely on IPs from Pod status instead of EndpointSlice.
 func applyPodStatusFromFile(ctx context.Context, c istiokube.CLIClient, defaultNs, filePath string) error {

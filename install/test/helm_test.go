@@ -2102,7 +2102,7 @@ spec:
   behavior:
     scaleDown:
       policies:
-      - type: LocalityPods
+      - type: Pods
         value: 4
         periodSeconds: 60
       - type: Percent
@@ -2148,7 +2148,7 @@ spec:
       - type: Percent
         value: 100
         periodSeconds: 15
-      - type: LocalityPods
+      - type: Pods
         value: 4
         periodSeconds: 15
       selectPolicy: Max

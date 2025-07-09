@@ -38,6 +38,8 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
@@ -47,7 +49,7 @@ const (
 
 func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	obj *gwv1.HTTPRoute, pos int, matchPos int,
-) (*api.Route, *ConfigError) {
+) (*api.Route, *reporter.RouteCondition) {
 	res := &api.Route{
 		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) + "." + strconv.Itoa(matchPos),
 		RouteName:   obj.Namespace + "/" + obj.Name,
@@ -117,9 +119,9 @@ func buildADPFilters(
 	ctx RouteContext,
 	ns string,
 	inputFilters []gwv1.HTTPRouteFilter,
-) ([]*api.RouteFilter, *ConfigError) {
+) ([]*api.RouteFilter, *reporter.RouteCondition) {
 	var filters []*api.RouteFilter
-	var mirrorBackendErr *ConfigError
+	var mirrorBackendErr *reporter.RouteCondition
 	for _, filter := range inputFilters {
 		switch filter.Type {
 		case gwv1.HTTPRouteFilterRequestHeaderModifier:
@@ -154,13 +156,15 @@ func buildADPFilters(
 			}
 			filters = append(filters, h)
 		case gwv1.HTTPRouteFilterCORS:
-			//return nil, &ConfigError{
+			//return nil, &reporter.RouteCondition{
 			//	Reason:  InvalidFilter,
 			//	Message: fmt.Sprintf("unsupported filter type %q", filter.Type),
 			//}
 		default:
-			return nil, &ConfigError{
-				Reason:  InvalidFilter,
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonIncompatibleFilters,
 				Message: fmt.Sprintf("unsupported filter type %q", filter.Type),
 			}
 		}
@@ -172,12 +176,12 @@ func buildADPHTTPDestination(
 	ctx RouteContext,
 	forwardTo []gwv1.HTTPBackendRef,
 	ns string,
-) ([]*api.RouteBackend, *ConfigError, *ConfigError) {
+) ([]*api.RouteBackend, *reporter.RouteCondition, *reporter.RouteCondition) {
 	if forwardTo == nil {
 		return nil, nil, nil
 	}
 
-	var invalidBackendErr *ConfigError
+	var invalidBackendErr *reporter.RouteCondition
 	var res []*api.RouteBackend
 	for _, fwd := range forwardTo {
 		dst, err := buildADPDestination(ctx, fwd, ns, wellknown.HTTPRouteGVK)
@@ -207,12 +211,14 @@ func buildADPDestination(
 	to gwv1.HTTPBackendRef,
 	ns string,
 	k schema.GroupVersionKind,
-) (*api.RouteBackend, *ConfigError) {
+) (*api.RouteBackend, *reporter.RouteCondition) {
 	// check if the reference is allowed
 	if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
 		if !ctx.Grants.BackendAllowed(ctx.Krt, k, to.Name, *toNs, ns) {
-			return nil, &ConfigError{
-				Reason:  InvalidDestinationPermit,
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonRefNotPermitted,
 				Message: fmt.Sprintf("backendRef %v/%v not accessible to a %s in namespace %q (missing a ReferenceGrant?)", to.Name, *toNs, k.Kind, ns),
 			}
 		}
@@ -222,7 +228,7 @@ func buildADPDestination(
 	if to.Namespace != nil {
 		namespace = string(*to.Namespace)
 	}
-	var invalidBackendErr *ConfigError
+	var invalidBackendErr *reporter.RouteCondition
 	var hostname string
 	weight := int32(1) // default
 	if to.Weight != nil {
@@ -236,14 +242,22 @@ func buildADPDestination(
 	switch ref.GroupKind() {
 	case wellknown.InferencePoolGVK.GroupKind():
 		if strings.Contains(string(to.Name), ".") {
-			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: "service name invalid; the name of the Service must be used, not the hostname."}
 		}
 		hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
 		key := namespace + "/" + string(to.Name)
 		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
 		logger.Debug("Found pull pool for service", "svc", svc, "key", key)
 		if svc == nil {
-			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
+			invalidBackendErr = &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonBackendNotFound,
+				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		} else {
 			port = ptr.Of(gwv1.PortNumber(svc.Spec.TargetPortNumber))
 		}
@@ -251,19 +265,29 @@ func buildADPDestination(
 	case wellknown.ServiceGVK.GroupKind():
 		port = to.Port
 		if strings.Contains(string(to.Name), ".") {
-			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: "service name invalid; the name of the Service must be used, not the hostname."}
 		}
 		hostname = fmt.Sprintf("%s.%s.svc.%s", to.Name, namespace, ctx.DomainSuffix)
 		key := namespace + "/" + string(to.Name)
 		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Services, krt.FilterKey(key)))
 		if svc == nil {
-			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
+			invalidBackendErr = &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonBackendNotFound,
+				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
 		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
 	default:
 		port = to.Port
-		return nil, &ConfigError{
-			Reason:  InvalidDestinationKind,
+		return nil, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionResolvedRefs,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonInvalidKind,
 			Message: fmt.Sprintf("referencing unsupported backendRef: group %q kind %q", ptr.OrEmpty(to.Group), ptr.OrEmpty(to.Kind)),
 		}
 	}
@@ -271,7 +295,11 @@ func buildADPDestination(
 	// that do not require port.
 	if port == nil {
 		// "Port is required when the referent is a Kubernetes Service."
-		return nil, &ConfigError{Reason: InvalidDestination, Message: "port is required in backendRef"}
+		return nil, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
+			Message: "port is required in backendRef"}
 	}
 	rb.Port = int32(*port)
 	return rb, invalidBackendErr
@@ -505,7 +533,7 @@ func extractParentReferenceInfo(ctx RouteContext, parents RouteParents, obj cont
 	return parentRefs
 }
 
-func convertTCPRoute(ctx RouteContext, r gwv1alpha2.TCPRouteRule, obj *gwv1alpha2.TCPRoute) (*istio.TCPRoute, *ConfigError) {
+func convertTCPRoute(ctx RouteContext, r gwv1alpha2.TCPRouteRule, obj *gwv1alpha2.TCPRoute) (*istio.TCPRoute, *reporter.RouteCondition) {
 	if tcpWeightSum(r.BackendRefs) == 0 {
 		// The spec requires us to reject connections when there are no >0 weight backends
 		// We don't have a great way to do it. TODO: add a fault injection API for TCP?
@@ -529,7 +557,7 @@ func convertTCPRoute(ctx RouteContext, r gwv1alpha2.TCPRouteRule, obj *gwv1alpha
 	}, backendErr
 }
 
-func convertTLSRoute(ctx RouteContext, r gwv1alpha2.TLSRouteRule, obj *gwv1alpha2.TLSRoute) (*istio.TLSRoute, *ConfigError) {
+func convertTLSRoute(ctx RouteContext, r gwv1alpha2.TLSRouteRule, obj *gwv1alpha2.TLSRoute) (*istio.TLSRoute, *reporter.RouteCondition) {
 	if tcpWeightSum(r.BackendRefs) == 0 {
 		// The spec requires us to reject connections when there are no >0 weight backends
 		// We don't have a great way to do it. TODO: add a fault injection API for TCP?
@@ -559,7 +587,7 @@ func buildTCPDestination(
 	forwardTo []gwv1.BackendRef,
 	ns string,
 	k schema.GroupVersionKind,
-) ([]*istio.RouteDestination, *ConfigError, *ConfigError) {
+) ([]*istio.RouteDestination, *reporter.RouteCondition, *reporter.RouteCondition) {
 	if forwardTo == nil {
 		return nil, nil, nil
 	}
@@ -578,7 +606,7 @@ func buildTCPDestination(
 		weights = []int{0}
 	}
 
-	var invalidBackendErr *ConfigError
+	var invalidBackendErr *reporter.RouteCondition
 	var res []*istio.RouteDestination
 	for i, fwd := range action {
 		dst, err := buildDestination(ctx, fwd, ns, k)
@@ -644,7 +672,7 @@ func buildHTTPDestination(
 	ctx RouteContext,
 	forwardTo []gwv1.HTTPBackendRef,
 	ns string,
-) ([]*istio.HTTPRouteDestination, *ConfigError, *ConfigError) {
+) ([]*istio.HTTPRouteDestination, *reporter.RouteCondition, *reporter.RouteCondition) {
 	if forwardTo == nil {
 		return nil, nil, nil
 	}
@@ -662,7 +690,7 @@ func buildHTTPDestination(
 		weights = []int{0}
 	}
 
-	var invalidBackendErr *ConfigError
+	var invalidBackendErr *reporter.RouteCondition
 	res := []*istio.HTTPRouteDestination{}
 	for i, fwd := range action {
 		dst, err := buildDestination(ctx, fwd.BackendRef, ns, wellknown.HTTPRouteGVK)
@@ -699,7 +727,11 @@ func buildHTTPDestination(
 				}
 				rd.GetHeaders().Response = h
 			default:
-				return nil, nil, &ConfigError{Reason: InvalidFilter, Message: fmt.Sprintf("unsupported filter type %q", filter.Type)}
+				return nil, nil, &reporter.RouteCondition{
+					Type:    gwv1.RouteConditionAccepted,
+					Status:  metav1.ConditionFalse,
+					Reason:  gwv1.RouteReasonIncompatibleFilters,
+					Message: fmt.Sprintf("unsupported filter type %q", filter.Type)}
 			}
 		}
 		res = append(res, rd)
@@ -711,7 +743,7 @@ func buildGRPCDestination(
 	ctx RouteContext,
 	forwardTo []gwv1.GRPCBackendRef,
 	ns string,
-) ([]*istio.HTTPRouteDestination, *ConfigError, *ConfigError) {
+) ([]*istio.HTTPRouteDestination, *reporter.RouteCondition, *reporter.RouteCondition) {
 	if forwardTo == nil {
 		return nil, nil, nil
 	}
@@ -729,8 +761,8 @@ func buildGRPCDestination(
 		weights = []int{0}
 	}
 
-	var invalidBackendErr *ConfigError
-	res := []*istio.HTTPRouteDestination{}
+	var invalidBackendErr *reporter.RouteCondition
+	var res []*istio.HTTPRouteDestination
 	for i, fwd := range action {
 		dst, err := buildDestination(ctx, fwd.BackendRef, ns, wellknown.GRPCRouteGVK)
 		if err != nil {
@@ -766,7 +798,11 @@ func buildGRPCDestination(
 				}
 				rd.GetHeaders().Response = h
 			default:
-				return nil, nil, &ConfigError{Reason: InvalidFilter, Message: fmt.Sprintf("unsupported filter type %q", filter.Type)}
+				return nil, nil, &reporter.RouteCondition{
+					Type:    gwv1.RouteConditionAccepted,
+					Status:  metav1.ConditionFalse,
+					Reason:  gwv1.RouteReasonIncompatibleFilters,
+					Message: fmt.Sprintf("unsupported filter type %q", filter.Type)}
 			}
 		}
 		res = append(res, rd)
@@ -774,45 +810,67 @@ func buildGRPCDestination(
 	return res, invalidBackendErr, nil
 }
 
-func buildDestination(ctx RouteContext, to gwv1.BackendRef, ns string, k schema.GroupVersionKind) (*istio.Destination, *ConfigError) {
+func buildDestination(ctx RouteContext, to gwv1.BackendRef, ns string, k schema.GroupVersionKind) (*istio.Destination, *reporter.RouteCondition) {
 	// check if the reference is allowed
 	if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
 		if !ctx.Grants.BackendAllowed(ctx.Krt, k, to.Name, *toNs, ns) {
-			return &istio.Destination{}, &ConfigError{
-				Reason:  InvalidDestinationPermit,
+			return &istio.Destination{}, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonRefNotPermitted,
 				Message: fmt.Sprintf("backendRef %v/%v not accessible to a %s in namespace %q (missing a ReferenceGrant?)", to.Name, *toNs, k.Kind, ns),
 			}
 		}
 	}
 
 	namespace := ptr.OrDefault((*string)(to.Namespace), ns)
-	var invalidBackendErr *ConfigError
+	var invalidBackendErr *reporter.RouteCondition
 	var hostname string
 	ref := normalizeReference(to.Group, to.Kind, wellknown.ServiceGVK)
 	switch ref {
-	//case wellknown.InferencePoolGVK: // TODO: add validation
-	//	if strings.Contains(string(to.Name), ".") {
-	//		return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
-	//	}
-	//	hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
-	//	key := namespace + "/" + string(to.Name)
-	//	svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
-	//	if svc == nil {
-	//		invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
-	//	}
+	case wellknown.InferencePoolGVK: // TODO: add validation
+		if strings.Contains(string(to.Name), ".") {
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: "service name invalid; the name of the Service must be used, not the hostname."}
+		}
+		hostname = fmt.Sprintf("%s.%s.inference.%s", to.Name, namespace, ctx.DomainSuffix)
+		key := namespace + "/" + string(to.Name)
+		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.InferencePools, krt.FilterKey(key)))
+		if svc == nil {
+			invalidBackendErr = &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonBackendNotFound,
+				Message: fmt.Sprintf("backend(%s) not found", hostname)}
+		}
 	case wellknown.ServiceGVK:
 		if strings.Contains(string(to.Name), ".") {
-			return nil, &ConfigError{Reason: InvalidDestination, Message: "service name invalid; the name of the Service must be used, not the hostname."}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: "service name invalid; the name of the Service must be used, not the hostname."}
 		}
 		hostname = fmt.Sprintf("%s.%s.svc.%s", to.Name, namespace, ctx.DomainSuffix)
 		key := namespace + "/" + string(to.Name)
 		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Services, krt.FilterKey(key)))
 		if svc == nil {
-			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
+			invalidBackendErr = &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonBackendNotFound,
+				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
 	case schema.GroupVersionKind{Group: wellknown.ServiceEntryGVK.Group, Kind: "Hostname"}:
 		if to.Namespace != nil {
-			return nil, &ConfigError{Reason: InvalidDestination, Message: "namespace may not be set with Hostname type"}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: "namespace may not be set with Hostname type"}
 		}
 		hostname = string(to.Name)
 		// TODO: check hostname is valid
@@ -827,11 +885,17 @@ func buildDestination(ctx RouteContext, to gwv1.BackendRef, ns string, k schema.
 		key := namespace + "/" + string(to.Name)
 		svc := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Services, krt.FilterKey(key)))
 		if svc == nil {
-			invalidBackendErr = &ConfigError{Reason: InvalidDestinationNotFound, Message: fmt.Sprintf("backend(%s) not found", hostname)}
+			invalidBackendErr = &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonBackendNotFound,
+				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
 	default:
-		return &istio.Destination{}, &ConfigError{
-			Reason:  InvalidDestinationKind,
+		return &istio.Destination{}, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionResolvedRefs,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonInvalidKind,
 			Message: fmt.Sprintf("referencing unsupported backendRef: group %q kind %q", ptr.OrEmpty(to.Group), ptr.OrEmpty(to.Kind)),
 		}
 	}
@@ -839,7 +903,11 @@ func buildDestination(ctx RouteContext, to gwv1.BackendRef, ns string, k schema.
 	// that do not require port.
 	if to.Port == nil {
 		// "Port is required when the referent is a Kubernetes Service."
-		return nil, &ConfigError{Reason: InvalidDestination, Message: "port is required in backendRef"}
+		return nil, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
+			Message: "port is required in backendRef"}
 	}
 	return &istio.Destination{
 		Host: hostname,
@@ -848,10 +916,10 @@ func buildDestination(ctx RouteContext, to gwv1.BackendRef, ns string, k schema.
 }
 
 // https://github.com/kubernetes-sigs/gateway-api/blob/cea484e38e078a2c1997d8c7a62f410a1540f519/apis/v1beta1/httproute_types.go#L207-L212
-func isInvalidBackend(err *ConfigError) bool {
-	return err.Reason == InvalidDestinationPermit ||
-		err.Reason == InvalidDestinationNotFound ||
-		err.Reason == InvalidDestinationKind
+func isInvalidBackend(err *reporter.RouteCondition) bool {
+	return err.Reason == gwv1.RouteReasonRefNotPermitted ||
+		err.Reason == gwv1.RouteReasonBackendNotFound ||
+		err.Reason == gwv1.RouteReasonInvalidKind
 }
 
 func headerListToMap(hl []gwv1.HTTPHeader) map[string]string {
@@ -872,7 +940,7 @@ func headerListToMap(hl []gwv1.HTTPHeader) map[string]string {
 
 func createMirrorFilter(ctx RouteContext, filter *gwv1.HTTPRequestMirrorFilter, ns string,
 	k schema.GroupVersionKind,
-) (*istio.HTTPMirrorPolicy, *ConfigError) {
+) (*istio.HTTPMirrorPolicy, *reporter.RouteCondition) {
 	if filter == nil {
 		return nil, nil
 	}
@@ -1009,7 +1077,7 @@ func createHeadersFilter(filter *gwv1.HTTPHeaderFilter) *istio.Headers_HeaderOpe
 }
 
 // nolint: unparam
-func createMethodMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *ConfigError) {
+func createMethodMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *reporter.RouteCondition) {
 	if match.Method == nil {
 		return nil, nil
 	}
@@ -1018,7 +1086,7 @@ func createMethodMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *ConfigEr
 	}, nil
 }
 
-func createQueryParamsMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatch, *ConfigError) {
+func createQueryParamsMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatch, *reporter.RouteCondition) {
 	res := map[string]*istio.StringMatch{}
 	for _, qp := range match.QueryParams {
 		tp := gwv1.QueryParamMatchExact
@@ -1036,7 +1104,11 @@ func createQueryParamsMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.String
 			}
 		default:
 			// Should never happen, unless a new field is added
-			return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported QueryParams type", tp)}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: fmt.Sprintf("unknown type: %q is not supported QueryParams type", tp)}
 		}
 	}
 
@@ -1046,7 +1118,7 @@ func createQueryParamsMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.String
 	return res, nil
 }
 
-func createHeadersMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatch, *ConfigError) {
+func createHeadersMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatch, *reporter.RouteCondition) {
 	res := map[string]*istio.StringMatch{}
 	for _, header := range match.Headers {
 		tp := gwv1.HeaderMatchExact
@@ -1064,7 +1136,11 @@ func createHeadersMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatc
 			}
 		default:
 			// Should never happen, unless a new field is added
-			return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
 		}
 	}
 
@@ -1074,7 +1150,7 @@ func createHeadersMatch(match gwv1.HTTPRouteMatch) (map[string]*istio.StringMatc
 	return res, nil
 }
 
-func createGRPCHeadersMatch(match gwv1.GRPCRouteMatch) (map[string]*istio.StringMatch, *ConfigError) {
+func createGRPCHeadersMatch(match gwv1.GRPCRouteMatch) (map[string]*istio.StringMatch, *reporter.RouteCondition) {
 	res := map[string]*istio.StringMatch{}
 	for _, header := range match.Headers {
 		tp := gwv1.GRPCHeaderMatchExact
@@ -1092,7 +1168,11 @@ func createGRPCHeadersMatch(match gwv1.GRPCRouteMatch) (map[string]*istio.String
 			}
 		default:
 			// Should never happen, unless a new field is added
-			return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: fmt.Sprintf("unknown type: %q is not supported HeaderMatch type", tp)}
 		}
 	}
 
@@ -1102,7 +1182,7 @@ func createGRPCHeadersMatch(match gwv1.GRPCRouteMatch) (map[string]*istio.String
 	return res, nil
 }
 
-func createURIMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *ConfigError) {
+func createURIMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *reporter.RouteCondition) {
 	tp := gwv1.PathMatchPathPrefix
 	if match.Path.Type != nil {
 		tp = *match.Path.Type
@@ -1130,11 +1210,15 @@ func createURIMatch(match gwv1.HTTPRouteMatch) (*istio.StringMatch, *ConfigError
 		}, nil
 	default:
 		// Should never happen, unless a new field is added
-		return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
+		return nil, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
+			Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
 	}
 }
 
-func createGRPCURIMatch(match gwv1.GRPCRouteMatch) (*istio.StringMatch, *ConfigError) {
+func createGRPCURIMatch(match gwv1.GRPCRouteMatch) (*istio.StringMatch, *reporter.RouteCondition) {
 	m := match.Method
 	if m == nil {
 		return nil, nil
@@ -1145,7 +1229,11 @@ func createGRPCURIMatch(match gwv1.GRPCRouteMatch) (*istio.StringMatch, *ConfigE
 	}
 	if m.Method == nil && m.Service == nil {
 		// Should never happen, invalid per spec
-		return nil, &ConfigError{Reason: InvalidConfiguration, Message: "gRPC match must have method or service defined"}
+		return nil, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
+			Message: "gRPC match must have method or service defined"}
 	}
 	// gRPC format is /<Service>/<Method>. Since we don't natively understand this, convert to various string matches
 	switch tp {
@@ -1179,7 +1267,11 @@ func createGRPCURIMatch(match gwv1.GRPCRouteMatch) (*istio.StringMatch, *ConfigE
 		}, nil
 	default:
 		// Should never happen, unless a new field is added
-		return nil, &ConfigError{Reason: InvalidConfiguration, Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
+		return nil, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
+			Message: fmt.Sprintf("unknown type: %q is not supported Path match type", tp)}
 	}
 }
 
@@ -1330,7 +1422,7 @@ func IsManaged(gw *gwv1.GatewaySpec) bool {
 	return false
 }
 
-func extractGatewayServices(domainSuffix string, kgw *gwv1.Gateway) ([]string, *ConfigError) {
+func extractGatewayServices(domainSuffix string, kgw *gwv1.Gateway) ([]string, *reporter.RouteCondition) {
 	if IsManaged(&kgw.Spec) {
 		name := model.GetOrDefault(kgw.Annotations[annotation.GatewayNameOverride.Name], getDefaultName(kgw.Name, &kgw.Spec))
 		return []string{fmt.Sprintf("%s.%s.svc.%v", name, kgw.Namespace, domainSuffix)}, nil
@@ -1355,16 +1447,20 @@ func extractGatewayServices(domainSuffix string, kgw *gwv1.Gateway) ([]string, *
 	}
 	if len(skippedAddresses) > 0 {
 		// Give error but return services, this is a soft failure
-		return gatewayServices, &ConfigError{
-			Reason:  InvalidAddress,
+		return gatewayServices, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
 			Message: fmt.Sprintf("only Hostname is supported, ignoring %v", skippedAddresses),
 		}
 	}
 	if _, f := kgw.Annotations[annotation.NetworkingServiceType.Name]; f {
 		// Give error but return services, this is a soft failure
 		// Remove entirely in 1.20
-		return gatewayServices, &ConfigError{
-			Reason:  DeprecateFieldUsage,
+		return gatewayServices, &reporter.RouteCondition{
+			Type:    gwv1.RouteConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  gwv1.RouteReasonUnsupportedValue,
 			Message: fmt.Sprintf("annotation %v is deprecated, use Spec.Infrastructure.Routeability", annotation.NetworkingServiceType.Name),
 		}
 	}

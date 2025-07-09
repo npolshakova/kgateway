@@ -21,9 +21,9 @@ const (
 // inferencePool defines the internal representation of an inferencePool resource.
 type inferencePool struct {
 	objMeta metav1.ObjectMeta
-	// podSelector is a label selector to select LocalityPods that are members of the InferencePool.
+	// podSelector is a label selector to select Pods that are members of the InferencePool.
 	podSelector map[string]string
-	// targetPort is the port number that should be targeted for LocalityPods selected by Selector.
+	// targetPort is the port number that should be targeted for Pods selected by Selector.
 	targetPort int32
 	// configRef is a reference to the extension configuration. A configRef is typically implemented
 	// as a Kubernetes Service resource.

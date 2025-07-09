@@ -28,7 +28,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 )
 
-func TestAgentGatewayScenarioDump(t *testing.T) {
+func TestAgentgateway(t *testing.T) {
 	st, err := settings.BuildSettings()
 	st.EnableAgentGateway = true
 
