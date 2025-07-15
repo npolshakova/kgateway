@@ -123,8 +123,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.FieldDefaultApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FileSink"):
 		return &apiv1alpha1.FileSinkApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("FilterMatcher"):
-		return &apiv1alpha1.FilterMatcherApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FilterType"):
 		return &apiv1alpha1.FilterTypeApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("GatewayExtension"):
@@ -197,8 +195,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.LocalRateLimitPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MCP"):
 		return &apiv1alpha1.MCPApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("McpFilter"):
-		return &apiv1alpha1.McpFilterApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("McpTarget"):
 		return &apiv1alpha1.McpTargetApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Message"):

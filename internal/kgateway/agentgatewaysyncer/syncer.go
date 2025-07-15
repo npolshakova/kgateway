@@ -41,7 +41,6 @@ import (
 	gwxv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
@@ -156,19 +155,6 @@ func NewAgentGwSyncer(
 	}
 }
 
-type envoyResourceWithName struct {
-	inner   envoytypes.ResourceWithName
-	version uint64
-}
-
-func (r envoyResourceWithName) ResourceName() string {
-	return r.inner.GetName()
-}
-
-func (r envoyResourceWithName) Equals(in envoyResourceWithName) bool {
-	return r.version == in.version
-}
-
 type envoyResourceWithCustomName struct {
 	proto.Message
 	Name    string
@@ -227,6 +213,9 @@ type Inputs struct {
 	// Extended resources
 	ServiceEntries krt.Collection[*networkingclient.ServiceEntry]
 	InferencePools krt.Collection[*inf.InferencePool]
+
+	// kgateway resources
+	Backends *krtcollections.BackendIndex
 }
 
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
@@ -282,6 +271,9 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 		ReferenceGrants: krt.WrapClient(kclient.NewFiltered[*gwv1beta1.ReferenceGrant](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/ReferenceGrants")...),
 		//ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
 		InferencePools: krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools"), kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...),
+
+		// kgateway resources
+		Backends: s.commonCols.BackendIndex,
 	}
 
 	if s.EnableAlphaGatewayAPI {
@@ -398,6 +390,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		Services:       inputs.Services,
 		Namespaces:     inputs.Namespaces,
 		InferencePools: inputs.InferencePools,
+		Backends:       s.commonCols.BackendIndex,
 	}
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, *reportMap, rep)
 
@@ -753,61 +746,6 @@ func (m *agentGwSnapshot) GetVersionMap(typeURL string) map[string]string {
 }
 
 var _ envoycache.ResourceSnapshot = &agentGwSnapshot{}
-
-type clustersWithErrors struct {
-	clusters            envoycache.Resources
-	erroredClusters     []string
-	erroredClustersHash uint64
-	clustersHash        uint64
-	resourceName        string
-}
-
-type addressesWithUccName struct {
-	addresses    envoycache.Resources
-	resourceName string
-}
-
-func (c clustersWithErrors) ResourceName() string {
-	return c.resourceName
-}
-
-var _ krt.Equaler[clustersWithErrors] = new(clustersWithErrors)
-
-func (c clustersWithErrors) Equals(k clustersWithErrors) bool {
-	return c.clustersHash == k.clustersHash && c.erroredClustersHash == k.erroredClustersHash
-}
-
-func (c addressesWithUccName) ResourceName() string {
-	return c.resourceName
-}
-
-var _ krt.Equaler[addressesWithUccName] = new(addressesWithUccName)
-
-func (c addressesWithUccName) Equals(k addressesWithUccName) bool {
-	return c.addresses.Version == k.addresses.Version
-}
-
-type UccWithAddress struct {
-	Client  ir.UniqlyConnectedClient
-	Address ADPCacheAddress
-}
-
-func (c UccWithAddress) ResourceName() string {
-	return fmt.Sprintf("%s/%s", c.Client.ResourceName(), c.Address.ResourceName())
-}
-
-func (c UccWithAddress) Equals(in UccWithAddress) bool {
-	return c.Client.Equals(in.Client) && c.Address.Equals(in.Address)
-}
-
-type PerClientAddresses struct {
-	addresses krt.Collection[UccWithAddress]
-	index     krt.Index[string, UccWithAddress]
-}
-
-func (ie *PerClientAddresses) FetchEndpointsForClient(kctx krt.HandlerContext, ucc ir.UniqlyConnectedClient) []UccWithAddress {
-	return krt.Fetch(kctx, ie.addresses, krt.FilterIndex(ie.index, ucc.ResourceName()))
-}
 
 func (s *AgentGwSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger, rm reports.ReportMap) {
 	stopwatch := utils.NewTranslatorStopWatch("RouteStatusSyncer")

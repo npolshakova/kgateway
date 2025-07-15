@@ -939,24 +939,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: stringFormat
       type:
         scalar: string
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.FilterMatcher
-  map:
-    fields:
-    - name: contains
-      type:
-        scalar: string
-    - name: exact
-      type:
-        scalar: string
-    - name: prefix
-      type:
-        scalar: string
-    - name: regex
-      type:
-        scalar: string
-    - name: suffix
-      type:
-        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.FilterType
   map:
     fields:
@@ -1557,29 +1539,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTarget
           elementRelationship: atomic
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpFilter
-  map:
-    fields:
-    - name: match
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.FilterMatcher
-      default: {}
-    - name: type
-      type:
-        scalar: string
-      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTarget
   map:
     fields:
-    - name: enableTls
-      type:
-        scalar: boolean
-    - name: filters
-      type:
-        list:
-          elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpFilter
-          elementRelationship: atomic
     - name: host
       type:
         scalar: string
@@ -1592,6 +1554,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+    - name: protocol
+      type:
+        scalar: string
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Message
   map:
     fields:

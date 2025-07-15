@@ -16,6 +16,8 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
@@ -293,6 +295,7 @@ type RouteContextInputs struct {
 	InferencePools krt.Collection[*inf.InferencePool]
 	Namespaces     krt.Collection[*corev1.Namespace]
 	ServiceEntries krt.Collection[*networkingclient.ServiceEntry]
+	Backends       *krtcollections.BackendIndex
 }
 
 func (i RouteContextInputs) WithCtx(krtctx krt.HandlerContext) RouteContext {

@@ -36,6 +36,9 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
@@ -245,7 +248,7 @@ func buildADPTCPDestination(
 		dst, err := buildADPDestination(ctx, gwv1.HTTPBackendRef{
 			BackendRef: fwd,
 			Filters:    nil, // TCP routes don't have per-backend filters?
-		}, ns, wellknown.TCPRouteGVK)
+		}, ns, wellknown.TCPRouteGVK, ctx.Backends)
 		if err != nil {
 			logger.Error("error building agent gateway destination", "error", err)
 			if isInvalidBackend(err) {
@@ -275,7 +278,7 @@ func buildADPTLSDestination(
 		dst, err := buildADPDestination(ctx, gwv1.HTTPBackendRef{
 			BackendRef: fwd,
 			Filters:    nil, // TLS routes don't have per-backend filters
-		}, ns, wellknown.TLSRouteGVK)
+		}, ns, wellknown.TLSRouteGVK, ctx.Backends)
 		if err != nil {
 			logger.Error("error building agent gateway destination", "error", err)
 			if isInvalidBackend(err) {
@@ -359,7 +362,7 @@ func buildADPHTTPDestination(
 	var invalidBackendErr *reporter.RouteCondition
 	var res []*api.RouteBackend
 	for _, fwd := range forwardTo {
-		dst, err := buildADPDestination(ctx, fwd, ns, wellknown.HTTPRouteGVK)
+		dst, err := buildADPDestination(ctx, fwd, ns, wellknown.HTTPRouteGVK, ctx.Backends)
 		if err != nil {
 			logger.Error("erroring building agent gateway destination", "error", err)
 			if isInvalidBackend(err) {
@@ -386,6 +389,7 @@ func buildADPDestination(
 	to gwv1.HTTPBackendRef,
 	ns string,
 	k schema.GroupVersionKind,
+	backendCol *krtcollections.BackendIndex,
 ) (*api.RouteBackend, *reporter.RouteCondition) {
 	// check if the reference is allowed
 	if toNs := to.Namespace; toNs != nil && string(*toNs) != ns {
@@ -460,6 +464,40 @@ func buildADPDestination(
 	case wellknown.BackendGVK.GroupKind():
 		// check that the backend is of MCP kind
 		// TODO: support other kinds
+
+		// Create the source ObjectSource representing the route object making the reference
+		routeSrc := ir.ObjectSource{
+			Group:     k.Group,
+			Kind:      k.Kind,
+			Namespace: ns,
+		}
+
+		// Create the backend reference from the 'to' parameter
+		backendRef := gwv1.BackendObjectReference{
+			Group:     to.Group,
+			Kind:      to.Kind,
+			Name:      to.Name,
+			Namespace: to.Namespace,
+			Port:      to.Port,
+		}
+
+		mcpBackend, err := backendCol.GetBackendFromRef(ctx.Krt, routeSrc, backendRef)
+		if err != nil {
+			logger.Error("failed to get MCP backend", "error", err)
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionResolvedRefs,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonBackendNotFound,
+				Message: fmt.Sprintf("MCP backend not found: %v", err),
+			}
+		}
+
+		// TODO: convert to api Backend type
+
+		// Use the backend information if available
+		if mcpBackend != nil {
+			logger.Debug("successfully resolved MCP backend", "backend", mcpBackend.Name)
+		}
 	default:
 		return nil, &reporter.RouteCondition{
 			Type:    gwv1.RouteConditionResolvedRefs,

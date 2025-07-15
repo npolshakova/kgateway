@@ -619,32 +619,6 @@ spec:
                   targets:
                     items:
                       properties:
-                        enableTls:
-                          type: boolean
-                        filters:
-                          items:
-                            properties:
-                              match:
-                                properties:
-                                  contains:
-                                    type: string
-                                  exact:
-                                    type: string
-                                  prefix:
-                                    type: string
-                                  regex:
-                                    type: string
-                                  suffix:
-                                    type: string
-                                type: object
-                              type:
-                                minLength: 1
-                                type: string
-                            required:
-                            - match
-                            - type
-                            type: object
-                          type: array
                         host:
                           minLength: 1
                           type: string
@@ -656,6 +630,12 @@ spec:
                           maximum: 65535
                           minimum: 1
                           type: integer
+                        protocol:
+                          enum:
+                          - Undefined
+                          - SSE
+                          - StreamableHTTP
+                          type: string
                       required:
                       - host
                       - name

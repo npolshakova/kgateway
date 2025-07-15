@@ -31,46 +31,16 @@ type McpTarget struct {
 	// +kubebuilder:validation:Maximum=65535
 	Port int32 `json:"port"`
 
-	// EnableTls enables TLS for the connection to the MCP target.
+	// Protocol is the protocol to use for the connection to the MCP target.
 	// +optional
-	EnableTls bool `json:"enableTls,omitempty"`
-
-	// Filters is a list of filters to apply to this target.
-	// +optional
-	Filters []McpFilter `json:"filters,omitempty"`
+	// +kubebuilder:validation:Enum=Undefined;SSE;StreamableHTTP
+	Protocol MCPProtocol `json:"protocol,omitempty"`
 }
 
-// McpFilter defines a filter configuration for MCP targets.
-type McpFilter struct {
-	// Type specifies the type of filter to apply.
-	// +required
-	// +kubebuilder:validation:MinLength=1
-	Type string `json:"type"`
+type MCPProtocol string
 
-	// Match specifies the matching criteria for the filter.
-	// +required
-	Match FilterMatcher `json:"match"`
-}
-
-// FilterMatcher defines different matching strategies for filters.
-type FilterMatcher struct {
-	// Exact matches the exact string value.
-	// +optional
-	Exact *string `json:"exact,omitempty"`
-
-	// Prefix matches strings that start with the specified prefix.
-	// +optional
-	Prefix *string `json:"prefix,omitempty"`
-
-	// Suffix matches strings that end with the specified suffix.
-	// +optional
-	Suffix *string `json:"suffix,omitempty"`
-
-	// Contains matches strings that contain the specified substring.
-	// +optional
-	Contains *string `json:"contains,omitempty"`
-
-	// Regex matches strings using the specified regular expression.
-	// +optional
-	Regex *string `json:"regex,omitempty"`
-}
+const (
+	MCPProtocolUndefined      MCPProtocol = "Undefined"
+	MCPProtocolSSE            MCPProtocol = "SSE"
+	MCPProtocolStreamableHTTP MCPProtocol = "StreamableHTTP"
+)

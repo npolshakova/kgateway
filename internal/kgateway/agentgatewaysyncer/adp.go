@@ -197,7 +197,7 @@ func createADPMirrorFilter(
 			BackendObjectReference: filter.BackendRef,
 			Weight:                 &weightOne,
 		},
-	}, ns, k)
+	}, ns, k, ctx.Backends)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +378,7 @@ func buildADPGRPCDestination(
 			Group:   "gateway.networking.k8s.io",
 			Version: "v1",
 			Kind:    "GRPCRoute",
-		})
+		}, ctx.Backends)
 		if err != nil {
 			logger.Error("error building agent gateway destination", "error", err)
 			if isInvalidBackend(err) {

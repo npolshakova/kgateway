@@ -132,13 +132,13 @@ func (a *index) inferencePoolBuilder(
 	}
 }
 
-func (a *index) serviceEntryServiceBuilder(
-	namespaces krt.Collection[*corev1.Namespace],
-) krt.TransformationMulti[*networkingclient.ServiceEntry, ServiceInfo] {
-	return func(ctx krt.HandlerContext, s *networkingclient.ServiceEntry) []ServiceInfo {
-		return a.serviceEntriesInfo(ctx, s)
-	}
-}
+//func (a *index) serviceEntryServiceBuilder(
+//	namespaces krt.Collection[*corev1.Namespace],
+//) krt.TransformationMulti[*networkingclient.ServiceEntry, ServiceInfo] {
+//	return func(ctx krt.HandlerContext, s *networkingclient.ServiceEntry) []ServiceInfo {
+//		return a.serviceEntriesInfo(ctx, s)
+//	}
+//}
 
 func toAppProtocolFromKube(p corev1.ServicePort) api.AppProtocol {
 	return toAppProtocolFromProtocol(string(kubeutil.ConvertProtocol(p.Port, p.Name, p.Protocol, p.AppProtocol)))

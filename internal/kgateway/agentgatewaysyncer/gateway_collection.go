@@ -21,11 +21,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
-func toResourcep(gw types.NamespacedName, t any) *ADPResource {
-	res := toResource(gw, t)
-	return &res
-}
-
 func toResourcepWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) *ADPResource {
 	res := toResourceWithReports(gw, t, reportMap)
 	return &res
@@ -38,11 +33,11 @@ func toResource(gw types.NamespacedName, t any) ADPResource {
 func toResourceWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) ADPResource {
 	switch tt := t.(type) {
 	case Bind:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{tt.Bind}}, Gateway: gw, reports: reportMap}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}, Gateway: gw, reports: reportMap}
 	case ADPListener:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{tt.Listener}}, Gateway: gw, reports: reportMap}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}, Gateway: gw, reports: reportMap}
 	case ADPRoute:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{tt.Route}}, Gateway: gw, reports: reportMap}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}, Gateway: gw, reports: reportMap}
 	}
 	panic("unknown resource kind")
 }

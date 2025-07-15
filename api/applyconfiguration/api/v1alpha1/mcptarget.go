@@ -2,14 +2,17 @@
 
 package v1alpha1
 
+import (
+	apiv1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+)
+
 // McpTargetApplyConfiguration represents a declarative configuration of the McpTarget type for use
 // with apply.
 type McpTargetApplyConfiguration struct {
-	Name      *string                       `json:"name,omitempty"`
-	Host      *string                       `json:"host,omitempty"`
-	Port      *int32                        `json:"port,omitempty"`
-	EnableTls *bool                         `json:"enableTls,omitempty"`
-	Filters   []McpFilterApplyConfiguration `json:"filters,omitempty"`
+	Name     *string                  `json:"name,omitempty"`
+	Host     *string                  `json:"host,omitempty"`
+	Port     *int32                   `json:"port,omitempty"`
+	Protocol *apiv1alpha1.MCPProtocol `json:"protocol,omitempty"`
 }
 
 // McpTargetApplyConfiguration constructs a declarative configuration of the McpTarget type for use with
@@ -42,23 +45,10 @@ func (b *McpTargetApplyConfiguration) WithPort(value int32) *McpTargetApplyConfi
 	return b
 }
 
-// WithEnableTls sets the EnableTls field in the declarative configuration to the given value
+// WithProtocol sets the Protocol field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the EnableTls field is set to the value of the last call.
-func (b *McpTargetApplyConfiguration) WithEnableTls(value bool) *McpTargetApplyConfiguration {
-	b.EnableTls = &value
-	return b
-}
-
-// WithFilters adds the given value to the Filters field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Filters field.
-func (b *McpTargetApplyConfiguration) WithFilters(values ...*McpFilterApplyConfiguration) *McpTargetApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithFilters")
-		}
-		b.Filters = append(b.Filters, *values[i])
-	}
+// If called multiple times, the Protocol field is set to the value of the last call.
+func (b *McpTargetApplyConfiguration) WithProtocol(value apiv1alpha1.MCPProtocol) *McpTargetApplyConfiguration {
+	b.Protocol = &value
 	return b
 }
