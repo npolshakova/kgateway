@@ -7,7 +7,6 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/api/annotation"
 	apiv1 "istio.io/api/networking/v1"
-	networkingv1alpha3 "istio.io/api/networking/v1alpha3"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/serviceregistry/kube"
@@ -294,21 +293,21 @@ func serviceToAddress(s *api.Service) *api.Address {
 	}
 }
 
-func toAppProtocolFromIstio(p *networkingv1alpha3.ServicePort) api.AppProtocol {
-	return toAppProtocolFromProtocol(p.Protocol)
-}
-
-func toAppProtocolFromProtocol(p string) api.AppProtocol {
-	switch p {
-	case "HTTP":
-		return api.AppProtocol_HTTP11
-	case "HTTP2":
-		return api.AppProtocol_HTTP2
-	case "GRPC":
-		return api.AppProtocol_GRPC
-	}
-	return api.AppProtocol_UNKNOWN
-}
+//func toAppProtocolFromIstio(p *networkingv1alpha3.ServicePort) api.AppProtocol {
+//	return toAppProtocolFromProtocol(p.Protocol)
+//}
+//
+//func toAppProtocolFromProtocol(p string) api.AppProtocol {
+//	switch p {
+//	case "HTTP":
+//		return api.AppProtocol_HTTP11
+//	case "HTTP2":
+//		return api.AppProtocol_HTTP2
+//	case "GRPC":
+//		return api.AppProtocol_GRPC
+//	}
+//	return api.AppProtocol_UNKNOWN
+//}
 
 func GetHostAddressesFromServiceEntry(se *networkingclient.ServiceEntry) map[string][]netip.Addr {
 	if se == nil {
@@ -643,48 +642,48 @@ func setTunnelProtocol(labels, annotations map[string]string, w *api.Workload) {
 	}
 }
 
-func constructServicesFromWorkloadEntry(p *networkingv1alpha3.WorkloadEntry, services []ServiceInfo) map[string]*api.PortList {
-	res := map[string]*api.PortList{}
-	for _, svc := range services {
-		n := namespacedHostname(svc.Service.Namespace, svc.Service.Hostname)
-		pl := &api.PortList{}
-		res[n] = pl
-		for _, port := range svc.Service.Ports {
-			targetPort := port.TargetPort
-			// Named targetPort has different semantics from Service vs ServiceEntry
-			if svc.Source.Kind == kind.Service.String() {
-				// Service has explicit named targetPorts.
-				if named, f := svc.PortNames[int32(port.ServicePort)]; f && named.TargetPortName != "" {
-					// This port is a named target port, look it up
-					tv, ok := p.Ports[named.TargetPortName]
-					if !ok {
-						// We needed an explicit port, but didn't find one - skip this port
-						continue
-					}
-					targetPort = tv
-				}
-			} else {
-				// ServiceEntry has no explicit named targetPorts; targetPort only allows a number
-				// Instead, there is name matching between the port names
-				if named, f := svc.PortNames[int32(port.ServicePort)]; f {
-					// get port name or target port
-					tv, ok := p.Ports[named.PortName]
-					if ok {
-						// if we match one, override it. Otherwise, use the service port
-						targetPort = tv
-					} else if targetPort == 0 {
-						targetPort = port.ServicePort
-					}
-				}
-			}
-			pl.Ports = append(pl.Ports, &api.Port{
-				ServicePort: port.ServicePort,
-				TargetPort:  targetPort,
-			})
-		}
-	}
-	return res
-}
+//func constructServicesFromWorkloadEntry(p *networkingv1alpha3.WorkloadEntry, services []ServiceInfo) map[string]*api.PortList {
+//	res := map[string]*api.PortList{}
+//	for _, svc := range services {
+//		n := namespacedHostname(svc.Service.Namespace, svc.Service.Hostname)
+//		pl := &api.PortList{}
+//		res[n] = pl
+//		for _, port := range svc.Service.Ports {
+//			targetPort := port.TargetPort
+//			// Named targetPort has different semantics from Service vs ServiceEntry
+//			if svc.Source.Kind == kind.Service.String() {
+//				// Service has explicit named targetPorts.
+//				if named, f := svc.PortNames[int32(port.ServicePort)]; f && named.TargetPortName != "" {
+//					// This port is a named target port, look it up
+//					tv, ok := p.Ports[named.TargetPortName]
+//					if !ok {
+//						// We needed an explicit port, but didn't find one - skip this port
+//						continue
+//					}
+//					targetPort = tv
+//				}
+//			} else {
+//				// ServiceEntry has no explicit named targetPorts; targetPort only allows a number
+//				// Instead, there is name matching between the port names
+//				if named, f := svc.PortNames[int32(port.ServicePort)]; f {
+//					// get port name or target port
+//					tv, ok := p.Ports[named.PortName]
+//					if ok {
+//						// if we match one, override it. Otherwise, use the service port
+//						targetPort = tv
+//					} else if targetPort == 0 {
+//						targetPort = port.ServicePort
+//					}
+//				}
+//			}
+//			pl.Ports = append(pl.Ports, &api.Port{
+//				ServicePort: port.ServicePort,
+//				TargetPort:  targetPort,
+//			})
+//		}
+//	}
+//	return res
+//}
 
 func constructServices(p krtcollections.WrappedPod, services []ServiceInfo) map[string]*api.PortList {
 	res := map[string]*api.PortList{}

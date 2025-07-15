@@ -747,17 +747,6 @@ func extractParentReferenceInfo(ctx RouteContext, parents RouteParents, obj cont
 	return parentRefs
 }
 
-func hostnamesToStringListWithWildcard(h []gwv1.Hostname) []string {
-	if len(h) == 0 {
-		return []string{"*"}
-	}
-	res := make([]string, 0, len(h))
-	for _, i := range h {
-		res = append(res, string(i))
-	}
-	return res
-}
-
 // https://github.com/kubernetes-sigs/gateway-api/blob/cea484e38e078a2c1997d8c7a62f410a1540f519/apis/v1beta1/httproute_types.go#L207-L212
 func isInvalidBackend(err *reporter.RouteCondition) bool {
 	return err.Reason == gwv1.RouteReasonRefNotPermitted ||
@@ -823,36 +812,6 @@ type routeParentReference struct {
 	BannedHostnames sets.Set[string]
 	ParentKey       parentKey
 	ParentSection   gwv1.SectionName
-}
-
-func (r routeParentReference) hostnameAllowedByIsolation(rawRouteHost string) bool {
-	routeHost := host.Name(rawRouteHost)
-	ourListener := host.Name(r.Hostname)
-	if len(ourListener) > 0 && !ourListener.IsWildCarded() {
-		// Short circuit: this logic only applies to wildcards
-		// Not required for correctness, just an optimization
-		return true
-	}
-	if len(ourListener) > 0 && !routeHost.Matches(ourListener) {
-		return false
-	}
-	for checkListener := range r.BannedHostnames {
-		// We have 3 hostnames here:
-		// * routeHost, the hostname in the route entry
-		// * ourListener, the hostname of the listener the route is bound to
-		// * checkListener, the hostname of the other listener we are comparing to
-		// We want to return false if checkListener would match the routeHost and it would be a more exact match
-		if len(ourListener) > len(checkListener) {
-			// If our hostname is longer, it must be more exact than the check
-			continue
-		}
-		// Ours is shorter. If it matches the checkListener, then it should ONLY match that one
-		// Note protocol, port, etc are already considered when we construct bannedHostnames
-		if routeHost.SubsetOf(host.Name(checkListener)) {
-			return false
-		}
-	}
-	return true
 }
 
 func filteredReferences(parents []routeParentReference) []routeParentReference {

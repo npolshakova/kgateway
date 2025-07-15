@@ -26,10 +26,6 @@ func toResourcepWithReports(gw types.NamespacedName, t any, reportMap reports.Re
 	return &res
 }
 
-func toResource(gw types.NamespacedName, t any) ADPResource {
-	return toResourceWithReports(gw, t, reports.NewReportMap())
-}
-
 func toResourceWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) ADPResource {
 	switch tt := t.(type) {
 	case Bind:

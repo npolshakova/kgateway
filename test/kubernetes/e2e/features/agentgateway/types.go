@@ -9,10 +9,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
 )
 
-const (
-	a2aPort = 9090
-)
-
 var (
 	// kgateway managed deployment for the agentgateway
 	deployAgentGatewayManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "agentgateway-deploy.yaml")
