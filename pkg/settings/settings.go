@@ -141,6 +141,9 @@ type Settings struct {
 	// EnableAgentGateway enables kgateway to send config to the agentgateway
 	EnableAgentGateway bool `split_words:"true" default:"false"`
 
+	// EnableAgentGatewayAlphaApis enables kgateway to send config to the agentgateway for alpha kubernetes gateway apis (TCPRoutes, TLSRoutes)
+	EnableAgentGatewayAlphaApis bool `split_words:"true" default:"false"`
+
 	// WeightedRoutePrecedence enables routes with a larger weight to take precedence over routes with a smaller weight.
 	// If two routes have the same weight, Gateway API route precedence rules apply.
 	// When enabled, the default weight for a route is 0.

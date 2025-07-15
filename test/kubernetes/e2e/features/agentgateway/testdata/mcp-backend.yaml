@@ -1,0 +1,152 @@
+kind: GatewayParameters
+apiVersion: gateway.kgateway.dev/v1alpha1
+metadata:
+  name: kgateway
+spec:
+  kube:
+    agentGateway:
+      enabled: true
+      logLevel: debug
+      image:
+        tag: d283bef-dirty
+---
+kind: GatewayClass
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: agentgateway
+spec:
+  controllerName: kgateway.dev/kgateway
+  parametersRef:
+    group: gateway.kgateway.dev
+    kind: GatewayParameters
+    name: kgateway
+    namespace: default
+---
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: agent-gateway
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+    - protocol: HTTP
+      port: 8080
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp
+  labels:
+    example: mcp-route
+spec:
+  parentRefs:
+    - name: agent-gateway
+      namespace: default
+  hostnames:
+    - "www.example.com"
+  rules:
+    - backendRefs:
+        - name: mcp-backend
+          group: gateway.kgateway.dev
+          kind: Backend
+---
+
+# TODO: app protocol on svc, backend target label selector?
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  labels:
+    app: kgateway
+  name: mcp-virtual-backend
+spec:
+  type: MCP
+  mcp:
+    name: mcp-server
+    labels:
+      app: mcp-server
+#    namespaceSelector:
+
+
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  labels:
+    app: kgateway
+  name: mcp-backend
+spec:
+  type: MCP
+  mcp:
+    name: mcp-server
+    # appProtocol on svc?
+    targets:
+      - name: mcp-target
+        host: mcp-website-fetcher.default.svc.cluster.local # detect it's a k8s svc
+        port: 8000
+      - name: mcp-target-2
+        host: mcp-website-fetcher-2.default.svc.cluster.local # detect it's a k8s svc
+        port: 8000
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  labels:
+    app: kgateway
+  name: a2a-backend
+spec:
+  type: Static
+  static:
+    host: a2a-website-fetcher.default.svc.cluster.local
+    appProtocol: kgateway.dev/a2a
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-website-fetcher
+  labels:
+    app: mcp-website-fetcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-website-fetcher
+  template:
+    metadata:
+      labels:
+        app: mcp-website-fetcher
+    spec:
+      containers:
+        - name: mcp-website-fetcher
+          image: ghcr.io/peterj/mcp-website-fetcher:main
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /sse
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-website-fetcher
+spec:
+  selector:
+    app: mcp-website-fetcher
+  ports:
+    - port: 80
+      targetPort: 8000
+  type: ClusterIP

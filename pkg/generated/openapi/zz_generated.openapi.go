@@ -117,6 +117,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetReferenceWithSectionName": schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetReferenceWithSectionName(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetSelector":                 schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetSelector(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalRateLimitPolicy":                      schema_kgateway_v2_api_v1alpha1_LocalRateLimitPolicy(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP":                                       schema_kgateway_v2_api_v1alpha1_MCP(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget":                                 schema_kgateway_v2_api_v1alpha1_McpTarget(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Message":                                   schema_kgateway_v2_api_v1alpha1_Message(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MetadataKey":                               schema_kgateway_v2_api_v1alpha1_MetadataKey(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MetadataPathSegment":                       schema_kgateway_v2_api_v1alpha1_MetadataPathSegment(ref),
@@ -1786,6 +1788,12 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DynamicForwardProxyBackend"),
 						},
 					},
+					"mcp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MCP is the mcp backend configuration.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP"),
+						},
+					},
 				},
 				Required: []string{"type"},
 			},
@@ -1798,6 +1806,7 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 								"ai":                  "AI",
 								"aws":                 "Aws",
 								"dynamicForwardProxy": "DynamicForwardProxy",
+								"mcp":                 "MCP",
 								"static":              "Static",
 							},
 						},
@@ -1806,7 +1815,7 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AIBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AwsBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DynamicForwardProxyBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StaticBackend"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AIBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AwsBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DynamicForwardProxyBackend", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.StaticBackend"},
 	}
 }
 
@@ -4695,6 +4704,89 @@ func schema_kgateway_v2_api_v1alpha1_LocalRateLimitPolicy(ref common.ReferenceCa
 		},
 		Dependencies: []string{
 			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.TokenBucket"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_MCP(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MCP configures mcp backends",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the backend name for this MCP configuration.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targets": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Targets is a list of MCP targets to use for this backend.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "targets"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_McpTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "McpTarget defines a single MCP target configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the name of this MCP target.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"host": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Host is the hostname or IP address of the MCP target.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Port is the port number of the MCP target.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"protocol": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Protocol is the protocol to use for the connection to the MCP target.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "host", "port"},
+			},
+		},
 	}
 }
 

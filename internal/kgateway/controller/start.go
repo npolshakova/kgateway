@@ -80,6 +80,8 @@ type StartConfig struct {
 	Client      istiokube.Client
 
 	AugmentedPods krt.Collection[krtcollections.LocalityPod]
+	// Special collection built using envoy callbacks
+	// Need this for DR (failover for eds snapshot)
 	UniqueClients krt.Collection[ir.UniqlyConnectedClient]
 
 	KrtOptions krtutil.KrtOptions
@@ -210,14 +212,18 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	proxySyncer.Init(ctx, cfg.KrtOptions)
 
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
+		domainSuffix := "cluster.local" // TODO: don't hard code
 		agentGatewaySyncer := agentgatewaysyncer.NewAgentGwSyncer(
-			ctx,
 			cfg.ControllerName,
 			cfg.AgentGatewayClassName,
-			mgr,
 			cfg.Client,
+			mgr,
 			commoncol,
 			cfg.SetupOpts.Cache,
+			domainSuffix,
+			namespaces.GetPodNamespace(),
+			cfg.Client.ClusterID().String(),
+			cfg.SetupOpts.GlobalSettings.EnableAgentGatewayAlphaApis,
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)
 
