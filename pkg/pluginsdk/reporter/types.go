@@ -29,24 +29,27 @@ type PolicyKey struct {
 }
 
 type GatewayCondition struct {
-	Type    gwv1.GatewayConditionType
-	Status  metav1.ConditionStatus
-	Reason  gwv1.GatewayConditionReason
-	Message string
+	Type               gwv1.GatewayConditionType
+	Status             metav1.ConditionStatus
+	Reason             gwv1.GatewayConditionReason
+	Message            string
+	ObservedGeneration int64
 }
 
 type ListenerCondition struct {
-	Type    gwv1.ListenerConditionType
-	Status  metav1.ConditionStatus
-	Reason  gwv1.ListenerConditionReason
-	Message string
+	Type               gwv1.ListenerConditionType
+	Status             metav1.ConditionStatus
+	Reason             gwv1.ListenerConditionReason
+	Message            string
+	ObservedGeneration int64
 }
 
 type RouteCondition struct {
-	Type    gwv1.RouteConditionType
-	Status  metav1.ConditionStatus
-	Reason  gwv1.RouteConditionReason
-	Message string
+	Type               gwv1.RouteConditionType
+	Status             metav1.ConditionStatus
+	Reason             gwv1.RouteConditionReason
+	Message            string
+	ObservedGeneration int64
 }
 
 type AncestorRefReporter interface {
