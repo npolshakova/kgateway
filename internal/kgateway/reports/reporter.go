@@ -33,6 +33,43 @@ type GatewayReport struct {
 	observedGeneration int64
 }
 
+func (r *GatewayReport) Equals(in *GatewayReport) bool {
+	if r == nil && in == nil {
+		return true
+	}
+	if r == nil || in == nil {
+		return false
+	}
+
+	// Compare observedGeneration
+	if r.observedGeneration != in.observedGeneration {
+		return false
+	}
+
+	// Compare conditions slices
+	if len(r.conditions) != len(in.conditions) {
+		return false
+	}
+	for i, cond := range r.conditions {
+		if cond != in.conditions[i] {
+			return false
+		}
+	}
+
+	// Compare listeners maps
+	if len(r.listeners) != len(in.listeners) {
+		return false
+	}
+	for key, listener := range r.listeners {
+		otherListener, exists := in.listeners[key]
+		if !exists || listener != otherListener {
+			return false
+		}
+	}
+
+	return true
+}
+
 type ListenerSetReport struct {
 	conditions         []metav1.Condition
 	listeners          map[string]*ListenerReport
@@ -81,24 +118,15 @@ func key(obj metav1.Object) types.NamespacedName {
 //
 // NOTE: Exported for unit testing, validation_test.go should be refactored to reduce this visibility
 func (r *ReportMap) Gateway(gateway *gwv1.Gateway) *GatewayReport {
-	fmt.Printf("debug(npolshak) Gateway() %s\n", gateway.Name)
 	key := key(gateway)
-	if r.Gateways[key] == nil {
-		fmt.Printf("debug(npolshak) nil gateway report %v\n", r.Gateways[key])
-	} else {
-		fmt.Printf("debug(npolshak) val gateway report not nil %v\n", r.Gateways[key].conditions)
-	}
 	return r.Gateways[key]
 }
 
 func (r *ReportMap) newGatewayReport(gateway *gwv1.Gateway) *GatewayReport {
-	fmt.Printf("debug(npolshak) creating new gateway report %s\n", gateway.Name)
-
 	gr := &GatewayReport{}
 	gr.observedGeneration = gateway.Generation
 	key := key(gateway)
 	r.Gateways[key] = gr
-	fmt.Printf("debug(npolshak) newGatewayReport val gateway report %v\n", gr.conditions)
 	return gr
 }
 
@@ -203,12 +231,12 @@ func (g *GatewayReport) GetConditions() []metav1.Condition {
 
 func (g *GatewayReport) SetCondition(gc pluginsdkreporter.GatewayCondition) {
 	condition := metav1.Condition{
-		Type:    string(gc.Type),
-		Status:  gc.Status,
-		Reason:  string(gc.Reason),
-		Message: gc.Message,
+		Type:               string(gc.Type),
+		Status:             gc.Status,
+		Reason:             string(gc.Reason),
+		Message:            gc.Message,
+		ObservedGeneration: gc.ObservedGeneration,
 	}
-	fmt.Printf("debug(npolshak) SetCondition %v for %v\n", condition, g)
 	meta.SetStatusCondition(&g.conditions, condition)
 }
 
@@ -245,17 +273,19 @@ func (g *ListenerSetReport) GetConditions() []metav1.Condition {
 
 func (g *ListenerSetReport) SetCondition(gc pluginsdkreporter.GatewayCondition) {
 	condition := metav1.Condition{
-		Type:    string(gc.Type),
-		Status:  gc.Status,
-		Reason:  string(gc.Reason),
-		Message: gc.Message,
+		Type:               string(gc.Type),
+		Status:             gc.Status,
+		Reason:             string(gc.Reason),
+		Message:            gc.Message,
+		ObservedGeneration: gc.ObservedGeneration,
 	}
-	g.conditions = append(g.conditions, condition)
+	meta.SetStatusCondition(&g.conditions, condition)
 }
 
 func NewListenerReport(name string) *ListenerReport {
 	lr := ListenerReport{}
 	lr.Status.Name = gwv1.SectionName(name)
+	lr.Status.SupportedKinds = []gwv1.RouteGroupKind{} // Initialize with empty slice
 	return &lr
 }
 
@@ -282,11 +312,11 @@ type reporter struct {
 }
 
 func (r *reporter) Gateway(gateway *gwv1.Gateway) pluginsdkreporter.GatewayReporter {
-	fmt.Printf("debug(npolshak) reporter Gateway(gateway) %s\n", gateway.Name)
 	gr := r.report.Gateway(gateway)
 	if gr == nil {
 		gr = r.report.newGatewayReport(gateway)
 	}
+	gr.observedGeneration = gateway.Generation
 	return gr
 }
 
@@ -295,10 +325,15 @@ func (r *reporter) ListenerSet(listenerSet *gwxv1alpha1.XListenerSet) pluginsdkr
 	if lsr == nil {
 		lsr = r.report.newListenerSetReport(listenerSet)
 	}
+	lsr.observedGeneration = listenerSet.Generation
 	return lsr
 }
 
 func (r *reporter) Route(obj metav1.Object) pluginsdkreporter.RouteReporter {
+	if r == nil || r.report == nil {
+		// Return a no-op reporter to prevent panics
+		return &RouteReport{}
+	}
 	rr := r.report.route(obj)
 	if rr == nil {
 		rr = r.report.newRouteReport(obj)

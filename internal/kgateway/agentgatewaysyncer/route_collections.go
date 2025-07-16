@@ -17,9 +17,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
@@ -30,6 +28,8 @@ func ADPRouteCollection(
 	grpcRouteCol krt.Collection[*gwv1.GRPCRoute],
 	tcpRouteCol krt.Collection[*gwv1alpha2.TCPRoute],
 	tlsRouteCol krt.Collection[*gwv1alpha2.TLSRoute],
+	gateways krt.Collection[Gateway],
+	gatewayObjs krt.Collection[*gwv1.Gateway],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
 	rm reports.ReportMap,
@@ -237,7 +237,55 @@ func ADPRouteCollection(
 	}, krtopts.ToOptions("ADPTLSRoutes")...)
 
 	routes := krt.JoinCollection([]krt.Collection[ADPResource]{httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes}, krtopts.ToOptions("ADPRoutes")...)
+
+	// Create an index on routes by gateway for efficient lookup
+	routesByGateway := krt.NewIndex(routes, func(adpResource ADPResource) []types.NamespacedName {
+		return []types.NamespacedName{adpResource.Gateway}
+	})
+
+	// Set attached routes for each gateway after routes are built
+	// Create a collection to trigger route counting when both gateways and routes are ready
+	_ = krt.NewManyCollection(gateways, func(krtctx krt.HandlerContext, gateway Gateway) []struct{} {
+		logger.Debug("setting attached routes for gateway", "gateway", gateway.ResourceName())
+
+		// Find the corresponding gwv1.Gateway object
+		gatewayObj := findGatewayObject(krtctx, gatewayObjs, gateway)
+		if gatewayObj == nil {
+			logger.Debug("could not find corresponding gwv1.Gateway object", "gateway", gateway.ResourceName())
+			return []struct{}{}
+		}
+		setAttachedRoutes(&gateway, krtctx, routes, routesByGateway, gatewayObj, rep)
+
+		// Return empty slice since this is just for side effects
+		return []struct{}{}
+	}, krtopts.ToOptions("AttachedRouteSetter")...)
+
 	return routes
+}
+
+// Helper function to find the corresponding gwv1.Gateway object for a Gateway
+func findGatewayObject(krtctx krt.HandlerContext, gatewayObjs krt.Collection[*gwv1.Gateway], gateway Gateway) *gwv1.Gateway {
+	// Find the gwv1.Gateway that matches this Gateway's parent namespace and name
+	allGateways := krt.Fetch(krtctx, gatewayObjs)
+	for _, gw := range allGateways {
+		if gw.Namespace == gateway.parent.Namespace && gw.Name == gateway.parent.Name {
+			return gw
+		}
+	}
+	return nil
+}
+
+// Helper function to extract listener name from ListenerKey
+// ListenerKey format: gwName-AgentgatewayName-lName
+func extractListenerNameFromKey(listenerKey string) string {
+	// The listener name is the part after the last occurrence of AgentgatewayName-
+	prefix := AgentgatewayName + "-"
+	idx := strings.LastIndex(listenerKey, prefix)
+	if idx == -1 {
+		// Fallback: if the expected pattern is not found, return the original key
+		return listenerKey
+	}
+	return listenerKey[idx+len(prefix):]
 }
 
 type conversionResult[O any] struct {
@@ -321,4 +369,61 @@ func (r RouteWithKey) Equals(o RouteWithKey) bool {
 // buildGatewayRoutes contains common logic to build a set of routes with gwv1beta1 semantics
 func buildGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
 	return convertRules()
+}
+
+func setAttachedRoutes(gateway *Gateway, krtctx krt.HandlerContext, routes krt.Collection[ADPResource], routesByGateway krt.Index[types.NamespacedName, ADPResource], gatewayObj *gwv1.Gateway, reporter reports.Reporter) {
+	// In agentgatewaysyncer, each Gateway represents a single listener
+	// We need to count routes attached to this specific gateway/listener and set the count
+
+	// Get the gateway reporter
+	gwReporter := reporter.Gateway(gatewayObj)
+
+	// Count routes that are attached to this specific listener
+	// Routes have a ListenerKey that matches the listener name
+	listenerName := string(gateway.parentInfo.SectionName)
+
+	// Use the index to find all routes attached to this specific gateway
+	gatewayNamespacedName := types.NamespacedName{
+		Namespace: gateway.parent.Namespace,
+		Name:      gateway.parent.Name,
+	}
+	routesForGateway := krt.Fetch(krtctx, routes, krt.FilterIndex(routesByGateway, gatewayNamespacedName))
+
+	routeCount := 0
+	for _, adpResource := range routesForGateway {
+		if adpResource.Resource != nil {
+			if routeRes := adpResource.Resource.GetRoute(); routeRes != nil {
+				// Check if this route is attached to our listener
+				logger.Debug("checking route", "route", routeRes.ListenerKey, "listener", listenerName)
+				// Extract listener name from ListenerKey (format: gwName-AgentgatewayName-lName)
+				// TODO: fix this
+				extractedListenerName := extractListenerNameFromKey(routeRes.ListenerKey)
+				if extractedListenerName == listenerName {
+					// Also verify the gateway matches
+					logger.Debug("checking gw for route ns", "adp", adpResource.Gateway.Namespace, "parent", gateway.parent.Namespace)
+					logger.Debug("checking gw for route name", "adp", adpResource.Gateway.Name, "parent", gateway.parent.Name)
+					if adpResource.Gateway.Namespace == gateway.parent.Namespace &&
+						adpResource.Gateway.Name == gateway.parent.Name {
+						routeCount++
+					}
+				}
+			}
+		}
+	}
+
+	// Find the corresponding listener in the Gateway object
+	var targetListener *gwv1.Listener
+	for _, listener := range gatewayObj.Spec.Listeners {
+		logger.Debug("checking section name", "gw", gateway.parentInfo.SectionName, "listener", listener.Name)
+		if listener.Name == gateway.parentInfo.SectionName {
+			targetListener = &listener
+			break
+		}
+	}
+
+	if targetListener != nil {
+		// Set the attached routes count for this listener
+		logger.Debug("setting attached routes", "listener", targetListener.Name, "count", routeCount)
+		gwReporter.Listener(targetListener).SetAttachedRoutes(uint(routeCount))
+	}
 }
