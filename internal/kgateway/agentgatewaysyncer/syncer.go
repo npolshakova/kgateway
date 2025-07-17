@@ -186,7 +186,8 @@ func (r report) ResourceName() string {
 }
 
 func (r report) Equals(in report) bool {
-	// TODO: fix equality
+	// TODO: should we create a new report every time and compare? (map equality will always be false then)
+	// retrigger status updates on every sync for singleton
 	return false
 }
 
