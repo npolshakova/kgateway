@@ -296,7 +296,7 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 		// kgateway resources
 		Backends: s.commonCols.BackendIndex,
 		// TODO: remove
-		BackendsTemp: krt.NewInformer[*v1alpha1.Backend](s.client),
+		BackendsTemp: krt.WrapClient(kclient.NewFiltered[*v1alpha1.Backend](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/Backends")...),
 	}
 
 	if s.EnableAlphaGatewayAPI {
