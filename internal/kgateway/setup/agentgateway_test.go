@@ -196,6 +196,8 @@ func testAgentGatewayScenario(
 
 			// Compare actual vs expected dump
 			if err := compareDumps(dump, expectedDump); err != nil {
+				t.Logf("actual dump: %+v", dump)
+				t.Logf("comparison failed: %v", err)
 				return fmt.Errorf("dump comparison failed: %v", err)
 			}
 		}

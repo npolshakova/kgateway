@@ -48,6 +48,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
@@ -78,6 +79,7 @@ type AgentGwSyncer struct {
 	commonCols *common.CommonCollections
 	mgr        manager.Manager
 	client     kube.Client
+	plugins    pluginsdk.Plugin
 
 	// Configuration
 	controllerName        string
@@ -134,6 +136,7 @@ func NewAgentGwSyncer(
 	client kube.Client,
 	mgr manager.Manager,
 	commonCols *common.CommonCollections,
+	plugins pluginsdk.Plugin,
 	xdsCache envoycache.SnapshotCache,
 	domainSuffix string,
 	systemNamespace string,
@@ -145,6 +148,7 @@ func NewAgentGwSyncer(
 		commonCols:            commonCols,
 		controllerName:        controllerName,
 		agentGatewayClassName: agentGatewayClassName,
+		plugins:               plugins,
 		xdsCache:              xdsCache,
 		client:                client,
 		mgr:                   mgr,
@@ -389,7 +393,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		InferencePools: inputs.InferencePools,
 		Backends:       s.commonCols.BackendIndex,
 	}
-	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, gateways, inputs.Gateways, routeInputs, krtopts, repMap, rep)
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, gateways, inputs.Gateways, routeInputs, krtopts, repMap, rep, s.plugins)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)

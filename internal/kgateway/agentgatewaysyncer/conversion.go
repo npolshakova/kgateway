@@ -7,10 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"istio.io/api/annotation"
 	istio "istio.io/api/networking/v1alpha3"
 	kubecreds "istio.io/istio/pilot/pkg/credentials/kube"
@@ -38,7 +36,6 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
@@ -87,18 +84,17 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	}
 	res.Filters = filters
 
-	if r.Timeouts != nil {
-		res.TrafficPolicy = &api.TrafficPolicy{}
-		if r.Timeouts.Request != nil {
-			request, _ := time.ParseDuration(string(*r.Timeouts.Request))
-			if request > 0 {
-				res.GetTrafficPolicy().RequestTimeout = durationpb.New(request)
-			}
-		}
-		if r.Timeouts.BackendRequest != nil {
-			request, _ := time.ParseDuration(string(*r.Timeouts.BackendRequest))
-			if request > 0 {
-				res.GetTrafficPolicy().RequestTimeout = durationpb.New(request)
+	agentGatewayRouteContext := ir.AgentGatewayRouteContext{
+		Rule: &r,
+	}
+
+	for _, pass := range ctx.pluginPasses {
+		if err := pass.ApplyForRoute(&agentGatewayRouteContext, res); err != nil {
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  "PluginError",
+				Message: fmt.Sprintf("failed to apply a plugin: %v", err),
 			}
 		}
 	}
