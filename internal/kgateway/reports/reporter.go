@@ -33,43 +33,6 @@ type GatewayReport struct {
 	observedGeneration int64
 }
 
-func (r *GatewayReport) Equals(in *GatewayReport) bool {
-	if r == nil && in == nil {
-		return true
-	}
-	if r == nil || in == nil {
-		return false
-	}
-
-	// Compare observedGeneration
-	if r.observedGeneration != in.observedGeneration {
-		return false
-	}
-
-	// Compare conditions slices
-	if len(r.conditions) != len(in.conditions) {
-		return false
-	}
-	for i, cond := range r.conditions {
-		if cond != in.conditions[i] {
-			return false
-		}
-	}
-
-	// Compare listeners maps
-	if len(r.listeners) != len(in.listeners) {
-		return false
-	}
-	for key, listener := range r.listeners {
-		otherListener, exists := in.listeners[key]
-		if !exists || listener != otherListener {
-			return false
-		}
-	}
-
-	return true
-}
-
 type ListenerSetReport struct {
 	conditions         []metav1.Condition
 	listeners          map[string]*ListenerReport
@@ -231,11 +194,10 @@ func (g *GatewayReport) GetConditions() []metav1.Condition {
 
 func (g *GatewayReport) SetCondition(gc pluginsdkreporter.GatewayCondition) {
 	condition := metav1.Condition{
-		Type:               string(gc.Type),
-		Status:             gc.Status,
-		Reason:             string(gc.Reason),
-		Message:            gc.Message,
-		ObservedGeneration: gc.ObservedGeneration,
+		Type:    string(gc.Type),
+		Status:  gc.Status,
+		Reason:  string(gc.Reason),
+		Message: gc.Message,
 	}
 	meta.SetStatusCondition(&g.conditions, condition)
 }
@@ -273,13 +235,12 @@ func (g *ListenerSetReport) GetConditions() []metav1.Condition {
 
 func (g *ListenerSetReport) SetCondition(gc pluginsdkreporter.GatewayCondition) {
 	condition := metav1.Condition{
-		Type:               string(gc.Type),
-		Status:             gc.Status,
-		Reason:             string(gc.Reason),
-		Message:            gc.Message,
-		ObservedGeneration: gc.ObservedGeneration,
+		Type:    string(gc.Type),
+		Status:  gc.Status,
+		Reason:  string(gc.Reason),
+		Message: gc.Message,
 	}
-	meta.SetStatusCondition(&g.conditions, condition)
+	g.conditions = append(g.conditions, condition)
 }
 
 func NewListenerReport(name string) *ListenerReport {
@@ -330,10 +291,6 @@ func (r *reporter) ListenerSet(listenerSet *gwxv1alpha1.XListenerSet) pluginsdkr
 }
 
 func (r *reporter) Route(obj metav1.Object) pluginsdkreporter.RouteReporter {
-	if r == nil || r.report == nil {
-		// Return a no-op reporter to prevent panics
-		return &RouteReport{}
-	}
 	rr := r.report.route(obj)
 	if rr == nil {
 		rr = r.report.newRouteReport(obj)

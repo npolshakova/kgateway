@@ -146,11 +146,10 @@ func GatewayCollection(
 			// Short circuit if it's a hard failure
 			logger.Error("failed to translate gwv1", "name", obj.GetName(), "namespace", obj.GetNamespace(), "err", err.Message)
 			gwReporter.SetCondition(reporter.GatewayCondition{
-				Type:               gwv1.GatewayConditionAccepted,
-				Status:             metav1.ConditionFalse,
-				Reason:             gwv1.GatewayReasonInvalid,
-				Message:            err.Message,
-				ObservedGeneration: obj.Generation,
+				Type:    gwv1.GatewayConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.GatewayReasonInvalid,
+				Message: err.Message,
 			})
 			return nil
 		}
@@ -165,11 +164,10 @@ func GatewayCollection(
 			// Set all listener conditions from the actual status
 			for _, lcond := range lstatus.Conditions {
 				gwReporter.Listener(&l).SetCondition(reporter.ListenerCondition{
-					Type:               gwv1.ListenerConditionType(lcond.Type),
-					Status:             lcond.Status,
-					Reason:             gwv1.ListenerConditionReason(lcond.Reason),
-					Message:            lcond.Message,
-					ObservedGeneration: lcond.ObservedGeneration,
+					Type:    gwv1.ListenerConditionType(lcond.Type),
+					Status:  lcond.Status,
+					Reason:  gwv1.ListenerConditionReason(lcond.Reason),
+					Message: lcond.Message,
 				})
 			}
 
@@ -219,10 +217,9 @@ func GatewayCollection(
 		}
 
 		gwReporter.SetCondition(reporter.GatewayCondition{
-			Type:               gwv1.GatewayConditionAccepted,
-			Status:             metav1.ConditionTrue,
-			Reason:             gwv1.GatewayReasonAccepted,
-			ObservedGeneration: obj.Generation,
+			Type:   gwv1.GatewayConditionAccepted,
+			Status: metav1.ConditionTrue,
+			Reason: gwv1.GatewayReasonAccepted,
 		})
 		return result
 	}, krtopts.ToOptions("KubernetesGateway")...)
