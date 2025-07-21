@@ -631,7 +631,6 @@ func TestADPRouteCollection(t *testing.T) {
 			inferencePools := krttest.GetMockCollection[*inf.InferencePool](mock)
 
 			// Wait for collections to sync
-			gateways.WaitUntilSynced(context.Background().Done())
 			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
@@ -660,7 +659,7 @@ func TestADPRouteCollection(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1229,7 +1228,6 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			inferencePools := krttest.GetMockCollection[*inf.InferencePool](mock)
 
 			// Wait for collections to sync
-			gateways.WaitUntilSynced(context.Background().Done())
 			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
@@ -1258,7 +1256,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1525,7 +1523,6 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			inferencePools := krttest.GetMockCollection[*inf.InferencePool](mock)
 
 			// Wait for collections to sync
-			gateways.WaitUntilSynced(context.Background().Done())
 			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
@@ -1554,7 +1551,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
