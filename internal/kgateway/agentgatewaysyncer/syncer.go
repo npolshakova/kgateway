@@ -43,13 +43,13 @@ import (
 	gwxv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	kgwversioned "github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
@@ -227,9 +227,23 @@ type Inputs struct {
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
 	logger.Debug("init agentgateway Syncer", "controllername", s.controllerName)
 
+	s.setupkgwResources(s.commonCols.OurClient)
 	s.setupInferenceExtensionClient()
 	inputs := s.buildInputCollections(krtopts)
 	s.buildResourceCollections(inputs, krtopts)
+}
+
+func (s *AgentGwSyncer) setupkgwResources(kgwClient kgwversioned.Interface) {
+	kubeclient.Register[*v1alpha1.Backend](
+		wellknown.BackendGVR,
+		wellknown.BackendGVK,
+		func(c kubeclient.ClientGetter, namespace string, o metav1.ListOptions) (runtime.Object, error) {
+			return kgwClient.GatewayV1alpha1().Backends(namespace).List(context.Background(), o)
+		},
+		func(c kubeclient.ClientGetter, namespace string, o metav1.ListOptions) (watch.Interface, error) {
+			return kgwClient.GatewayV1alpha1().Backends(namespace).Watch(context.Background(), o)
+		},
+	)
 }
 
 func (s *AgentGwSyncer) setupInferenceExtensionClient() {
@@ -278,7 +292,7 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 		// kgateway resources
 		Backends: s.commonCols.BackendIndex,
 		// TODO: remove
-		BackendsTemp: krt.WrapClient(kclient.NewFiltered[*v1alpha1.Backend](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/Backends")...),
+		BackendsTemp: krt.NewInformer[*v1alpha1.Backend](s.client),
 	}
 
 	if s.EnableAlphaGatewayAPI {
@@ -388,7 +402,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	// Build backends
 	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []ADPResource {
 		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, repMap)
-	}, krtopts.ToOptions("Backends")...)
+	}, krtopts.ToOptions("ADPBackends")...)
 
 	// Build routes
 	routeParents := BuildRouteParents(gateways)
