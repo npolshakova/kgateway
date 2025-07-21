@@ -52,7 +52,7 @@ func TestFilterChains(t *testing.T) {
 		// it will be necessary; leaving it here to save time debugging after a refactor
 		ContributedPolicies: map[schema.GroupKind]extensionsplug.PolicyPlugin{
 			addFiltersGK: {
-				NewGatewayTranslationPass: func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
+				NewEnvoyGatewayTranslationPass: func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
 					return addFilters{}
 				},
 			},
@@ -90,7 +90,7 @@ func TestFilterChains(t *testing.T) {
 	envoyListener, _ := translator.ComputeListener(
 		ctx,
 		irtranslator.TranslationPassPlugins{
-			addFiltersGK: &irtranslator.TranslationPass{ProxyTranslationPass: addFilters{}},
+			addFiltersGK: &irtranslator.TranslationPass{EnvoyTranslationPass: addFilters{}},
 		},
 		gateway,
 		listener,
