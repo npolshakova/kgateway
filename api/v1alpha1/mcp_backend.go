@@ -20,15 +20,15 @@ type MCP struct {
 type McpTargetSelector struct {
 	// Selectors is the selector logic to search for MCP targets with the mcp app protocol.
 	// +optional
-	Selectors McpSelector `json:"selectors,omitempty"`
+	Selectors *McpSelector `json:"selectors,omitempty"`
 
 	// StaticTarget is the MCP target to use for this backend.
 	// +optional
-	StaticTarget McpTarget `json:"static,omitempty"`
+	StaticTarget *McpTarget `json:"static,omitempty"`
 }
 
 // McpSelector defines the selector logic to search for MCP targets.
-// +kubebuilder:validation:XValidation:message="at least one of namespaceSelector and serviceSelector must be set",rule="!(has(self.namespaceSelector) || has(self.serviceSelector))"
+// +kubebuilder:validation:XValidation:message="at least one of namespaceSelector and serviceSelector must be set",rule="has(self.namespaceSelector) || has(self.serviceSelector)"
 type McpSelector struct {
 	// NamespaceSelector is the label selector in which namespace the MCP targets
 	// are searched for.

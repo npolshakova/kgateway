@@ -461,6 +461,17 @@ func buildADPDestination(
 				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
 		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
+		// TODO: All kubernetes service types currently require a Port, so we do this for everything; consider making this per-type if we have future types
+		// that do not require port.
+		if port == nil {
+			// "Port is required when the referent is a Kubernetes Service."
+			return nil, &reporter.RouteCondition{
+				Type:    gwv1.RouteConditionAccepted,
+				Status:  metav1.ConditionFalse,
+				Reason:  gwv1.RouteReasonUnsupportedValue,
+				Message: "port is required in backendRef"}
+		}
+		rb.Port = int32(*port)
 	case wellknown.BackendGVK.GroupKind():
 		// Create the source ObjectSource representing the route object making the reference
 		routeSrc := ir.ObjectSource{
@@ -489,11 +500,9 @@ func buildADPDestination(
 			}
 		}
 
-		// TODO: support other backend kinds
-
-		// Use the backend information if available
-		if kgwBackend != nil {
-			logger.Debug("successfully resolved kgateway Backend", "backend", kgwBackend.Name)
+		logger.Debug("successfully resolved kgateway Backend", "backend", kgwBackend.Name)
+		rb.Kind = &api.RouteBackend_Backend{
+			Backend: kgwBackend.Namespace + "/" + kgwBackend.Name,
 		}
 	default:
 		return nil, &reporter.RouteCondition{
@@ -503,17 +512,6 @@ func buildADPDestination(
 			Message: fmt.Sprintf("referencing unsupported backendRef: group %q kind %q", ptr.OrEmpty(to.Group), ptr.OrEmpty(to.Kind)),
 		}
 	}
-	// All types currently require a Port, so we do this for everything; consider making this per-type if we have future types
-	// that do not require port.
-	if port == nil {
-		// "Port is required when the referent is a Kubernetes Service."
-		return nil, &reporter.RouteCondition{
-			Type:    gwv1.RouteConditionAccepted,
-			Status:  metav1.ConditionFalse,
-			Reason:  gwv1.RouteReasonUnsupportedValue,
-			Message: "port is required in backendRef"}
-	}
-	rb.Port = int32(*port)
 	return rb, invalidBackendErr
 }
 

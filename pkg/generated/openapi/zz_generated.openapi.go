@@ -4829,14 +4829,12 @@ func schema_kgateway_v2_api_v1alpha1_McpTargetSelector(ref common.ReferenceCallb
 					"selectors": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selectors is the selector logic to search for MCP targets with the mcp app protocol.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpSelector"),
 						},
 					},
 					"static": {
 						SchemaProps: spec.SchemaProps{
 							Description: "StaticTarget is the MCP target to use for this backend.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"),
 						},
 					},

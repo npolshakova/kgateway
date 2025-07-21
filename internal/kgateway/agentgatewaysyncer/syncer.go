@@ -27,6 +27,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,6 +41,8 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	gwxv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
+
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
@@ -217,6 +220,8 @@ type Inputs struct {
 
 	// kgateway resources
 	Backends *krtcollections.BackendIndex
+	// TODO: remove
+	BackendsTemp krt.Collection[*v1alpha1.Backend]
 }
 
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
@@ -272,6 +277,8 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 
 		// kgateway resources
 		Backends: s.commonCols.BackendIndex,
+		// TODO: remove
+		BackendsTemp: krt.WrapClient(kclient.NewFiltered[*v1alpha1.Backend](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/Backends")...),
 	}
 
 	if s.EnableAlphaGatewayAPI {
@@ -362,7 +369,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		var binds []ADPResource
 
 		for _, obj := range uniq.UnsortedList() {
-			bind := Bind{
+			bind := ADPBind{
 				Bind: &api.Bind{
 					Key:  object.Key + "/" + obj.String(),
 					Port: uint32(port),
@@ -378,6 +385,11 @@ func (s *AgentGwSyncer) buildADPResources(
 		return s.buildListenerFromGateway(ctx, obj, repMap)
 	}, krtopts.ToOptions("Listeners")...)
 
+	// Build backends
+	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []ADPResource {
+		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, repMap)
+	}, krtopts.ToOptions("Backends")...)
+
 	// Build routes
 	routeParents := BuildRouteParents(gateways)
 	routeInputs := RouteContextInputs{
@@ -392,7 +404,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, gateways, inputs.Gateways, routeInputs, krtopts, repMap, rep)
 
 	// Join all ADP resources
-	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
+	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes, backends}, krtopts.ToOptions("ADPResources")...)
 
 	return allADPResources
 }
@@ -420,6 +432,276 @@ func (s *AgentGwSyncer) buildListenerFromGateway(ctx krt.HandlerContext, obj Gat
 		Namespace: obj.parent.Namespace,
 		Name:      obj.parent.Name,
 	}, ADPListener{l}, repMap)
+}
+
+const (
+	mcpProtocol = "kgateway.dev/mcp"
+)
+
+// buildBackendFromBackend creates a backend resource
+func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace], repMap reports.ReportMap) []ADPResource {
+	var results []ADPResource
+	// Translate the backend type from Kubernetes Backend to agentgateway API
+	switch obj.Spec.Type {
+	case v1alpha1.BackendTypeAI:
+		if obj.Spec.AI == nil {
+			logger.Warn("AI backend spec is nil", "backend", obj.Name)
+			return results
+		}
+
+		// Extract the provider configuration
+		var providerConfig *api.AIBackend
+
+		if obj.Spec.AI.LLM != nil {
+			providerConfig = s.buildAIBackendFromLLM(obj.Spec.AI.LLM)
+		} else if obj.Spec.AI.MultiPool != nil && len(obj.Spec.AI.MultiPool.Priorities) > 0 &&
+			len(obj.Spec.AI.MultiPool.Priorities[0].Pool) > 0 {
+			// For MultiPool, use the first provider from the first priority pool
+			providerConfig = s.buildAIBackendFromLLM(&obj.Spec.AI.MultiPool.Priorities[0].Pool[0])
+		} else {
+			logger.Warn("AI backend has no valid LLM or MultiPool configuration", "backend", obj.Name)
+			// Create empty AI backend as fallback
+			providerConfig = &api.AIBackend{}
+		}
+
+		aiBackend := &api.Backend{
+			Name: obj.Namespace + "/" + obj.Name,
+			Kind: &api.Backend_Ai{
+				Ai: providerConfig,
+			},
+		}
+		logger.Debug("creating AI backend", "backend", obj.Name)
+		results = append(results, toResourceWithReports(types.NamespacedName{
+			Namespace: obj.Namespace,
+			Name:      obj.Name,
+		}, ADPBackend{aiBackend}, repMap))
+	case v1alpha1.BackendTypeStatic:
+		if len(obj.Spec.Static.Hosts) > 1 {
+			// TODO: support multiple hosts
+			logger.Warn("multiple hosts are not supported for static backends in agentgateway", "backend", obj.Name)
+		}
+		host := obj.Spec.Static.Hosts[0].Host
+		port := obj.Spec.Static.Hosts[0].Port
+		staticBackend := &api.Backend{
+			Name: obj.Namespace + "/" + obj.Name,
+			Kind: &api.Backend_Static{
+				Static: &api.StaticBackend{
+					Host: host,
+					Port: int32(port),
+				},
+			},
+		}
+		logger.Debug("creating static backend", "backend", staticBackend)
+		results = append(results, toResourceWithReports(types.NamespacedName{
+			Namespace: obj.Namespace,
+			Name:      obj.Name,
+		}, ADPBackend{staticBackend}, repMap))
+	case v1alpha1.BackendTypeMCP:
+		// Convert Kubernetes MCP targets to agentgateway format
+		var mcpTargets []*api.MCPTarget
+
+		if obj.Spec.MCP != nil {
+			for _, targetSelector := range obj.Spec.MCP.Targets {
+				if targetSelector.StaticTarget != nil {
+					staticBackendRef := obj.Namespace + "/" + targetSelector.StaticTarget.Name
+					// TODO: check if the backend exists first to dedup
+					staticBackend := &api.Backend{
+						Name: staticBackendRef,
+						Kind: &api.Backend_Static{
+							Static: &api.StaticBackend{
+								Host: targetSelector.StaticTarget.Host,
+								Port: targetSelector.StaticTarget.Port,
+							},
+						},
+					}
+					results = append(results, *toResourcepWithReports(types.NamespacedName{
+						Namespace: obj.Namespace,
+						Name:      targetSelector.StaticTarget.Name,
+					}, ADPBackend{staticBackend}, repMap))
+
+					mcpTarget := &api.MCPTarget{
+						Name: targetSelector.StaticTarget.Name,
+						Port: targetSelector.StaticTarget.Port, // TODO: which port should be set (static vs. parent)?
+						Kind: &api.MCPTarget_Backend{Backend: staticBackendRef},
+					}
+
+					// Convert protocol if specified
+					switch targetSelector.StaticTarget.Protocol {
+					case v1alpha1.MCPProtocolSSE:
+						mcpTarget.Protocol = api.MCPTarget_SSE
+					case v1alpha1.MCPProtocolStreamableHTTP:
+						mcpTarget.Protocol = api.MCPTarget_STREAMABLE_HTTP
+					default:
+						mcpTarget.Protocol = api.MCPTarget_UNDEFINED
+					}
+
+					mcpTargets = append(mcpTargets, mcpTarget)
+				}
+
+				if targetSelector.Selectors != nil {
+					// Filter services based on service selector and namespace selector
+					var filters []krt.FetchOption
+
+					// Apply service label selector
+					if targetSelector.Selectors.ServiceSelector != nil {
+						// Convert metav1.LabelSelector to labels.Selector
+						serviceSelector, err := metav1.LabelSelectorAsSelector(targetSelector.Selectors.ServiceSelector)
+						if err != nil {
+							logger.Warn("invalid service selector", "error", err, "backend", obj.Name)
+							continue
+						}
+						// Use the selector to filter services with matching labels
+						if !serviceSelector.Empty() {
+							filters = append(filters, krt.FilterGeneric(func(svc any) bool {
+								service := svc.(*corev1.Service)
+								return serviceSelector.Matches(labels.Set(service.Labels))
+							}))
+						}
+					}
+
+					// Apply namespace selector if specified
+					if targetSelector.Selectors.NamespaceSelector != nil {
+						namespaceSelector, err := metav1.LabelSelectorAsSelector(targetSelector.Selectors.NamespaceSelector)
+						if err != nil {
+							logger.Warn("invalid namespace selector", "error", err, "backend", obj.Name)
+							continue
+						}
+						if !namespaceSelector.Empty() {
+							// Get all namespaces and find those matching the selector
+							allNamespaces := krt.Fetch(ctx, nsCol)
+							matchingNamespaces := make(map[string]bool)
+							for _, ns := range allNamespaces {
+								if namespaceSelector.Matches(labels.Set(ns.Labels)) {
+									matchingNamespaces[ns.Name] = true
+								}
+							}
+							// Filter services to only those in matching namespaces
+							filters = append(filters, krt.FilterGeneric(func(svc any) bool {
+								service := svc.(*corev1.Service)
+								return matchingNamespaces[service.Namespace]
+							}))
+						}
+					} else {
+						// If no namespace selector, limit to same namespace as backend
+						filters = append(filters, krt.FilterGeneric(func(svc any) bool {
+							service := svc.(*corev1.Service)
+							return service.Namespace == obj.Namespace
+						}))
+					}
+
+					// Fetch matching services
+					matchingServices := krt.Fetch(ctx, svcCol, filters...)
+
+					// Create MCP targets for each matching service
+					for _, service := range matchingServices {
+						for _, port := range service.Spec.Ports {
+							if port.AppProtocol == nil || *port.AppProtocol != mcpProtocol {
+								continue
+							}
+							// For each mcp port on the service, create an MCP target
+							mcpTarget := &api.MCPTarget{
+								Name: service.Name + "-" + port.Name,
+								Port: port.Port,
+								Kind: &api.MCPTarget_Service{
+									Service: service.Namespace + "/" + service.Name,
+								},
+							}
+
+							// TODO: Determine protocol from service annotations or other metadata
+							// For now, default to undefined protocol
+							mcpTarget.Protocol = api.MCPTarget_UNDEFINED
+
+							mcpTargets = append(mcpTargets, mcpTarget)
+						}
+					}
+				}
+			}
+		}
+
+		mcpBackend := &api.Backend{
+			Name: obj.Namespace + "/" + obj.Name,
+			Kind: &api.Backend_Mcp{
+				Mcp: &api.MCPBackend{
+					Targets: mcpTargets,
+				},
+			},
+		}
+
+		results = append(results, toResourceWithReports(types.NamespacedName{
+			Namespace: obj.Namespace,
+			Name:      obj.Name,
+		}, ADPBackend{mcpBackend}, repMap))
+	}
+
+	return results
+}
+
+// buildAIBackendFromLLM converts a kgateway LLMProvider to an agentgateway AIBackend
+func (s *AgentGwSyncer) buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AIBackend {
+	// Create AIBackend structure with provider-specific configuration
+	aiBackend := &api.AIBackend{}
+
+	// Extract and set provider configuration based on the LLM provider type
+	provider := llm.Provider
+
+	if provider.OpenAI != nil {
+		model := ""
+		if provider.OpenAI.Model != nil {
+			model = *provider.OpenAI.Model
+		}
+		aiBackend.Provider = &api.AIBackend_Openai{
+			Openai: &api.AIBackend_OpenAI{
+				Model: model,
+			},
+		}
+	} else if provider.AzureOpenAI != nil {
+		// TODO: is this the same as open ai
+		model := ""
+		if provider.OpenAI.Model != nil {
+			model = *provider.OpenAI.Model
+		}
+		aiBackend.Provider = &api.AIBackend_Openai{
+			Openai: &api.AIBackend_OpenAI{
+				Model: model,
+			},
+		}
+	} else if provider.Anthropic != nil {
+		model := ""
+		if provider.Anthropic.Model != nil {
+			model = *provider.Anthropic.Model
+		}
+		aiBackend.Provider = &api.AIBackend_Anthropic_{
+			Anthropic: &api.AIBackend_Anthropic{
+				Model: model,
+			},
+		}
+	} else if provider.Gemini != nil {
+		model := provider.Gemini.Model
+		aiBackend.Provider = &api.AIBackend_Gemini_{
+			Gemini: &api.AIBackend_Gemini{
+				Model: model,
+			},
+		}
+	} else if provider.VertexAI != nil {
+		model := provider.VertexAI.Model
+		aiBackend.Provider = &api.AIBackend_Vertex_{
+			Vertex: &api.AIBackend_Vertex{
+				Model: model,
+			},
+		}
+	}
+	// TODO: add bedrock support
+
+	// Map common override configurations
+	if llm.HostOverride != nil {
+		logger.Debug("host override configured", "host", llm.HostOverride.Host, "port", llm.HostOverride.Port)
+		aiBackend.Override = &api.AIBackend_Override{
+			Host: llm.HostOverride.Host,
+			Port: int32(llm.HostOverride.Port),
+		}
+	}
+
+	return aiBackend
 }
 
 // getProtocolAndTLSConfig extracts protocol and TLS configuration from a gateway

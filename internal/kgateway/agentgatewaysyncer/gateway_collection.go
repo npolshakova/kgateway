@@ -28,25 +28,27 @@ func toResourcepWithReports(gw types.NamespacedName, t any, reportMap reports.Re
 
 func toResourceWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) ADPResource {
 	switch tt := t.(type) {
-	case Bind:
+	case ADPBind:
 		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}, Gateway: gw, reports: reportMap}
 	case ADPListener:
 		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}, Gateway: gw, reports: reportMap}
+	case ADPBackend:
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Backend{Backend: tt.Backend}}, Gateway: gw, reports: reportMap}
 	case ADPRoute:
 		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}, Gateway: gw, reports: reportMap}
 	}
 	panic("unknown resource kind")
 }
 
-type Bind struct {
+type ADPBind struct {
 	*api.Bind
 }
 
-func (g Bind) ResourceName() string {
+func (g ADPBind) ResourceName() string {
 	return g.Key
 }
 
-func (g Bind) Equals(other Bind) bool {
+func (g ADPBind) Equals(other ADPBind) bool {
 	return protoconv.Equals(g, other)
 }
 
@@ -59,6 +61,18 @@ func (g ADPListener) ResourceName() string {
 }
 
 func (g ADPListener) Equals(other ADPListener) bool {
+	return protoconv.Equals(g, other)
+}
+
+type ADPBackend struct {
+	*api.Backend
+}
+
+func (g ADPBackend) ResourceName() string {
+	return g.Name
+}
+
+func (g ADPBackend) Equals(other ADPBackend) bool {
 	return protoconv.Equals(g, other)
 }
 

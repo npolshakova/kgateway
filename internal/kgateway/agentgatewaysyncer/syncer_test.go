@@ -281,7 +281,7 @@ func TestADPResourceCreation(t *testing.T) {
 		expectedResourceName string
 	}{
 		{
-			name: "Create Bind resource",
+			name: "Create ADPBind resource",
 			expectedResource: &api.Resource{
 				Kind: &api.Resource_Bind{
 					Bind: &api.Bind{

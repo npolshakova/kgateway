@@ -163,7 +163,7 @@ func testAgentGatewayScenario(
 			switch resource.GetKind().(type) {
 			case *api.Resource_Bind:
 				bindCount++
-				t.Logf("Bind resource: %+v", resource.GetBind())
+				t.Logf("ADPBind resource: %+v", resource.GetBind())
 			case *api.Resource_Listener:
 				listenerCount++
 				t.Logf("Listener resource: %+v", resource.GetListener())
@@ -355,7 +355,7 @@ func readExpectedDump(t *testing.T, filename string) (agentGwDump, error) {
 
 				// Parse Kind field
 				if kindData, ok := resourceMap["Kind"].(map[string]interface{}); ok {
-					if bindData, ok := kindData["Bind"].(map[string]interface{}); ok {
+					if bindData, ok := kindData["ADPBind"].(map[string]interface{}); ok {
 						bindJSON, err := json.Marshal(bindData)
 						if err != nil {
 							t.Logf("failed to marshal bind data: %v", err)

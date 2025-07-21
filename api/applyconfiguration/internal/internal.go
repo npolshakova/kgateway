@@ -1572,11 +1572,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: selectors
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpSelector
-      default: {}
     - name: static
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTarget
-      default: {}
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Message
   map:
     fields:
