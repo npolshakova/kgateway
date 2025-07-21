@@ -186,8 +186,12 @@ func (r report) ResourceName() string {
 }
 
 func (r report) Equals(in report) bool {
-	// TODO: should we create a new report every time and compare? (map equality will always be false then)
-	// retrigger status updates on every sync for singleton
+	// Always return false to force status recalculation on every sync.
+	// This is safe because status includes observedGeneration, so any edit to the Gateway resource
+	// (e.g. changing the port) will eventually trigger a new status update.
+	// We currently rely on the translation process (not the status diff) to trigger reconciliation,
+	// so skipping deep equality here avoids brittle or unnecessary comparisons (e.g. map equality).
+	// If we find a case where this causes redundant updates or missed transitions, we can revisit this.
 	return false
 }
 
