@@ -462,9 +462,6 @@ func buildADPDestination(
 		}
 		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
 	case wellknown.BackendGVK.GroupKind():
-		// check that the backend is of MCP kind
-		// TODO: support other kinds
-
 		// Create the source ObjectSource representing the route object making the reference
 		routeSrc := ir.ObjectSource{
 			Group:     k.Group,
@@ -481,22 +478,22 @@ func buildADPDestination(
 			Port:      to.Port,
 		}
 
-		mcpBackend, err := backendCol.GetBackendFromRef(ctx.Krt, routeSrc, backendRef)
+		kgwBackend, err := backendCol.GetBackendFromRef(ctx.Krt, routeSrc, backendRef)
 		if err != nil {
-			logger.Error("failed to get MCP backend", "error", err)
+			logger.Error("failed to get kgateway Backend", "error", err)
 			return nil, &reporter.RouteCondition{
 				Type:    gwv1.RouteConditionResolvedRefs,
 				Status:  metav1.ConditionFalse,
 				Reason:  gwv1.RouteReasonBackendNotFound,
-				Message: fmt.Sprintf("MCP backend not found: %v", err),
+				Message: fmt.Sprintf("kgateway Backend not found: %v", err),
 			}
 		}
 
-		// TODO: convert to api Backend type
+		// TODO: support other backend kinds
 
 		// Use the backend information if available
-		if mcpBackend != nil {
-			logger.Debug("successfully resolved MCP backend", "backend", mcpBackend.Name)
+		if kgwBackend != nil {
+			logger.Debug("successfully resolved kgateway Backend", "backend", kgwBackend.Name)
 		}
 	default:
 		return nil, &reporter.RouteCondition{

@@ -1,5 +1,7 @@
 package v1alpha1
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 // MCP configures mcp backends
 type MCP struct {
 	// Name is the backend name for this MCP configuration.
@@ -10,7 +12,33 @@ type MCP struct {
 	// Targets is a list of MCP targets to use for this backend.
 	// +required
 	// +kubebuilder:validation:MinItems=1
-	Targets []McpTarget `json:"targets"`
+	Targets []McpTargetSelector `json:"targets"`
+}
+
+// McpTargetSelector defines the MCP target to use for this backend.
+// +kubebuilder:validation:XValidation:message="exactly one of static or selectors must be set",rule="!(has(self.static) && has(self.selectors))"
+type McpTargetSelector struct {
+	// Selectors is the selector logic to search for MCP targets with the mcp app protocol.
+	// +optional
+	Selectors McpSelector `json:"selectors,omitempty"`
+
+	// StaticTarget is the MCP target to use for this backend.
+	// +optional
+	StaticTarget McpTarget `json:"static,omitempty"`
+}
+
+// McpSelector defines the selector logic to search for MCP targets.
+// +kubebuilder:validation:XValidation:message="at least one of namespaceSelector and serviceSelector must be set",rule="!(has(self.namespaceSelector) || has(self.serviceSelector))"
+type McpSelector struct {
+	// NamespaceSelector is the label selector in which namespace the MCP targets
+	// are searched for.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+
+	// ServiceSelector is the label selector in which services the MCP targets
+	// are searched for.
+	// +optional
+	ServiceSelector *metav1.LabelSelector `json:"serviceSelector,omitempty"`
 }
 
 // McpTarget defines a single MCP target configuration.
