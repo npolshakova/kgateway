@@ -618,6 +618,7 @@ func TestADPRouteCollection(t *testing.T) {
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
 			gateways := krttest.GetMockCollection[Gateway](mock)
+			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
 			tcpRoutes := krttest.GetMockCollection[*gwv1alpha2.TCPRoute](mock)
@@ -630,6 +631,7 @@ func TestADPRouteCollection(t *testing.T) {
 
 			// Wait for collections to sync
 			gateways.WaitUntilSynced(context.Background().Done())
+			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
 			tcpRoutes.WaitUntilSynced(context.Background().Done())
@@ -657,7 +659,7 @@ func TestADPRouteCollection(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1214,6 +1216,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
 			gateways := krttest.GetMockCollection[Gateway](mock)
+			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
 			tcpRoutes := krttest.GetMockCollection[*gwv1alpha2.TCPRoute](mock)
@@ -1226,6 +1229,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 
 			// Wait for collections to sync
 			gateways.WaitUntilSynced(context.Background().Done())
+			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
 			tcpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1253,7 +1257,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1508,6 +1512,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
 			gateways := krttest.GetMockCollection[Gateway](mock)
+			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
 			tcpRoutes := krttest.GetMockCollection[*gwv1alpha2.TCPRoute](mock)
@@ -1520,6 +1525,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 
 			// Wait for collections to sync
 			gateways.WaitUntilSynced(context.Background().Done())
+			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
 			tcpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1547,7 +1553,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, rm, rep)
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep)
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
