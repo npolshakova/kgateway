@@ -124,7 +124,7 @@ func GatewayCollection(
 ) krt.Collection[Gateway] {
 	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gwv1.Gateway) []Gateway {
 		gwReporter := statusReporter.Gateway(obj)
-		logger.Debug("translating Gateway", "gw_name", obj.GetName(), "resource_version", obj.GetResourceVersion(), "obGen", obj.GetObjectMeta().GetGeneration())
+		logger.Debug("translating Gateway", "gw_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
 
 		if string(obj.Spec.GatewayClassName) != agentGatewayClassName {
 			return nil // ignore non agentgateway gws
