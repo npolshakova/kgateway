@@ -259,31 +259,6 @@ func ADPRouteCollection(
 	return routes
 }
 
-// Helper function to find the corresponding gwv1.Gateway object for a Gateway
-func findGatewayObject(krtctx krt.HandlerContext, gatewayObjs krt.Collection[*gwv1.Gateway], gateway Gateway) *gwv1.Gateway {
-	// Find the gwv1.Gateway that matches this Gateway's parent namespace and name
-	allGateways := krt.Fetch(krtctx, gatewayObjs)
-	for _, gw := range allGateways {
-		if gw.Namespace == gateway.parent.Namespace && gw.Name == gateway.parent.Name {
-			return gw
-		}
-	}
-	return nil
-}
-
-// Helper function to extract listener name from ListenerKey
-// ListenerKey format: gwName-AgentgatewayName-lName
-func extractListenerNameFromKey(listenerKey string) string {
-	// The listener name is the part after the last occurrence of AgentgatewayName-
-	prefix := AgentgatewayName + "-"
-	idx := strings.LastIndex(listenerKey, prefix)
-	if idx == -1 {
-		// Fallback: if the expected pattern is not found, return the original key
-		return listenerKey
-	}
-	return listenerKey[idx+len(prefix):]
-}
-
 type conversionResult[O any] struct {
 	error  *reporter.RouteCondition
 	routes []O

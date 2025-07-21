@@ -38,7 +38,6 @@ func toResourceWithReports(gw types.NamespacedName, t any, reportMap reports.Rep
 	panic("unknown resource kind")
 }
 
-// TODO: we need some way to associate this to a specific instance of the proxy!!
 type Bind struct {
 	*api.Bind
 }
