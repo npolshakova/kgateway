@@ -34,11 +34,9 @@ func ADPRouteCollection(
 	grpcRouteCol krt.Collection[*gwv1.GRPCRoute],
 	tcpRouteCol krt.Collection[*gwv1alpha2.TCPRoute],
 	tlsRouteCol krt.Collection[*gwv1alpha2.TLSRoute],
-	gateways krt.Collection[Gateway],
 	gatewayObjs krt.Collection[*gwv1.Gateway],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
-	rm reports.ReportMap,
 	rep reporter.Reporter,
 	plugins pluginsdk.Plugin,
 ) krt.Collection[ADPResource] {
@@ -96,7 +94,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -145,7 +143,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -194,7 +192,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -243,7 +241,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -321,7 +319,7 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 		}
 		return res
 	}
-	gwResult := buildGatewayRoutes(parentRefs, convertRules)
+	gwResult := buildGatewayRoutes(convertRules)
 
 	return parentRefs, gwResult
 }
@@ -369,7 +367,7 @@ func (r RouteWithKey) Equals(o RouteWithKey) bool {
 }
 
 // buildGatewayRoutes contains common logic to build a set of routes with gwv1beta1 semantics
-func buildGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
+func buildGatewayRoutes[T any](convertRules func() T) T {
 	return convertRules()
 }
 

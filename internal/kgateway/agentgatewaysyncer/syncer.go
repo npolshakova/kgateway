@@ -190,13 +190,25 @@ func (r report) ResourceName() string {
 }
 
 func (r report) Equals(in report) bool {
-	// Always return false to force status recalculation on every sync.
-	// This is safe because status includes observedGeneration, so any edit to the Gateway resource
-	// (e.g. changing the port) will eventually trigger a new status update.
-	// We currently rely on the translation process (not the status diff) to trigger reconciliation,
-	// so skipping deep equality here avoids brittle or unnecessary comparisons (e.g. map equality).
-	// If we find a case where this causes redundant updates or missed transitions, we can revisit this.
-	return false
+	if !maps.Equal(r.reportMap.Gateways, in.reportMap.Gateways) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.ListenerSets, in.reportMap.ListenerSets) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.HTTPRoutes, in.reportMap.HTTPRoutes) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.TCPRoutes, in.reportMap.TCPRoutes) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.TLSRoutes, in.reportMap.TLSRoutes) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.Policies, in.reportMap.Policies) {
+		return false
+	}
+	return true
 }
 
 // Inputs holds all the input collections needed for the syncer
@@ -308,7 +320,7 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	addresses := s.buildAddressCollections(inputs, krtopts)
 
 	// Build XDS collection
-	s.buildXDSCollection(adpResources, addresses, krtopts, rm)
+	s.buildXDSCollection(adpResources, addresses, rm)
 
 	// Build status reporting
 	s.buildStatusReporting()
@@ -372,7 +384,7 @@ func (s *AgentGwSyncer) buildADPResources(
 					Port: uint32(port),
 				},
 			}
-			binds = append(binds, toResourceWithReports(obj, bind, repMap))
+			binds = append(binds, toResource(obj, bind))
 		}
 		return binds
 	}, krtopts.ToOptions("Binds")...)
@@ -393,7 +405,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		InferencePools: inputs.InferencePools,
 		Backends:       s.commonCols.BackendIndex,
 	}
-	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, gateways, inputs.Gateways, routeInputs, krtopts, repMap, rep, s.plugins)
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, inputs.Gateways, routeInputs, krtopts, rep, s.plugins)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
@@ -420,10 +432,10 @@ func (s *AgentGwSyncer) buildListenerFromGateway(ctx krt.HandlerContext, obj Gat
 	l.Protocol = protocol
 	l.Tls = tlsConfig
 
-	return toResourcepWithReports(types.NamespacedName{
+	return toResourcep(types.NamespacedName{
 		Namespace: obj.parent.Namespace,
 		Name:      obj.parent.Name,
-	}, ADPListener{l}, repMap)
+	}, ADPListener{l})
 }
 
 // getProtocolAndTLSConfig extracts protocol and TLS configuration from a gateway
@@ -528,7 +540,7 @@ func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.K
 	}, krtopts.ToOptions("XDSAddresses")...)
 }
 
-func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], krtopts krtutil.KrtOptions, rm reports.ReportMap) {
+func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], rm reports.ReportMap) {
 	// Create an index on adpResources by Gateway to avoid fetching all resources
 	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResource) []types.NamespacedName {
 		return []types.NamespacedName{resource.Gateway}
@@ -973,42 +985,70 @@ func mergeProxyReports(proxies []agentGwXdsResources) reports.ReportMap {
 		// 2. merge LS Reports for all Proxies' status reports
 		maps.Copy(merged.ListenerSets, p.reports.ListenerSets)
 
-		// 3. merge route parentRefs into RouteReports for all route types
-		mergeRouteReports(merged.HTTPRoutes, p.reports.HTTPRoutes)
-		mergeRouteReports(merged.TCPRoutes, p.reports.TCPRoutes)
-		mergeRouteReports(merged.TLSRoutes, p.reports.TLSRoutes)
-		mergeRouteReports(merged.GRPCRoutes, p.reports.GRPCRoutes)
+		// 3. merge httproute parentRefs into RouteReports
+		for rnn, rr := range p.reports.HTTPRoutes {
+			// if we haven't encountered this route, just copy it over completely
+			old := merged.HTTPRoutes[rnn]
+			if old == nil {
+				merged.HTTPRoutes[rnn] = rr
+				continue
+			}
+			// else, this route has already been seen for a proxy, merge this proxy's parents
+			// into the merged report
+			maps.Copy(merged.HTTPRoutes[rnn].Parents, rr.Parents)
+		}
 
-		// TODO: add back when policies are back
-		//for key, report := range p.reports.Policies {
-		//	// if we haven't encountered this policy, just copy it over completely
-		//	old := merged.Policies[key]
-		//	if old == nil {
-		//		merged.Policies[key] = report
-		//		continue
-		//	}
-		//	// else, let's merge our parentRefs into the existing map
-		//	// obsGen will stay as-is...
-		//	maps.Copy(merged.Policies[key].Ancestors, report.Ancestors)
-		//}
+		// 4. merge tcproute parentRefs into RouteReports
+		for rnn, rr := range p.reports.TCPRoutes {
+			// if we haven't encountered this route, just copy it over completely
+			old := merged.TCPRoutes[rnn]
+			if old == nil {
+				merged.TCPRoutes[rnn] = rr
+				continue
+			}
+			// else, this route has already been seen for a proxy, merge this proxy's parents
+			// into the merged report
+			maps.Copy(merged.TCPRoutes[rnn].Parents, rr.Parents)
+		}
+
+		for rnn, rr := range p.reports.TLSRoutes {
+			// if we haven't encountered this route, just copy it over completely
+			old := merged.TLSRoutes[rnn]
+			if old == nil {
+				merged.TLSRoutes[rnn] = rr
+				continue
+			}
+			// else, this route has already been seen for a proxy, merge this proxy's parents
+			// into the merged report
+			maps.Copy(merged.TLSRoutes[rnn].Parents, rr.Parents)
+		}
+
+		for rnn, rr := range p.reports.GRPCRoutes {
+			// if we haven't encountered this route, just copy it over completely
+			old := merged.GRPCRoutes[rnn]
+			if old == nil {
+				merged.GRPCRoutes[rnn] = rr
+				continue
+			}
+			// else, this route has already been seen for a proxy, merge this proxy's parents
+			// into the merged report
+			maps.Copy(merged.GRPCRoutes[rnn].Parents, rr.Parents)
+		}
+
+		for key, report := range p.reports.Policies {
+			// if we haven't encountered this policy, just copy it over completely
+			old := merged.Policies[key]
+			if old == nil {
+				merged.Policies[key] = report
+				continue
+			}
+			// else, let's merge our parentRefs into the existing map
+			// obsGen will stay as-is...
+			maps.Copy(merged.Policies[key].Ancestors, report.Ancestors)
+		}
 	}
 
 	return merged
-}
-
-// mergeRouteReports is a helper function to merge route reports
-func mergeRouteReports(merged map[types.NamespacedName]*reports.RouteReport, source map[types.NamespacedName]*reports.RouteReport) {
-	for rnn, rr := range source {
-		// if we haven't encountered this route, just copy it over completely
-		old := merged[rnn]
-		if old == nil {
-			merged[rnn] = rr
-			continue
-		}
-		// else, this route has already been seen for a proxy, merge this proxy's parents
-		// into the merged report
-		maps.Copy(merged[rnn].Parents, rr.Parents)
-	}
 }
 
 func isGatewayStatusEqual(objA, objB *gwv1.GatewayStatus) bool {
