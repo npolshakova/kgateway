@@ -277,7 +277,7 @@ func (r *reporter) Gateway(gateway *gwv1.Gateway) pluginsdkreporter.GatewayRepor
 	if gr == nil {
 		gr = r.report.newGatewayReport(gateway)
 	}
-	gr.observedGeneration = gateway.Generation
+	gr.observedGeneration = gateway.GetGeneration()
 	return gr
 }
 
@@ -286,7 +286,7 @@ func (r *reporter) ListenerSet(listenerSet *gwxv1alpha1.XListenerSet) pluginsdkr
 	if lsr == nil {
 		lsr = r.report.newListenerSetReport(listenerSet)
 	}
-	lsr.observedGeneration = listenerSet.Generation
+	lsr.observedGeneration = listenerSet.GetGeneration()
 	return lsr
 }
 
@@ -295,6 +295,7 @@ func (r *reporter) Route(obj metav1.Object) pluginsdkreporter.RouteReporter {
 	if rr == nil {
 		rr = r.report.newRouteReport(obj)
 	}
+	rr.observedGeneration = obj.GetGeneration()
 	return rr
 }
 

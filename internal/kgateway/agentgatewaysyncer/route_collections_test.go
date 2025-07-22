@@ -660,7 +660,7 @@ func TestADPRouteCollection(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1258,7 +1258,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1554,7 +1554,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Call ADPRouteCollection
 			rm := reports.NewReportMap()
 			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())

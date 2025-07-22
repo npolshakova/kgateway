@@ -34,11 +34,9 @@ func ADPRouteCollection(
 	grpcRouteCol krt.Collection[*gwv1.GRPCRoute],
 	tcpRouteCol krt.Collection[*gwv1alpha2.TCPRoute],
 	tlsRouteCol krt.Collection[*gwv1alpha2.TLSRoute],
-	gateways krt.Collection[Gateway],
 	gatewayObjs krt.Collection[*gwv1.Gateway],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
-	rm reports.ReportMap,
 	rep reporter.Reporter,
 	plugins pluginsdk.Plugin,
 ) krt.Collection[ADPResource] {
@@ -96,7 +94,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -145,7 +143,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -194,7 +192,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -243,7 +241,7 @@ func ADPRouteCollection(
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
 				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toResourceWithReports(gw, ADPRoute{Route: inner}, rm)
+				return toResource(gw, ADPRoute{Route: inner})
 			})...)
 		}
 		return res
@@ -260,7 +258,7 @@ func ADPRouteCollection(
 	routeAttachmentsIndex := krt.NewIndex(routeAttachments, func(o *RouteAttachment) []types.NamespacedName {
 		return []types.NamespacedName{o.To}
 	})
-	FinalGatewayStatusCollectionAttachedRoutes(gatewayObjs, routeAttachments, routeAttachmentsIndex, krtopts, rep)
+	finalGatewayStatusCollectionAttachedRoutes(gatewayObjs, routeAttachments, routeAttachmentsIndex, krtopts, rep)
 
 	return routes
 }
@@ -474,10 +472,10 @@ func (g gatewayStatusUpdate) Equals(other gatewayStatusUpdate) bool {
 		g.gateway.ResourceVersion == other.gateway.ResourceVersion
 }
 
-// FinalGatewayStatusCollectionAttachedRoutes finalizes a Gateway status. There is a circular logic between Gateways and Routes to determine
+// finalGatewayStatusCollectionAttachedRoutes finalizes a Gateway status. There is a circular logic between Gateways and Routes to determine
 // the attachedRoute count, so we first build a partial Gateway status, then once routes are computed we finalize it with
 // the attachedRoute count.
-func FinalGatewayStatusCollectionAttachedRoutes(
+func finalGatewayStatusCollectionAttachedRoutes(
 	gateways krt.Collection[*gwv1.Gateway],
 	routeAttachments krt.Collection[*RouteAttachment],
 	routeAttachmentsIndex krt.Index[types.NamespacedName, *RouteAttachment],

@@ -233,8 +233,10 @@ func (r *ReportMap) BuildRouteStatus(
 		}
 
 		finalConditions := make([]metav1.Condition, 0, len(parentStatusReport.Conditions))
+		slog.Debug("parentStatusReport.Conditions", "conditions", parentStatusReport.Conditions)
 		for _, pCondition := range parentStatusReport.Conditions {
 			pCondition.ObservedGeneration = routeReport.observedGeneration
+			slog.Debug("ObservedGeneration", "ObservedGeneration", pCondition.ObservedGeneration)
 
 			// Copy old condition to preserve LastTransitionTime, if it exists
 			if cond := meta.FindStatusCondition(currentParentRefConditions, pCondition.Type); cond != nil {

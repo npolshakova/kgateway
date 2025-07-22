@@ -95,8 +95,6 @@ func (r ADPCacheAddress) Equals(in ADPCacheAddress) bool {
 type ADPResource struct {
 	Resource *api.Resource        `json:"resource"`
 	Gateway  types.NamespacedName `json:"gateway"`
-
-	reports reports.ReportMap
 }
 
 func (g ADPResource) ResourceName() string {

@@ -15,25 +15,24 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
-func toResourcepWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) *ADPResource {
-	res := toResourceWithReports(gw, t, reportMap)
+func toResourcep(gw types.NamespacedName, t any) *ADPResource {
+	res := toResource(gw, t)
 	return &res
 }
 
-func toResourceWithReports(gw types.NamespacedName, t any, reportMap reports.ReportMap) ADPResource {
+func toResource(gw types.NamespacedName, t any) ADPResource {
 	switch tt := t.(type) {
 	case Bind:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}, Gateway: gw, reports: reportMap}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}, Gateway: gw}
 	case ADPListener:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}, Gateway: gw, reports: reportMap}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}, Gateway: gw}
 	case ADPRoute:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}, Gateway: gw, reports: reportMap}
+		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}, Gateway: gw}
 	}
 	panic("unknown resource kind")
 }
