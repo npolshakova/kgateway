@@ -6,7 +6,7 @@ spec:
   kube:
     agentGateway:
       enabled: true
-      logLevel: debug
+      logLevel: trace
       image:
         tag: bb1fd20
 ---

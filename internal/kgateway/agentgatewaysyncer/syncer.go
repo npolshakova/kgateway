@@ -190,25 +190,13 @@ func (r report) ResourceName() string {
 }
 
 func (r report) Equals(in report) bool {
-	if !maps.Equal(r.reportMap.Gateways, in.reportMap.Gateways) {
-		return false
-	}
-	if !maps.Equal(r.reportMap.ListenerSets, in.reportMap.ListenerSets) {
-		return false
-	}
-	if !maps.Equal(r.reportMap.HTTPRoutes, in.reportMap.HTTPRoutes) {
-		return false
-	}
-	if !maps.Equal(r.reportMap.TCPRoutes, in.reportMap.TCPRoutes) {
-		return false
-	}
-	if !maps.Equal(r.reportMap.TLSRoutes, in.reportMap.TLSRoutes) {
-		return false
-	}
-	if !maps.Equal(r.reportMap.Policies, in.reportMap.Policies) {
-		return false
-	}
-	return true
+	// Always return false to force status recalculation on every sync.
+	// This is safe because status includes observedGeneration, so any edit to the Gateway resource
+	// (e.g. changing the port) will eventually trigger a new status update.
+	// We currently rely on the translation process (not the status diff) to trigger reconciliation,
+	// so skipping deep equality here avoids brittle or unnecessary comparisons (e.g. map equality).
+	// If we find a case where this causes redundant updates or missed transitions, we can revisit this.
+	return false
 }
 
 // Inputs holds all the input collections needed for the syncer
@@ -320,7 +308,7 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	addresses := s.buildAddressCollections(inputs, krtopts)
 
 	// Build XDS collection
-	s.buildXDSCollection(adpResources, addresses, rm)
+	s.buildXDSCollection(inputs.Gateways, adpResources, addresses, rm)
 
 	// Build status reporting
 	s.buildStatusReporting()
@@ -540,14 +528,17 @@ func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.K
 	}, krtopts.ToOptions("XDSAddresses")...)
 }
 
-func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], rm reports.ReportMap) {
+func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway], adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], rm reports.ReportMap) {
 	// Create an index on adpResources by Gateway to avoid fetching all resources
 	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResource) []types.NamespacedName {
 		return []types.NamespacedName{resource.Gateway}
 	})
 
-	s.xDS = krt.NewCollection(adpResources, func(kctx krt.HandlerContext, obj ADPResource) *agentGwXdsResources {
-		gwNamespacedName := obj.Gateway
+	s.xDS = krt.NewCollection(gateway, func(kctx krt.HandlerContext, obj *gwv1.Gateway) *agentGwXdsResources {
+		gwNamespacedName := types.NamespacedName{
+			Namespace: obj.Namespace,
+			Name:      obj.Name,
+		}
 
 		cacheAddresses := krt.Fetch(kctx, xdsAddresses)
 		envoytypesAddresses := make([]envoytypes.Resource, 0, len(cacheAddresses))
