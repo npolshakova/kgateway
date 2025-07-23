@@ -129,6 +129,61 @@ func (r agentGwXdsResources) Equals(in agentGwXdsResources) bool {
 		r.AddressConfig.Version == in.AddressConfig.Version
 }
 
+// mergeGatewayRouteReportMaps creates a new merged ReportMap from the provided gateway and route ReportMap
+func mergeGatewayRouteReportMaps(gwReports reports.ReportMap, routeReports reports.ReportMap) reports.ReportMap {
+	newRM := reports.NewReportMap()
+
+	// Copy Gateways map
+	for k, v := range gwReports.Gateways {
+		newRM.Gateways[k] = v
+	}
+
+	// Copy ListenerSets map
+	for k, v := range gwReports.ListenerSets {
+		newRM.ListenerSets[k] = v
+	}
+
+	// Copy HTTP Routes map
+	for k, v := range routeReports.HTTPRoutes {
+		newRM.HTTPRoutes[k] = v
+	}
+
+	// Copy GRPC Routes map
+	for k, v := range routeReports.GRPCRoutes {
+		newRM.GRPCRoutes[k] = v
+	}
+
+	// Copy TCP Routes map
+	for k, v := range routeReports.TCPRoutes {
+		newRM.TCPRoutes[k] = v
+	}
+
+	// Copy TLS Routes map
+	for k, v := range routeReports.TLSRoutes {
+		newRM.TLSRoutes[k] = v
+	}
+
+	// Copy and merge Policies map from both gateway and route reports
+	// First copy policies from gateway reports
+	for k, v := range gwReports.Policies {
+		newRM.Policies[k] = v
+	}
+
+	// Then merge policies from route reports
+	for k, v := range routeReports.Policies {
+		// if we haven't encountered this policy, just copy it over completely
+		old := newRM.Policies[k]
+		if old == nil {
+			newRM.Policies[k] = v
+			continue
+		}
+		// else, let's merge the ancestors into the existing policy
+		maps.Copy(newRM.Policies[k].Ancestors, v.Ancestors)
+	}
+
+	return newRM
+}
+
 func NewAgentGwSyncer(
 	controllerName string,
 	agentGatewayClassName string,
@@ -560,38 +615,17 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[GatewayWithSta
 			addrVersion ^= res.version
 		}
 
-		// 1. merge GW Reports for all route gateway reports (for attached routes)
-		maps.Copy(rm.Gateways, obj.report.Gateways)
-
-		// 2. merge GW listener Reports for all routes listener reports (for attached routes)
-		maps.Copy(rm.ListenerSets, obj.report.ListenerSets)
-
-		// 3. merge route reports for all route types
-		rm.HTTPRoutes = obj.report.HTTPRoutes
-		rm.TCPRoutes = obj.report.TCPRoutes
-		rm.TLSRoutes = obj.report.TLSRoutes
-		rm.GRPCRoutes = obj.report.GRPCRoutes
-
-		for key, rr := range obj.report.Policies {
-			// if we haven't encountered this policy, just copy it over completely
-			old := rm.Policies[key]
-			if old == nil {
-				rm.Policies[key] = rr
-				continue
-			}
-			// else, let's merge our parentRefs into the existing map
-			// obsGen will stay as-is...
-			maps.Copy(rm.Policies[key].Ancestors, rr.Ancestors)
-		}
+		// Create a copy of the shared ReportMap to avoid concurrent modification
+		gwReports := mergeGatewayRouteReportMaps(rm, obj.report)
 
 		// Set the aggregated count for each listener
 		for listenerName, count := range obj.attachedRoutes {
-			rm.Gateway(obj.gateway).ListenerName(listenerName).SetAttachedRoutes(count)
+			gwReports.Gateway(obj.gateway).ListenerName(listenerName).SetAttachedRoutes(count)
 		}
 
 		result := &agentGwXdsResources{
 			NamespacedName: gwNamespacedName,
-			reports:        rm,
+			reports:        gwReports,
 			ResourceConfig: envoycache.NewResources(fmt.Sprintf("%d", resourceVersion), cacheResources),
 			AddressConfig:  envoycache.NewResources(fmt.Sprintf("%d", addrVersion), envoytypesAddresses),
 		}
