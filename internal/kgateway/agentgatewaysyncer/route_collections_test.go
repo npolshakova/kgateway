@@ -656,7 +656,7 @@ func TestADPRouteCollection(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes, rm := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes, gwStatuses := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -666,7 +666,10 @@ func TestADPRouteCollection(t *testing.T) {
 
 			// Verify expected status
 			if len(tc.expectedRoutes) > 0 {
-				assert.NotEmpty(t, rm.HTTPRoutes)
+				for _, gw := range gwStatuses.List() {
+					assert.NotEmpty(t, gw.attachedRoutes)
+					assert.NotEmpty(t, gw.report.HTTPRoutes)
+				}
 			}
 
 			// Verify expected count
@@ -1256,7 +1259,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes, rm := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes, gwStatuses := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1266,7 +1269,10 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 
 			// Verify expected status
 			if len(tc.expectedRoutes) > 0 {
-				assert.NotEmpty(t, rm.GRPCRoutes)
+				for _, gw := range gwStatuses.List() {
+					assert.NotEmpty(t, gw.attachedRoutes)
+					assert.NotEmpty(t, gw.report.GRPCRoutes)
+				}
 			}
 
 			// Verify expected count
@@ -1554,7 +1560,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes, rm := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes, gwStatuses := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1563,7 +1569,10 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			results := adpRoutes.List()
 
 			// Verify expected status
-			assert.NotEmpty(t, rm.HTTPRoutes)
+			for _, gw := range gwStatuses.List() {
+				assert.NotEmpty(t, gw.attachedRoutes)
+				assert.NotEmpty(t, gw.report.HTTPRoutes)
+			}
 
 			// Verify we got a result
 			require.Len(t, results, 1, "Expected exactly one route")

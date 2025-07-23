@@ -2,6 +2,7 @@ package agentgatewaysyncer
 
 import (
 	"iter"
+	"maps"
 	"strings"
 
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
@@ -38,10 +39,9 @@ func ADPRouteCollection(
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
 	plugins pluginsdk.Plugin,
-) (krt.Collection[ADPResource], reports.ReportMap) {
+) (krt.Collection[ADPResource], krt.Collection[GatewayWithStatus]) {
 	rm := reports.NewReportMap()
 	rep := reports.NewReporter(&rm)
-
 	httpRouteAttachments := gatewayRouteAttachmentCountCollection(inputs, httpRouteCol, wellknown.HTTPRouteGVK, krtopts)
 	httpRoutes := krt.NewManyCollection(httpRouteCol, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
 		logger.Debug("translating HTTPRoute", "route_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
@@ -260,9 +260,9 @@ func ADPRouteCollection(
 	routeAttachmentsIndex := krt.NewIndex(routeAttachments, func(o *RouteAttachment) []types.NamespacedName {
 		return []types.NamespacedName{o.To}
 	})
-	FinalGatewayStatusCollectionAttachedRoutes(gatewayObjs, routeAttachments, routeAttachmentsIndex, krtopts, rep)
+	finalGateways := finalGatewayStatusCollection(gatewayObjs, routeAttachments, routeAttachmentsIndex, krtopts, rm)
 
-	return routes, rm
+	return routes, finalGateways
 }
 
 type conversionResult[O any] struct {
@@ -415,6 +415,8 @@ type RouteAttachment struct {
 	// To is assumed to be a Gateway
 	To           types.NamespacedName
 	ListenerName string
+	// route counts for this listener
+	RouteCounts uint
 }
 
 func (r *RouteAttachment) ResourceName() string {
@@ -452,50 +454,82 @@ func gatewayRouteAttachmentCountCollection[T controllers.Object](
 					Namespace: e.ParentKey.Namespace,
 				},
 				ListenerName: string(e.ParentSection),
+				RouteCounts:  1,
 			})
 		})
 	}, krtopts.ToOptions(kind.Kind+"/count")...)
 }
 
-// gatewayStatusUpdate is a simple wrapper type for Gateway status updates that implements ResourceNamer
-type gatewayStatusUpdate struct {
+// GatewayWithStatus is a simple wrapper type for Gateway status updates that implements ResourceNamer
+type GatewayWithStatus struct {
 	gateway *gwv1.Gateway
+	// status
+	report reports.ReportMap
+	// listenerName -> attachedRoutes
+	attachedRoutes map[string]uint
 }
 
 // ResourceName implements krt.ResourceNamer interface
-func (g gatewayStatusUpdate) ResourceName() string {
+func (g GatewayWithStatus) ResourceName() string {
 	return g.gateway.Namespace + "/" + g.gateway.Name
 }
 
 // Equals implements krt.Equaler interface
-func (g gatewayStatusUpdate) Equals(other gatewayStatusUpdate) bool {
-	return g.gateway.Namespace == other.gateway.Namespace &&
-		g.gateway.Name == other.gateway.Name &&
-		g.gateway.ResourceVersion == other.gateway.ResourceVersion
+func (g GatewayWithStatus) Equals(other GatewayWithStatus) bool {
+	// Compare gateway fields
+	if g.gateway.Namespace != other.gateway.Namespace ||
+		g.gateway.Name != other.gateway.Name ||
+		g.gateway.ResourceVersion != other.gateway.ResourceVersion {
+		return false
+	}
+
+	// Compare attachedRoutes map
+	if !maps.Equal(g.attachedRoutes, other.attachedRoutes) {
+		return false
+	}
+
+	// Compare report fields
+	if !maps.Equal(g.report.Gateways, other.report.Gateways) {
+		return false
+	}
+	if !maps.Equal(g.report.ListenerSets, other.report.ListenerSets) {
+		return false
+	}
+	if !maps.Equal(g.report.HTTPRoutes, other.report.HTTPRoutes) {
+		return false
+	}
+	if !maps.Equal(g.report.TCPRoutes, other.report.TCPRoutes) {
+		return false
+	}
+	if !maps.Equal(g.report.TLSRoutes, other.report.TLSRoutes) {
+		return false
+	}
+	if !maps.Equal(g.report.Policies, other.report.Policies) {
+		return false
+	}
+	return true
+
 }
 
-// FinalGatewayStatusCollectionAttachedRoutes finalizes a Gateway status. There is a circular logic between Gateways and Routes to determine
+// finalGatewayStatusCollection finalizes a Gateway status. There is a circular logic between Gateways and Routes to determine
 // the attachedRoute count, so we first build a partial Gateway status, then once routes are computed we finalize it with
 // the attachedRoute count.
-func FinalGatewayStatusCollectionAttachedRoutes(
+func finalGatewayStatusCollection(
 	gateways krt.Collection[*gwv1.Gateway],
 	routeAttachments krt.Collection[*RouteAttachment],
 	routeAttachmentsIndex krt.Index[types.NamespacedName, *RouteAttachment],
 	krtopts krtutil.KrtOptions,
-	rep reports.Reporter,
-) {
-	_ = krt.NewCollection(
+	rm reports.ReportMap,
+) krt.Collection[GatewayWithStatus] {
+	return krt.NewCollection(
 		gateways,
-		func(ctx krt.HandlerContext, obj *gwv1.Gateway) *gatewayStatusUpdate {
+		func(ctx krt.HandlerContext, obj *gwv1.Gateway) *GatewayWithStatus {
 			routeAttachmentsForGw := krt.Fetch(ctx, routeAttachments, krt.FilterIndex(routeAttachmentsIndex, types.NamespacedName{Name: obj.Name, Namespace: obj.Namespace}))
 			counts := map[string]uint{}
 			for _, r := range routeAttachmentsForGw {
 				counts[r.ListenerName]++
 			}
-			for _, listener := range obj.Spec.Listeners {
-				rep.Gateway(obj).Listener(&listener).SetAttachedRoutes(counts[string(listener.Name)])
-			}
 			// Return a wrapper instead of the raw Gateway object
-			return &gatewayStatusUpdate{gateway: obj}
+			return &GatewayWithStatus{gateway: obj, report: rm, attachedRoutes: counts}
 		}, krtopts.ToOptions("GatewayFinalStatus")...)
 }

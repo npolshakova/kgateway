@@ -298,43 +298,19 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	gateways, gatewayReports := s.buildGatewayCollection(inputs, gatewayClasses, refGrants, krtopts)
 
 	// Build ADP resources
-	adpResources, routeReports := s.buildADPResources(gateways, inputs, refGrants, krtopts)
+	adpResources, finalGateways := s.buildADPResources(gateways, inputs, refGrants, krtopts)
 
 	// Build address collections
 	addresses := s.buildAddressCollections(inputs, krtopts)
 
-	// 1. merge GW Reports for all route gateway reports (for attached routes)
-	maps.Copy(gatewayReports.Gateways, routeReports.Gateways)
-
-	// 2. merge GW listener Reports for all routes listener reports (for attached routes)
-	maps.Copy(gatewayReports.ListenerSets, routeReports.ListenerSets)
-
-	// 3. merge route reports for all route types
-	mergeRouteReports(gatewayReports.HTTPRoutes, routeReports.HTTPRoutes)
-	mergeRouteReports(gatewayReports.TCPRoutes, routeReports.TCPRoutes)
-	mergeRouteReports(gatewayReports.TLSRoutes, routeReports.TLSRoutes)
-	mergeRouteReports(gatewayReports.GRPCRoutes, routeReports.GRPCRoutes)
-
-	for key, rr := range routeReports.Policies {
-		// if we haven't encountered this policy, just copy it over completely
-		old := gatewayReports.Policies[key]
-		if old == nil {
-			gatewayReports.Policies[key] = rr
-			continue
-		}
-		// else, let's merge our parentRefs into the existing map
-		// obsGen will stay as-is...
-		maps.Copy(gatewayReports.Policies[key].Ancestors, rr.Ancestors)
-	}
-
 	// Build XDS collection
-	s.buildXDSCollection(inputs.Gateways, adpResources, addresses, gatewayReports)
+	s.buildXDSCollection(finalGateways, adpResources, addresses, gatewayReports)
 
 	// Build status reporting
 	s.buildStatusReporting()
 
 	// Set up sync dependencies
-	s.setupSyncDependencies(gateways, adpResources, addresses, inputs)
+	s.setupSyncDependencies(finalGateways, adpResources, addresses, inputs)
 }
 
 func (s *AgentGwSyncer) buildGatewayCollection(
@@ -360,7 +336,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	inputs Inputs,
 	refGrants ReferenceGrants,
 	krtopts krtutil.KrtOptions,
-) (krt.Collection[ADPResource], reports.ReportMap) {
+) (krt.Collection[ADPResource], krt.Collection[GatewayWithStatus]) {
 	// Build ports and binds
 	ports := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj Gateway) *IndexObject[string, Gateway] {
 		port := fmt.Sprint(obj.parentInfo.Port)
@@ -409,12 +385,12 @@ func (s *AgentGwSyncer) buildADPResources(
 		InferencePools: inputs.InferencePools,
 		Backends:       s.commonCols.BackendIndex,
 	}
-	adpRoutes, routeReports := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, inputs.Gateways, routeInputs, krtopts, s.plugins)
+	adpRoutes, finalGateways := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, inputs.Gateways, routeInputs, krtopts, s.plugins)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
 
-	return allADPResources, routeReports
+	return allADPResources, finalGateways
 }
 
 // buildListenerFromGateway creates a listener resource from a gateway
@@ -544,16 +520,16 @@ func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.K
 	}, krtopts.ToOptions("XDSAddresses")...)
 }
 
-func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway], adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], rm reports.ReportMap) {
+func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[GatewayWithStatus], adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], rm reports.ReportMap) {
 	// Create an index on adpResources by Gateway to avoid fetching all resources
 	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResource) []types.NamespacedName {
 		return []types.NamespacedName{resource.Gateway}
 	})
 
-	s.xDS = krt.NewCollection(gateway, func(kctx krt.HandlerContext, obj *gwv1.Gateway) *agentGwXdsResources {
+	s.xDS = krt.NewCollection(gateway, func(kctx krt.HandlerContext, obj GatewayWithStatus) *agentGwXdsResources {
 		gwNamespacedName := types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
+			Namespace: obj.gateway.Namespace,
+			Name:      obj.gateway.Name,
 		}
 
 		cacheAddresses := krt.Fetch(kctx, xdsAddresses)
@@ -584,6 +560,35 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway]
 			addrVersion ^= res.version
 		}
 
+		// 1. merge GW Reports for all route gateway reports (for attached routes)
+		maps.Copy(rm.Gateways, obj.report.Gateways)
+
+		// 2. merge GW listener Reports for all routes listener reports (for attached routes)
+		maps.Copy(rm.ListenerSets, obj.report.ListenerSets)
+
+		// 3. merge route reports for all route types
+		rm.HTTPRoutes = obj.report.HTTPRoutes
+		rm.TCPRoutes = obj.report.TCPRoutes
+		rm.TLSRoutes = obj.report.TLSRoutes
+		rm.GRPCRoutes = obj.report.GRPCRoutes
+
+		for key, rr := range obj.report.Policies {
+			// if we haven't encountered this policy, just copy it over completely
+			old := rm.Policies[key]
+			if old == nil {
+				rm.Policies[key] = rr
+				continue
+			}
+			// else, let's merge our parentRefs into the existing map
+			// obsGen will stay as-is...
+			maps.Copy(rm.Policies[key].Ancestors, rr.Ancestors)
+		}
+
+		// Set the aggregated count for each listener
+		for listenerName, count := range obj.attachedRoutes {
+			rm.Gateway(obj.gateway).ListenerName(listenerName).SetAttachedRoutes(count)
+		}
+
 		result := &agentGwXdsResources{
 			NamespacedName: gwNamespacedName,
 			reports:        rm,
@@ -605,7 +610,7 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 	})
 }
 
-func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[Gateway], adpResources krt.Collection[ADPResource], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
+func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[GatewayWithStatus], adpResources krt.Collection[ADPResource], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
 		gateways.HasSynced,

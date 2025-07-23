@@ -295,6 +295,7 @@ func (r *reporter) Route(obj metav1.Object) pluginsdkreporter.RouteReporter {
 	if rr == nil {
 		rr = r.report.newRouteReport(obj)
 	}
+	rr.observedGeneration = obj.GetGeneration()
 	return rr
 }
 
