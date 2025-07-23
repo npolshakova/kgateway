@@ -37,9 +37,11 @@ func ADPRouteCollection(
 	gatewayObjs krt.Collection[*gwv1.Gateway],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
-	rep reporter.Reporter,
 	plugins pluginsdk.Plugin,
-) krt.Collection[ADPResource] {
+) (krt.Collection[ADPResource], reports.ReportMap) {
+	rm := reports.NewReportMap()
+	rep := reports.NewReporter(&rm)
+
 	httpRouteAttachments := gatewayRouteAttachmentCountCollection(inputs, httpRouteCol, wellknown.HTTPRouteGVK, krtopts)
 	httpRoutes := krt.NewManyCollection(httpRouteCol, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
 		logger.Debug("translating HTTPRoute", "route_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
@@ -260,7 +262,7 @@ func ADPRouteCollection(
 	})
 	FinalGatewayStatusCollectionAttachedRoutes(gatewayObjs, routeAttachments, routeAttachmentsIndex, krtopts, rep)
 
-	return routes
+	return routes, rm
 }
 
 type conversionResult[O any] struct {

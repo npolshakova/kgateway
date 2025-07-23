@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
@@ -119,8 +121,9 @@ func GatewayCollection(
 	secrets krt.Collection[*corev1.Secret],
 	domainSuffix string,
 	krtopts krtutil.KrtOptions,
-	statusReporter reporter.Reporter,
-) krt.Collection[Gateway] {
+) (krt.Collection[Gateway], reports.ReportMap) {
+	rm := reports.NewReportMap()
+	statusReporter := reports.NewReporter(&rm)
 	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gwv1.Gateway) []Gateway {
 		gwReporter := statusReporter.Gateway(obj)
 		logger.Debug("translating Gateway", "gw_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
@@ -223,7 +226,7 @@ func GatewayCollection(
 		return result
 	}, krtopts.ToOptions("KubernetesGateway")...)
 
-	return gw
+	return gw, rm
 }
 
 // RouteParents holds information about things routes can reference as parents.

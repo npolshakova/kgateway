@@ -17,7 +17,6 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
@@ -657,15 +656,18 @@ func TestADPRouteCollection(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			rm := reports.NewReportMap()
-			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
+			adpRoutes, rm := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
 
 			// Get results
 			results := adpRoutes.List()
+
+			// Verify expected status
+			if len(tc.expectedRoutes) > 0 {
+				assert.NotEmpty(t, rm.HTTPRoutes)
+			}
 
 			// Verify expected count
 			assert.Equal(t, tc.expectedCount, len(results), "Expected %d routes but got %d", tc.expectedCount, len(results))
@@ -1254,15 +1256,18 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			rm := reports.NewReportMap()
-			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
+			adpRoutes, rm := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
 
 			// Get results
 			results := adpRoutes.List()
+
+			// Verify expected status
+			if len(tc.expectedRoutes) > 0 {
+				assert.NotEmpty(t, rm.GRPCRoutes)
+			}
 
 			// Verify expected count
 			assert.Equal(t, tc.expectedCount, len(results), "Expected %d routes but got %d", tc.expectedCount, len(results))
@@ -1549,15 +1554,16 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			rm := reports.NewReportMap()
-			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, rep, pluginsdk.Plugin{})
+			adpRoutes, rm := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
 
 			// Get results
 			results := adpRoutes.List()
+
+			// Verify expected status
+			assert.NotEmpty(t, rm.HTTPRoutes)
 
 			// Verify we got a result
 			require.Len(t, results, 1, "Expected exactly one route")
