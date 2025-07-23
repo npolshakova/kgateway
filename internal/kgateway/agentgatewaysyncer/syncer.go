@@ -417,6 +417,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		Namespaces:     inputs.Namespaces,
 		InferencePools: inputs.InferencePools,
 		Backends:       s.commonCols.BackendIndex,
+		Plugins:        s.plugins,
 	}
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, gateways, inputs.Gateways, routeInputs, krtopts, repMap, rep, s.plugins)
 
@@ -510,9 +511,15 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 			version: utils.HashProto(resourceWrapper),
 		})
 	case v1alpha1.BackendTypeStatic:
-		if len(obj.Spec.Static.Hosts) > 1 {
-			// TODO: support multiple hosts
-			logger.Warn("multiple hosts are not supported for static backends in agentgateway", "backend", obj.Name)
+		var backend *api.Backend
+		var err error
+		if plug, ok := s.plugins.ContributesBackends[wellknown.BackendGVK.GroupKind()]; ok && plug.BackendInit.InitAgentBackend != nil {
+			backend, err = plug.BackendInit.InitAgentBackend(obj)
+			if err != nil {
+				// TODO(jmcguire98): we should probably report an error here instead of just logging it
+				logger.Error("failed to translate static backend", "error", err, "backend", obj.Name)
+				return results
+			}
 		}
 		host := obj.Spec.Static.Hosts[0].Host
 		port := obj.Spec.Static.Hosts[0].Port

@@ -58,7 +58,7 @@ func NewPluginFromCollections(
 		ContributesBackends: map[schema.GroupKind]extensionsplug.BackendPlugin{
 			wellknown.ServiceGVK.GroupKind(): {
 				BackendInit: ir.BackendInit{
-					InitBackend: processBackend,
+					InitEnvoyBackend: processBackend,
 				},
 				Endpoints: k8sServiceEndpoints,
 				Backends:  k8sServiceBackends,
