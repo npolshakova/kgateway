@@ -92,7 +92,9 @@ type AgentGwSyncer struct {
 	xdsSnapshotsMetrics krtcollections.CollectionMetricsRecorder
 
 	// Status reporting
-	statusReport krt.Singleton[report]
+	gatewayReports     krt.Singleton[GatewayReports]
+	listenerSetReports krt.Singleton[ListenerSetReports]
+	routeReports       krt.Singleton[RouteReports]
 
 	// Synchronization
 	waitForSync []cache.InformerSynced
@@ -183,6 +185,70 @@ type report struct {
 	// lower case so krt doesn't error in debug handler
 	reportMap      reports.ReportMap
 	attachedRoutes map[string]uint
+}
+
+// RouteReports contains all route-related reports
+type RouteReports struct {
+	HTTPRoutes map[types.NamespacedName]*reports.RouteReport
+	GRPCRoutes map[types.NamespacedName]*reports.RouteReport
+	TCPRoutes  map[types.NamespacedName]*reports.RouteReport
+	TLSRoutes  map[types.NamespacedName]*reports.RouteReport
+}
+
+func (r RouteReports) ResourceName() string {
+	return "route-reports"
+}
+
+func (r RouteReports) Equals(in RouteReports) bool {
+	return maps.Equal(r.HTTPRoutes, in.HTTPRoutes) &&
+		maps.Equal(r.GRPCRoutes, in.GRPCRoutes) &&
+		maps.Equal(r.TCPRoutes, in.TCPRoutes) &&
+		maps.Equal(r.TLSRoutes, in.TLSRoutes)
+}
+
+// ListenerSetReports contains all listener set reports
+type ListenerSetReports struct {
+	Reports map[types.NamespacedName]*reports.ListenerSetReport
+}
+
+func (l ListenerSetReports) ResourceName() string {
+	return "listenerset-reports"
+}
+
+func (l ListenerSetReports) Equals(in ListenerSetReports) bool {
+	return maps.Equal(l.Reports, in.Reports)
+}
+
+// GatewayReports contains gateway reports along with attached routes information
+type GatewayReports struct {
+	Reports        map[types.NamespacedName]*reports.GatewayReport
+	AttachedRoutes map[types.NamespacedName]map[string]uint
+}
+
+func (g GatewayReports) ResourceName() string {
+	return "gateway-reports"
+}
+
+func (g GatewayReports) Equals(in GatewayReports) bool {
+	if !maps.Equal(g.Reports, in.Reports) {
+		return false
+	}
+
+	// Compare AttachedRoutes manually since it contains nested maps
+	if len(g.AttachedRoutes) != len(in.AttachedRoutes) {
+		return false
+	}
+	for key, gRoutes := range g.AttachedRoutes {
+		inRoutes, exists := in.AttachedRoutes[key]
+		if !exists {
+			return false
+		}
+		if !maps.Equal(gRoutes, inRoutes) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (r report) ResourceName() string {
@@ -631,13 +697,76 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway]
 }
 
 func (s *AgentGwSyncer) buildStatusReporting() {
-	// as proxies are created, they also contain a reportMap containing status for the Gateway and associated xRoutes (really parentRefs)
-	// here we will merge reports that are per-Proxy to a singleton Report used to persist to k8s on a timer
-	s.statusReport = krt.NewSingleton(func(kctx krt.HandlerContext) *report {
+	// TODO(npolshak): Move away from report map and separately fetch resource reports
+	// Create separate singleton collections for each resource type instead of merging everything
+	// This avoids the overhead of creating and processing a single large merged report
+	gatewayReports := krt.NewSingleton(func(kctx krt.HandlerContext) *GatewayReports {
 		proxies := krt.Fetch(kctx, s.xDS)
-		merged := mergeProxyReports(proxies)
-		return &report{reportMap: merged}
+		merged := make(map[types.NamespacedName]*reports.GatewayReport)
+		attachedRoutes := make(map[types.NamespacedName]map[string]uint)
+
+		for _, p := range proxies {
+			// Merge GW Reports for all Proxies' status reports
+			maps.Copy(merged, p.reports.Gateways)
+
+			// Collect attached routes for each gateway
+			if attachedRoutes[p.NamespacedName] == nil {
+				attachedRoutes[p.NamespacedName] = make(map[string]uint)
+			}
+			for listener, counts := range p.attachedRoutes {
+				attachedRoutes[p.NamespacedName][listener] += counts
+
+				// Also set the attached routes on the gateway report itself
+				if gwReport := merged[p.NamespacedName]; gwReport != nil {
+					gwReport.ListenerName(listener).SetAttachedRoutes(counts)
+				}
+			}
+		}
+
+		return &GatewayReports{
+			Reports:        merged,
+			AttachedRoutes: attachedRoutes,
+		}
 	})
+
+	listenerSetReports := krt.NewSingleton(func(kctx krt.HandlerContext) *ListenerSetReports {
+		proxies := krt.Fetch(kctx, s.xDS)
+		merged := make(map[types.NamespacedName]*reports.ListenerSetReport)
+
+		for _, p := range proxies {
+			// Merge LS Reports for all Proxies' status reports
+			maps.Copy(merged, p.reports.ListenerSets)
+		}
+
+		return &ListenerSetReports{
+			Reports: merged,
+		}
+	})
+
+	routeReports := krt.NewSingleton(func(kctx krt.HandlerContext) *RouteReports {
+		proxies := krt.Fetch(kctx, s.xDS)
+		merged := RouteReports{
+			HTTPRoutes: make(map[types.NamespacedName]*reports.RouteReport),
+			GRPCRoutes: make(map[types.NamespacedName]*reports.RouteReport),
+			TCPRoutes:  make(map[types.NamespacedName]*reports.RouteReport),
+			TLSRoutes:  make(map[types.NamespacedName]*reports.RouteReport),
+		}
+
+		for _, p := range proxies {
+			// Merge route parentRefs into RouteReports for all route types
+			mergeRouteReports(merged.HTTPRoutes, p.reports.HTTPRoutes)
+			mergeRouteReports(merged.GRPCRoutes, p.reports.GRPCRoutes)
+			mergeRouteReports(merged.TCPRoutes, p.reports.TCPRoutes)
+			mergeRouteReports(merged.TLSRoutes, p.reports.TLSRoutes)
+		}
+
+		return &merged
+	})
+
+	// Store references to the separate collections
+	s.gatewayReports = gatewayReports
+	s.listenerSetReports = listenerSetReports
+	s.routeReports = routeReports
 }
 
 func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[GatewayListener], adpResources krt.Collection[ADPResourcesForGateway], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
@@ -671,29 +800,74 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 	}
 	logger.Info("caches warm!")
 
-	// latestReport will be constantly updated to contain the merged status report for Kube Gateway status
-	// when timer ticks, we will use the state of the mergedReports at that point in time to sync the status to k8s
-	latestReportQueue := utils.NewAsyncQueue[reports.ReportMap]()
-	s.statusReport.Register(func(o krt.Event[report]) {
+	// Create separate queues for each resource type to avoid processing the entire reportMap
+	gatewayReportQueue := utils.NewAsyncQueue[GatewayReports]()
+	listenerSetReportQueue := utils.NewAsyncQueue[ListenerSetReports]()
+	routeReportQueue := utils.NewAsyncQueue[RouteReports]()
+
+	// Register to separate singleton collections instead of a single merged report
+	s.gatewayReports.Register(func(o krt.Event[GatewayReports]) {
 		if o.Event == controllers.EventDelete {
 			// TODO: handle garbage collection
 			return
 		}
-		latestReportQueue.Enqueue(o.Latest().reportMap)
+		gatewayReportQueue.Enqueue(o.Latest())
 	})
+
+	s.listenerSetReports.Register(func(o krt.Event[ListenerSetReports]) {
+		if o.Event == controllers.EventDelete {
+			// TODO: handle garbage collection
+			return
+		}
+		listenerSetReportQueue.Enqueue(o.Latest())
+	})
+
+	s.routeReports.Register(func(o krt.Event[RouteReports]) {
+		if o.Event == controllers.EventDelete {
+			// TODO: handle garbage collection
+			return
+		}
+		routeReportQueue.Enqueue(o.Latest())
+	})
+
+	// Start separate goroutines for each status syncer
 	routeStatusLogger := logger.With("subcomponent", "routeStatusSyncer")
 	listenerSetStatusLogger := logger.With("subcomponent", "listenerSetStatusSyncer")
 	gatewayStatusLogger := logger.With("subcomponent", "gatewayStatusSyncer")
+
+	// Gateway status syncer
 	go func() {
 		for {
-			latestReport, err := latestReportQueue.Dequeue(ctx)
+			gatewayReports, err := gatewayReportQueue.Dequeue(ctx)
 			if err != nil {
-				logger.Error("failed to dequeue latest report", "error", err)
+				logger.Error("failed to dequeue gateway reports", "error", err)
 				return
 			}
-			s.syncGatewayStatus(ctx, gatewayStatusLogger, latestReport)
-			s.syncListenerSetStatus(ctx, listenerSetStatusLogger, latestReport)
-			s.syncRouteStatus(ctx, routeStatusLogger, latestReport)
+			s.syncGatewayStatus(ctx, gatewayStatusLogger, gatewayReports)
+		}
+	}()
+
+	// Listener set status syncer
+	go func() {
+		for {
+			listenerSetReports, err := listenerSetReportQueue.Dequeue(ctx)
+			if err != nil {
+				logger.Error("failed to dequeue listener set reports", "error", err)
+				return
+			}
+			s.syncListenerSetStatus(ctx, listenerSetStatusLogger, listenerSetReports)
+		}
+	}()
+
+	// Route status syncer
+	go func() {
+		for {
+			routeReports, err := routeReportQueue.Dequeue(ctx)
+			if err != nil {
+				logger.Error("failed to dequeue route reports", "error", err)
+				return
+			}
+			s.syncRouteStatus(ctx, routeStatusLogger, routeReports)
 		}
 	}()
 
@@ -802,7 +976,7 @@ func (m *agentGwSnapshot) GetVersionMap(typeURL string) map[string]string {
 
 var _ envoycache.ResourceSnapshot = &agentGwSnapshot{}
 
-func (s *AgentGwSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger, rm reports.ReportMap) {
+func (s *AgentGwSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger, routeReports RouteReports) {
 	stopwatch := utils.NewTranslatorStopWatch("RouteStatusSyncer")
 	stopwatch.Start()
 	defer stopwatch.Stop(ctx)
@@ -839,6 +1013,14 @@ func (s *AgentGwSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger
 			retry.Delay(retryDelay),
 			retry.DelayType(retry.BackOffDelay),
 		)
+	}
+
+	// Create a minimal ReportMap with just the route reports for BuildRouteStatus to work
+	rm := reports.ReportMap{
+		HTTPRoutes: routeReports.HTTPRoutes,
+		GRPCRoutes: routeReports.GRPCRoutes,
+		TCPRoutes:  routeReports.TCPRoutes,
+		TLSRoutes:  routeReports.TLSRoutes,
 	}
 
 	// Helper function to build route status and update if needed
@@ -878,7 +1060,7 @@ func (s *AgentGwSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger
 		return s.mgr.GetClient().Status().Update(ctx, route)
 	}
 
-	for rnn := range rm.HTTPRoutes {
+	for rnn := range routeReports.HTTPRoutes {
 		err := syncStatusWithRetry(
 			wellknown.HTTPRouteKind,
 			rnn,
@@ -895,16 +1077,21 @@ func (s *AgentGwSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger
 	}
 }
 
-// syncGatewayStatus will build and update status for all Gateways in a reportMap
-func (s *AgentGwSyncer) syncGatewayStatus(ctx context.Context, logger *slog.Logger, rm reports.ReportMap) {
+// syncGatewayStatus will build and update status for all Gateways in gateway reports
+func (s *AgentGwSyncer) syncGatewayStatus(ctx context.Context, logger *slog.Logger, gatewayReports GatewayReports) {
 	stopwatch := utils.NewTranslatorStopWatch("GatewayStatusSyncer")
 	stopwatch.Start()
 
 	// TODO: add gatewayStatusMetrics
 
+	// Create a minimal ReportMap with just the gateway reports for BuildGWStatus to work
+	rm := reports.ReportMap{
+		Gateways: gatewayReports.Reports,
+	}
+
 	// TODO: retry within loop per GW rather that as a full block
 	err := retry.Do(func() error {
-		for gwnn := range rm.Gateways {
+		for gwnn := range gatewayReports.Reports {
 			gw := gwv1.Gateway{}
 			err := s.mgr.GetClient().Get(ctx, gwnn, &gw)
 			if err != nil {
@@ -948,19 +1135,24 @@ func (s *AgentGwSyncer) syncGatewayStatus(ctx context.Context, logger *slog.Logg
 		logger.Error("all attempts failed at updating gateway statuses", logKeyError, err)
 	}
 	duration := stopwatch.Stop(ctx)
-	logger.Debug("synced gw status for gateways", "count", len(rm.Gateways), "duration", duration)
+	logger.Debug("synced gw status for gateways", "count", len(gatewayReports.Reports), "duration", duration)
 }
 
-// syncListenerSetStatus will build and update status for all Listener Sets in a reportMap
-func (s *AgentGwSyncer) syncListenerSetStatus(ctx context.Context, logger *slog.Logger, rm reports.ReportMap) {
+// syncListenerSetStatus will build and update status for all Listener Sets in listener set reports
+func (s *AgentGwSyncer) syncListenerSetStatus(ctx context.Context, logger *slog.Logger, listenerSetReports ListenerSetReports) {
 	stopwatch := utils.NewTranslatorStopWatch("ListenerSetStatusSyncer")
 	stopwatch.Start()
 
 	// TODO: add listenerStatusMetrics
 
+	// Create a minimal ReportMap with just the listener set reports for BuildListenerSetStatus to work
+	rm := reports.ReportMap{
+		ListenerSets: listenerSetReports.Reports,
+	}
+
 	// TODO: retry within loop per LS rathen that as a full block
 	err := retry.Do(func() error {
-		for lsnn := range rm.ListenerSets {
+		for lsnn := range listenerSetReports.Reports {
 			ls := gwxv1a1.XListenerSet{}
 			err := s.mgr.GetClient().Get(ctx, lsnn, &ls)
 			if err != nil {
@@ -996,7 +1188,7 @@ func (s *AgentGwSyncer) syncListenerSetStatus(ctx context.Context, logger *slog.
 		logger.Error("all attempts failed at updating listener set statuses", logKeyError, err)
 	}
 	duration := stopwatch.Stop(ctx)
-	logger.Debug("synced listener sets status for listener set", "count", len(rm.ListenerSets), "duration", duration.String())
+	logger.Debug("synced listener sets status for listener set", "count", len(listenerSetReports.Reports), "duration", duration.String())
 }
 
 // TODO: refactor proxy_syncer status syncing to use the same logic as agentgateway syncer
@@ -1015,43 +1207,6 @@ func isRouteStatusEqual(objA, objB *gwv1.RouteStatus) bool {
 
 func isListenerSetStatusEqual(objA, objB *gwxv1a1.ListenerSetStatus) bool {
 	return cmp.Equal(objA, objB, opts)
-}
-
-func mergeProxyReports(proxies []agentGwXdsResources) reports.ReportMap {
-	merged := reports.NewReportMap()
-
-	for _, p := range proxies {
-		// 1. merge GW Reports for all Proxies' status reports
-		maps.Copy(merged.Gateways, p.reports.Gateways)
-
-		// set the attached routes
-		for listener, counts := range p.attachedRoutes {
-			merged.GatewayNamespaceName(p.NamespacedName).ListenerName(listener).SetAttachedRoutes(counts)
-		}
-
-		// 2. merge LS Reports for all Proxies' status reports
-		maps.Copy(merged.ListenerSets, p.reports.ListenerSets)
-
-		// 3. merge route parentRefs into RouteReports for all route types
-		mergeRouteReports(merged.HTTPRoutes, p.reports.HTTPRoutes)
-		mergeRouteReports(merged.TCPRoutes, p.reports.TCPRoutes)
-		mergeRouteReports(merged.TLSRoutes, p.reports.TLSRoutes)
-		mergeRouteReports(merged.GRPCRoutes, p.reports.GRPCRoutes)
-
-		for key, rr := range p.reports.Policies {
-			// if we haven't encountered this policy, just copy it over completely
-			old := merged.Policies[key]
-			if old == nil {
-				merged.Policies[key] = rr
-				continue
-			}
-			// else, let's merge our parentRefs into the existing map
-			// obsGen will stay as-is...
-			maps.Copy(merged.Policies[key].Ancestors, rr.Ancestors)
-		}
-	}
-
-	return merged
 }
 
 func isGatewayStatusEqual(objA, objB *gwv1.GatewayStatus) bool {
