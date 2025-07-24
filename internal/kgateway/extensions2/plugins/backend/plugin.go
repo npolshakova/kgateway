@@ -3,7 +3,9 @@ package backend
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/agentgateway/agentgateway/go/api"
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
@@ -115,7 +117,8 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 		ContributesBackends: map[schema.GroupKind]extensionsplug.BackendPlugin{
 			gk: {
 				BackendInit: ir.BackendInit{
-					InitBackend: processBackend,
+					InitEnvoyBackend: processBackendForEnvoy,
+					InitAgentBackend: processBackendForAgentGateway,
 				},
 				Endpoints: endpoints,
 				Backends:  bcol,
@@ -123,8 +126,8 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 		},
 		ContributesPolicies: map[schema.GroupKind]extensionsplug.PolicyPlugin{
 			wellknown.BackendGVK.GroupKind(): {
-				Name:                      "backend",
-				NewGatewayTranslationPass: newPlug,
+				Name:                           "backend",
+				NewEnvoyGatewayTranslationPass: newPlug,
 			},
 		},
 		ContributesRegistration: map[schema.GroupKind]func(){
@@ -251,7 +254,7 @@ func getAISecretRef(llm v1alpha1.SupportedLLMProvider) *corev1.LocalObjectRefere
 	return secretRef
 }
 
-func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_config_cluster_v3.Cluster) *ir.EndpointsForBackend {
+func processBackendForEnvoy(ctx context.Context, in ir.BackendObjectIR, out *envoy_config_cluster_v3.Cluster) *ir.EndpointsForBackend {
 	be, ok := in.Obj.(*v1alpha1.Backend)
 	if !ok {
 		logger.Error("failed to cast backend object")
@@ -268,7 +271,7 @@ func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_confi
 	spec := be.Spec
 	switch spec.Type {
 	case v1alpha1.BackendTypeStatic:
-		if err := processStatic(spec.Static, out); err != nil {
+		if err := processStaticBackendForEnvoy(spec.Static, out); err != nil {
 			logger.Error("failed to process static backend", "error", err)
 		}
 	case v1alpha1.BackendTypeAWS:
@@ -290,6 +293,21 @@ func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_confi
 		}
 	}
 	return nil
+}
+
+func processBackendForAgentGateway(be *v1alpha1.Backend) (*api.Backend, error) {
+	spec := be.Spec
+	switch spec.Type {
+	case v1alpha1.BackendTypeStatic:
+		return processStaticBackendForAgentGateway(be)
+	case v1alpha1.BackendTypeAWS:
+		return nil, fmt.Errorf("backend of type %s is not supported", spec.Type)
+	case v1alpha1.BackendTypeAI:
+		return nil, fmt.Errorf("backend of type %s is not supported", spec.Type)
+	case v1alpha1.BackendTypeDynamicForwardProxy:
+		return nil, fmt.Errorf("backend of type %s is not supported", spec.Type)
+	}
+	return nil, nil
 }
 
 func parseAppProtocol(b *v1alpha1.Backend) ir.AppProtocol {
@@ -331,9 +349,9 @@ type backendPlugin struct {
 	needsDfpFilter   map[string]bool
 }
 
-var _ ir.ProxyTranslationPass = &backendPlugin{}
+var _ ir.EnvoyTranslationPass = &backendPlugin{}
 
-func newPlug(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
+func newPlug(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
 	return &backendPlugin{}
 }
 

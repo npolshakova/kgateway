@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,7 +50,9 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	kgwversioned "github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -81,6 +82,7 @@ type AgentGwSyncer struct {
 	commonCols *common.CommonCollections
 	mgr        manager.Manager
 	client     kube.Client
+	plugins    pluginsdk.Plugin
 
 	// Configuration
 	controllerName        string
@@ -137,6 +139,7 @@ func NewAgentGwSyncer(
 	client kube.Client,
 	mgr manager.Manager,
 	commonCols *common.CommonCollections,
+	plugins pluginsdk.Plugin,
 	xdsCache envoycache.SnapshotCache,
 	domainSuffix string,
 	systemNamespace string,
@@ -148,6 +151,7 @@ func NewAgentGwSyncer(
 		commonCols:            commonCols,
 		controllerName:        controllerName,
 		agentGatewayClassName: agentGatewayClassName,
+		plugins:               plugins,
 		xdsCache:              xdsCache,
 		client:                client,
 		mgr:                   mgr,
@@ -321,17 +325,21 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	// Build ADP resources
 	adpResources := s.buildADPResources(gateways, inputs, refGrants, krtopts, rep, rm)
 
+	// Build backend collections,
+	// this is done seperately from other resources because backends are not a per gateway resource
+	adpBackends := s.buildBackendCollections(inputs, krtopts, rm)
+
 	// Build address collections
 	addresses := s.buildAddressCollections(inputs, krtopts)
 
 	// Build XDS collection
-	s.buildXDSCollection(adpResources, addresses, krtopts, rm)
+	s.buildXDSCollection(adpResources, adpBackends, addresses, krtopts, rm)
 
 	// Build status reporting
 	s.buildStatusReporting()
 
 	// Set up sync dependencies
-	s.setupSyncDependencies(gateways, adpResources, addresses, inputs)
+	s.setupSyncDependencies(gateways, adpResources, adpBackends, addresses, inputs)
 }
 
 func (s *AgentGwSyncer) buildGatewayCollection(
@@ -399,11 +407,6 @@ func (s *AgentGwSyncer) buildADPResources(
 		return s.buildListenerFromGateway(ctx, obj, repMap)
 	}, krtopts.ToOptions("Listeners")...)
 
-	// Build backends
-	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []ADPResource {
-		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, repMap)
-	}, krtopts.ToOptions("ADPBackends")...)
-
 	// Build routes
 	routeParents := BuildRouteParents(gateways)
 	routeInputs := RouteContextInputs{
@@ -414,13 +417,25 @@ func (s *AgentGwSyncer) buildADPResources(
 		Namespaces:     inputs.Namespaces,
 		InferencePools: inputs.InferencePools,
 		Backends:       s.commonCols.BackendIndex,
+		Plugins:        s.plugins,
 	}
-	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, gateways, inputs.Gateways, routeInputs, krtopts, repMap, rep)
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, gateways, inputs.Gateways, routeInputs, krtopts, repMap, rep, s.plugins)
 
 	// Join all ADP resources
-	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes, backends}, krtopts.ToOptions("ADPResources")...)
+	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
 
 	return allADPResources
+}
+
+// buildBackendCollections builds a collection of all backend resources
+func (s *AgentGwSyncer) buildBackendCollections(inputs Inputs, krtopts krtutil.KrtOptions, repMap reports.ReportMap) krt.Collection[*envoyResourceWithCustomName] {
+	// Build backends
+	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []*envoyResourceWithCustomName {
+		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, repMap)
+	}, krtopts.ToOptions("ADPBackends")...)
+	logger.Debug("backends", "backends", backends)
+
+	return backends
 }
 
 // buildListenerFromGateway creates a listener resource from a gateway
@@ -453,9 +468,11 @@ const (
 )
 
 // buildBackendFromBackend creates a backend resource
-func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace], repMap reports.ReportMap) []ADPResource {
-	var results []ADPResource
+func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace], repMap reports.ReportMap) []*envoyResourceWithCustomName {
+	var results []*envoyResourceWithCustomName
 	// Translate the backend type from Kubernetes Backend to agentgateway API
+	// TODO (Jmcguire98): this should all be moved into the plugin system
+	// after we have validated the approach with static backends
 	switch obj.Spec.Type {
 	case v1alpha1.BackendTypeAI:
 		if obj.Spec.AI == nil {
@@ -485,31 +502,39 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 			},
 		}
 		logger.Debug("creating AI backend", "backend", obj.Name)
-		results = append(results, toResourceWithReports(types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
-		}, ADPBackend{aiBackend}, repMap))
-	case v1alpha1.BackendTypeStatic:
-		if len(obj.Spec.Static.Hosts) > 1 {
-			// TODO: support multiple hosts
-			logger.Warn("multiple hosts are not supported for static backends in agentgateway", "backend", obj.Name)
-		}
-		host := obj.Spec.Static.Hosts[0].Host
-		port := obj.Spec.Static.Hosts[0].Port
-		staticBackend := &api.Backend{
-			Name: obj.Namespace + "/" + obj.Name,
-			Kind: &api.Backend_Static{
-				Static: &api.StaticBackend{
-					Host: host,
-					Port: int32(port),
-				},
+		resourceWrapper := &api.Resource{
+			Kind: &api.Resource_Backend{
+				Backend: aiBackend,
 			},
 		}
-		logger.Debug("creating static backend", "backend", staticBackend)
-		results = append(results, toResourceWithReports(types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
-		}, ADPBackend{staticBackend}, repMap))
+		results = append(results, &envoyResourceWithCustomName{
+			Message: resourceWrapper,
+			Name:    aiBackend.Name,
+			version: utils.HashProto(resourceWrapper),
+		})
+	case v1alpha1.BackendTypeStatic:
+		var backend *api.Backend
+		var err error
+		if plug, ok := s.plugins.ContributesBackends[wellknown.BackendGVK.GroupKind()]; ok && plug.BackendInit.InitAgentBackend != nil {
+			backend, err = plug.BackendInit.InitAgentBackend(obj)
+			if err != nil {
+				// TODO(jmcguire98): should we report an error here instead of just logging it
+				logger.Error("failed to translate static backend", "error", err, "backend", obj.Name)
+				return results
+			}
+		}
+
+		logger.Debug("creating static backend", "backend", backend)
+		resourceWrapper := &api.Resource{
+			Kind: &api.Resource_Backend{
+				Backend: backend,
+			},
+		}
+		results = append(results, &envoyResourceWithCustomName{
+			Message: resourceWrapper,
+			Name:    backend.Name,
+			version: utils.HashProto(resourceWrapper),
+		})
 	case v1alpha1.BackendTypeMCP:
 		// Convert Kubernetes MCP targets to agentgateway format
 		var mcpTargets []*api.MCPTarget
@@ -528,10 +553,16 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 							},
 						},
 					}
-					results = append(results, *toResourcepWithReports(types.NamespacedName{
-						Namespace: obj.Namespace,
-						Name:      targetSelector.StaticTarget.Name,
-					}, ADPBackend{staticBackend}, repMap))
+					resourceWrapper := &api.Resource{
+						Kind: &api.Resource_Backend{
+							Backend: staticBackend,
+						},
+					}
+					results = append(results, &envoyResourceWithCustomName{
+						Message: resourceWrapper,
+						Name:    staticBackend.Name,
+						version: utils.HashProto(resourceWrapper),
+					})
 
 					mcpTarget := &api.MCPTarget{
 						Name: targetSelector.StaticTarget.Name,
@@ -641,10 +672,16 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 			},
 		}
 
-		results = append(results, toResourceWithReports(types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
-		}, ADPBackend{mcpBackend}, repMap))
+		resourceWrapper := &api.Resource{
+			Kind: &api.Resource_Backend{
+				Backend: mcpBackend,
+			},
+		}
+		results = append(results, &envoyResourceWithCustomName{
+			Message: resourceWrapper,
+			Name:    mcpBackend.Name,
+			version: utils.HashProto(resourceWrapper),
+		})
 	}
 
 	return results
@@ -820,7 +857,7 @@ func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.K
 	}, krtopts.ToOptions("XDSAddresses")...)
 }
 
-func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResource], xdsAddresses krt.Collection[envoyResourceWithCustomName], krtopts krtutil.KrtOptions, rm reports.ReportMap) {
+func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResource], adpBackends krt.Collection[*envoyResourceWithCustomName], xdsAddresses krt.Collection[envoyResourceWithCustomName], krtopts krtutil.KrtOptions, rm reports.ReportMap) {
 	// Create an index on adpResources by Gateway to avoid fetching all resources
 	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResource) []types.NamespacedName {
 		return []types.NamespacedName{resource.Gateway}
@@ -844,6 +881,12 @@ func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResour
 				Name:    resource.ResourceName(),
 				version: utils.HashProto(resource.Resource),
 			})
+		}
+
+		// Fetch all backends and add them to the resources for every gateway
+		cachedBackends := krt.Fetch(kctx, adpBackends)
+		for _, backend := range cachedBackends {
+			cacheResources = append(cacheResources, backend)
 		}
 
 		// Create the resource wrappers
@@ -878,12 +921,13 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 	})
 }
 
-func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[Gateway], adpResources krt.Collection[ADPResource], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
+func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[Gateway], adpResources krt.Collection[ADPResource], adpBackends krt.Collection[*envoyResourceWithCustomName], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
 		gateways.HasSynced,
 		// resources
 		adpResources.HasSynced,
+		adpBackends.HasSynced,
 		s.xDS.HasSynced,
 		// addresses
 		addresses.HasSynced,
@@ -1207,7 +1251,7 @@ func (s *AgentGwSyncer) syncListenerSetStatus(ctx context.Context, logger *slog.
 					// if it's recreated, we'll retranslate it anyway
 					continue
 				}
-				logger.Info("error getting ls", "erro", err.Error())
+				logger.Info("error getting ls", "error", err.Error())
 				return err
 			}
 			lsStatus := ls.Status

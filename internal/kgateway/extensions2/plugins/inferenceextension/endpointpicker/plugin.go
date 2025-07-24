@@ -145,15 +145,15 @@ func NewPluginFromCollections(
 			gk: {
 				Backends: backendCol,
 				BackendInit: ir.BackendInit{
-					InitBackend: processBackendObjectIR,
+					InitEnvoyBackend: processBackendObjectIR,
 				},
 			},
 		},
 		ContributesPolicies: map[schema.GroupKind]extplug.PolicyPlugin{
 			gk: {
-				Name:                      "endpoint-picker",
-				Policies:                  policyCol,
-				NewGatewayTranslationPass: newEndpointPickerPass,
+				Name:                           "endpoint-picker",
+				Policies:                       policyCol,
+				NewEnvoyGatewayTranslationPass: newEndpointPickerPass,
 			},
 		},
 		ContributesRegistration: map[schema.GroupKind]func(){
@@ -171,9 +171,9 @@ type endpointPickerPass struct {
 	reporter reports.Reporter
 }
 
-var _ ir.ProxyTranslationPass = &endpointPickerPass{}
+var _ ir.EnvoyTranslationPass = &endpointPickerPass{}
 
-func newEndpointPickerPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
+func newEndpointPickerPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
 	return &endpointPickerPass{
 		usedPools: make(map[types.NamespacedName]*inferencePool),
 		reporter:  reporter,

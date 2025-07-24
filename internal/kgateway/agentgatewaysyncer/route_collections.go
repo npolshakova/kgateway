@@ -18,10 +18,13 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
+	pluginsdkir "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
@@ -37,12 +40,15 @@ func ADPRouteCollection(
 	krtopts krtutil.KrtOptions,
 	rm reports.ReportMap,
 	rep reporter.Reporter,
+	plugins pluginsdk.Plugin,
 ) krt.Collection[ADPResource] {
 	httpRouteAttachments := gatewayRouteAttachmentCountCollection(inputs, httpRouteCol, wellknown.HTTPRouteGVK, krtopts)
 	httpRoutes := krt.NewManyCollection(httpRouteCol, func(krtctx krt.HandlerContext, obj *gwv1.HTTPRoute) []ADPResource {
 		logger.Debug("translating HTTPRoute", "route_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
 
 		ctx := inputs.WithCtx(krtctx)
+		attachRoutePolicies(&ctx, obj)
+		ctx.pluginPasses = newAgentGatewayPasses(plugins, rep, ctx.AttachedPolicies)
 		routeReporter := rep.Route(obj)
 		route := obj.Spec
 		parentRefs, gwResult := computeRoute(ctx, obj, func(obj *gwv1.HTTPRoute) iter.Seq2[ADPRoute, *reporter.RouteCondition] {
@@ -270,6 +276,28 @@ func IsNil[O comparable](o O) bool {
 	return o == t
 }
 
+func newAgentGatewayPasses(plugs pluginsdk.Plugin,
+	rep reporter.Reporter,
+	aps ir.AttachedPolicies) []ir.AgentGatewayTranslationPass {
+	var out []ir.AgentGatewayTranslationPass
+	if len(aps.Policies) == 0 {
+		return out
+	}
+	for gk, paList := range aps.Policies {
+		plugin, ok := plugs.ContributesPolicies[gk]
+		if !ok || plugin.NewAgentGatewayPass == nil {
+			continue
+		}
+		// only instantiate if there is at least one attached policy
+		// OR this is the synthetic built-in GK
+		if len(paList) == 0 && gk != pluginsdkir.VirtualBuiltInGK {
+			continue
+		}
+		out = append(out, plugin.NewAgentGatewayPass(rep))
+	}
+	return out
+}
+
 // computeRoute holds the common route building logic shared amongst all types
 func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, translator func(
 	obj T,
@@ -281,7 +309,7 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 		res := conversionResult[O]{}
 		for vs, err := range translator(obj) {
 			// This was a hard error
-			if IsNil(vs) {
+			if err != nil && IsNil(vs) {
 				res.error = err
 				return conversionResult[O]{error: err}
 			}
@@ -304,6 +332,8 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 type RouteContext struct {
 	Krt krt.HandlerContext
 	RouteContextInputs
+	AttachedPolicies ir.AttachedPolicies
+	pluginPasses     []ir.AgentGatewayTranslationPass
 }
 
 type RouteContextInputs struct {
@@ -315,6 +345,8 @@ type RouteContextInputs struct {
 	Namespaces     krt.Collection[*corev1.Namespace]
 	ServiceEntries krt.Collection[*networkingclient.ServiceEntry]
 	Backends       *krtcollections.BackendIndex
+	Policies       *krtcollections.PolicyIndex
+	Plugins        pluginsdk.Plugin
 }
 
 func (i RouteContextInputs) WithCtx(krtctx krt.HandlerContext) RouteContext {
@@ -340,6 +372,43 @@ func (r RouteWithKey) Equals(o RouteWithKey) bool {
 // buildGatewayRoutes contains common logic to build a set of routes with gwv1beta1 semantics
 func buildGatewayRoutes[T any](parentRefs []routeParentReference, convertRules func() T) T {
 	return convertRules()
+}
+
+// attachRoutePolicies populates ctx.AttachedPolicies with policies that
+// target the given HTTPRoute. It uses the exported LookupTargetingPolicies
+// from PolicyIndex.
+func attachRoutePolicies(ctx *RouteContext, route *gwv1.HTTPRoute) {
+	if ctx.Backends == nil {
+		return
+	}
+	pi := ctx.Backends.PolicyIndex()
+	if pi == nil {
+		return
+	}
+
+	target := ir.ObjectSource{
+		Group:     wellknown.HTTPRouteGVK.Group,
+		Kind:      wellknown.HTTPRouteGVK.Kind,
+		Namespace: route.Namespace,
+		Name:      route.Name,
+	}
+
+	pols := pi.LookupTargetingPolicies(ctx.Krt,
+		pluginsdk.RouteAttachmentPoint,
+		target,
+		"", // route-level
+		route.GetLabels())
+
+	aps := ir.AttachedPolicies{Policies: map[schema.GroupKind][]ir.PolicyAtt{}}
+	for _, pa := range pols {
+		a := aps.Policies[pa.GroupKind]
+		aps.Policies[pa.GroupKind] = append(a, pa)
+	}
+
+	if _, ok := aps.Policies[pluginsdkir.VirtualBuiltInGK]; !ok {
+		aps.Policies[pluginsdkir.VirtualBuiltInGK] = nil
+	}
+	ctx.AttachedPolicies = aps
 }
 
 type RouteAttachment struct {
