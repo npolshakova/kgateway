@@ -190,13 +190,28 @@ func (r report) ResourceName() string {
 }
 
 func (r report) Equals(in report) bool {
-	// Always return false to force status recalculation on every sync.
-	// This is safe because status includes observedGeneration, so any edit to the Gateway resource
-	// (e.g. changing the port) will eventually trigger a new status update.
-	// We currently rely on the translation process (not the status diff) to trigger reconciliation,
-	// so skipping deep equality here avoids brittle or unnecessary comparisons (e.g. map equality).
-	// If we find a case where this causes redundant updates or missed transitions, we can revisit this.
-	return false
+	if !maps.Equal(r.reportMap.Gateways, in.reportMap.Gateways) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.ListenerSets, in.reportMap.ListenerSets) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.HTTPRoutes, in.reportMap.HTTPRoutes) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.TCPRoutes, in.reportMap.TCPRoutes) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.TLSRoutes, in.reportMap.TLSRoutes) {
+		return false
+	}
+	if !maps.Equal(r.reportMap.Policies, in.reportMap.Policies) {
+		return false
+	}
+	if !maps.Equal(r.attachedRoutes, in.attachedRoutes) {
+		return false
+	}
+	return true
 }
 
 // Inputs holds all the input collections needed for the syncer
