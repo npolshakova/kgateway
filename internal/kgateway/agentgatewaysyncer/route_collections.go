@@ -34,7 +34,6 @@ func ADPRouteCollection(
 	grpcRouteCol krt.Collection[*gwv1.GRPCRoute],
 	tcpRouteCol krt.Collection[*gwv1alpha2.TCPRoute],
 	tlsRouteCol krt.Collection[*gwv1alpha2.TLSRoute],
-	gatewayObjs krt.Collection[*gwv1.Gateway],
 	inputs RouteContextInputs,
 	krtopts krtutil.KrtOptions,
 	plugins pluginsdk.Plugin,

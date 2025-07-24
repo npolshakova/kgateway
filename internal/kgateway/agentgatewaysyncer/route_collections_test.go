@@ -656,7 +656,7 @@ func TestADPRouteCollection(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1252,7 +1252,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1546,7 +1546,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())

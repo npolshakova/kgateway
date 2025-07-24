@@ -411,7 +411,7 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	addresses := s.buildAddressCollections(inputs, krtopts)
 
 	// Build XDS collection
-	s.buildXDSCollection(inputs.Gateways, adpResources, adpBackends, addresses)
+	s.buildXDSCollection(adpResources, adpBackends, addresses)
 
 	// Build status reporting
 	s.buildStatusReporting()
@@ -501,7 +501,7 @@ func (s *AgentGwSyncer) buildADPResources(
 		Backends:       s.commonCols.BackendIndex,
 		Plugins:        s.plugins,
 	}
-	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, inputs.Gateways, routeInputs, krtopts, s.plugins)
+	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, s.plugins)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResourcesForGateway]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
@@ -940,17 +940,14 @@ func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.K
 	}, krtopts.ToOptions("XDSAddresses")...)
 }
 
-func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway], adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[*envoyResourceWithCustomName], xdsAddresses krt.Collection[envoyResourceWithCustomName]) {
+func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[*envoyResourceWithCustomName], xdsAddresses krt.Collection[envoyResourceWithCustomName]) {
 	// Create an index on adpResources by Gateway to avoid fetching all resources
 	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResourcesForGateway) []types.NamespacedName {
 		return []types.NamespacedName{resource.Gateway}
 	})
 
-	s.xDS = krt.NewCollection(gateway, func(kctx krt.HandlerContext, obj *gwv1.Gateway) *agentGwXdsResources {
-		gwNamespacedName := types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
-		}
+	s.xDS = krt.NewCollection(adpResources, func(kctx krt.HandlerContext, obj ADPResourcesForGateway) *agentGwXdsResources {
+		gwNamespacedName := obj.Gateway
 
 		cacheAddresses := krt.Fetch(kctx, xdsAddresses)
 		envoytypesAddresses := make([]envoytypes.Resource, 0, len(cacheAddresses))
