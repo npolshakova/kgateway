@@ -471,6 +471,8 @@ const (
 func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace], repMap reports.ReportMap) []*envoyResourceWithCustomName {
 	var results []*envoyResourceWithCustomName
 	// Translate the backend type from Kubernetes Backend to agentgateway API
+	// TODO (Jmcguire98): this should all be moved into the plugin system
+	// after we have validated the approach with static backends
 	switch obj.Spec.Type {
 	case v1alpha1.BackendTypeAI:
 		if obj.Spec.AI == nil {
@@ -516,31 +518,21 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 		if plug, ok := s.plugins.ContributesBackends[wellknown.BackendGVK.GroupKind()]; ok && plug.BackendInit.InitAgentBackend != nil {
 			backend, err = plug.BackendInit.InitAgentBackend(obj)
 			if err != nil {
-				// TODO(jmcguire98): we should probably report an error here instead of just logging it
+				// TODO(jmcguire98): should we report an error here instead of just logging it
 				logger.Error("failed to translate static backend", "error", err, "backend", obj.Name)
 				return results
 			}
 		}
-		host := obj.Spec.Static.Hosts[0].Host
-		port := obj.Spec.Static.Hosts[0].Port
-		staticBackend := &api.Backend{
-			Name: obj.Namespace + "/" + obj.Name,
-			Kind: &api.Backend_Static{
-				Static: &api.StaticBackend{
-					Host: host,
-					Port: int32(port),
-				},
-			},
-		}
-		logger.Debug("creating static backend", "backend", staticBackend)
+
+		logger.Debug("creating static backend", "backend", backend)
 		resourceWrapper := &api.Resource{
 			Kind: &api.Resource_Backend{
-				Backend: staticBackend,
+				Backend: backend,
 			},
 		}
 		results = append(results, &envoyResourceWithCustomName{
 			Message: resourceWrapper,
-			Name:    staticBackend.Name,
+			Name:    backend.Name,
 			version: utils.HashProto(resourceWrapper),
 		})
 	case v1alpha1.BackendTypeMCP:
