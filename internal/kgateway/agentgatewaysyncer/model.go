@@ -93,6 +93,8 @@ func getADPResourceName(r *api.Resource) string {
 		return "bind/" + t.Bind.GetKey()
 	case *api.Resource_Listener:
 		return "listener/" + t.Listener.GetKey()
+	case *api.Resource_Backend:
+		return "backend/" + t.Backend.GetName()
 	case *api.Resource_Route:
 		return "route/" + t.Route.GetKey()
 	}

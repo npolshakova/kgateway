@@ -447,6 +447,7 @@ type RouteContextInputs struct {
 	ServiceEntries krt.Collection[*networkingclient.ServiceEntry]
 	Backends       *krtcollections.BackendIndex
 	Policies       *krtcollections.PolicyIndex
+	Plugins        pluginsdk.Plugin
 }
 
 func (i RouteContextInputs) WithCtx(krtctx krt.HandlerContext) RouteContext {

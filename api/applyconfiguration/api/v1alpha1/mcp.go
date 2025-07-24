@@ -5,8 +5,8 @@ package v1alpha1
 // MCPApplyConfiguration represents a declarative configuration of the MCP type for use
 // with apply.
 type MCPApplyConfiguration struct {
-	Name    *string                       `json:"name,omitempty"`
-	Targets []McpTargetApplyConfiguration `json:"targets,omitempty"`
+	Name    *string                               `json:"name,omitempty"`
+	Targets []McpTargetSelectorApplyConfiguration `json:"targets,omitempty"`
 }
 
 // MCPApplyConfiguration constructs a declarative configuration of the MCP type for use with
@@ -26,7 +26,7 @@ func (b *MCPApplyConfiguration) WithName(value string) *MCPApplyConfiguration {
 // WithTargets adds the given value to the Targets field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Targets field.
-func (b *MCPApplyConfiguration) WithTargets(values ...*McpTargetApplyConfiguration) *MCPApplyConfiguration {
+func (b *MCPApplyConfiguration) WithTargets(values ...*McpTargetSelectorApplyConfiguration) *MCPApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTargets")

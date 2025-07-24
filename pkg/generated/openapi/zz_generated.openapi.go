@@ -118,7 +118,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalPolicyTargetSelector":                 schema_kgateway_v2_api_v1alpha1_LocalPolicyTargetSelector(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.LocalRateLimitPolicy":                      schema_kgateway_v2_api_v1alpha1_LocalRateLimitPolicy(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP":                                       schema_kgateway_v2_api_v1alpha1_MCP(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpSelector":                               schema_kgateway_v2_api_v1alpha1_McpSelector(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget":                                 schema_kgateway_v2_api_v1alpha1_McpTarget(ref),
+		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTargetSelector":                         schema_kgateway_v2_api_v1alpha1_McpTargetSelector(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Message":                                   schema_kgateway_v2_api_v1alpha1_Message(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MetadataKey":                               schema_kgateway_v2_api_v1alpha1_MetadataKey(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MetadataPathSegment":                       schema_kgateway_v2_api_v1alpha1_MetadataPathSegment(ref),
@@ -4730,7 +4732,7 @@ func schema_kgateway_v2_api_v1alpha1_MCP(ref common.ReferenceCallback) common.Op
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"),
+										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTargetSelector"),
 									},
 								},
 							},
@@ -4741,7 +4743,34 @@ func schema_kgateway_v2_api_v1alpha1_MCP(ref common.ReferenceCallback) common.Op
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTargetSelector"},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_McpSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "McpSelector defines the selector logic to search for MCP targets.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"namespaceSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NamespaceSelector is the label selector in which namespace the MCP targets are searched for.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+						},
+					},
+					"serviceSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceSelector is the label selector in which services the MCP targets are searched for.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
 	}
 }
 
@@ -4787,6 +4816,33 @@ func schema_kgateway_v2_api_v1alpha1_McpTarget(ref common.ReferenceCallback) com
 				Required: []string{"name", "host", "port"},
 			},
 		},
+	}
+}
+
+func schema_kgateway_v2_api_v1alpha1_McpTargetSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "McpTargetSelector defines the MCP target to use for this backend.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selectors": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selectors is the selector logic to search for MCP targets with the mcp app protocol.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpSelector"),
+						},
+					},
+					"static": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StaticTarget is the MCP target to use for this backend.",
+							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpSelector", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.McpTarget"},
 	}
 }
 

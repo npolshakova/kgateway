@@ -16,7 +16,6 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
@@ -29,7 +28,7 @@ func toResourcep(gw types.NamespacedName, resources []*api.Resource, rm reports.
 
 func toADPResource(t any) *api.Resource {
 	switch tt := t.(type) {
-	case Bind:
+	case ADPBind:
 		return &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}
 	case ADPListener:
 		return &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}
@@ -56,15 +55,15 @@ func toResource(gw types.NamespacedName, resources []*api.Resource, rm reports.R
 	}
 }
 
-type Bind struct {
+type ADPBind struct {
 	*api.Bind
 }
 
-func (g Bind) ResourceName() string {
+func (g ADPBind) ResourceName() string {
 	return g.Key
 }
 
-func (g Bind) Equals(other Bind) bool {
+func (g ADPBind) Equals(other ADPBind) bool {
 	return protoconv.Equals(g, other)
 }
 
@@ -77,6 +76,18 @@ func (g ADPListener) ResourceName() string {
 }
 
 func (g ADPListener) Equals(other ADPListener) bool {
+	return protoconv.Equals(g, other)
+}
+
+type ADPBackend struct {
+	*api.Backend
+}
+
+func (g ADPBackend) ResourceName() string {
+	return g.Name
+}
+
+func (g ADPBackend) Equals(other ADPBackend) bool {
 	return protoconv.Equals(g, other)
 }
 
