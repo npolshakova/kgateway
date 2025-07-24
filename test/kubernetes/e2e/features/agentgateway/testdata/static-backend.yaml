@@ -88,5 +88,5 @@ spec:
   static:
     hosts:
       - host: google.com
-        port: 443
+        port: 80
 ---
