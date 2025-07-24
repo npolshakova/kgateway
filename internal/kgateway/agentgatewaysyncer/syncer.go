@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,6 +51,7 @@ import (
 	kgwversioned "github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -319,7 +319,11 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	gateways := s.buildGatewayCollection(inputs, gatewayClasses, refGrants, krtopts, rep)
 
 	// Build ADP resources
-	adpResources, adpBackends := s.buildADPResources(gateways, inputs, refGrants, krtopts, rep, rm)
+	adpResources := s.buildADPResources(gateways, inputs, refGrants, krtopts, rep, rm)
+
+	// Build backend collections,
+	// this is done seperately from other resources because backends are not a per gateway resource
+	adpBackends := s.buildBackendCollections(inputs, krtopts, rm)
 
 	// Build address collections
 	addresses := s.buildAddressCollections(inputs, krtopts)
@@ -331,7 +335,7 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	s.buildStatusReporting()
 
 	// Set up sync dependencies
-	s.setupSyncDependencies(gateways, adpResources, addresses, inputs)
+	s.setupSyncDependencies(gateways, adpResources, adpBackends, addresses, inputs)
 }
 
 func (s *AgentGwSyncer) buildGatewayCollection(
@@ -361,7 +365,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	krtopts krtutil.KrtOptions,
 	rep reporter.Reporter,
 	repMap reports.ReportMap,
-) (krt.Collection[ADPResource], krt.Collection[*envoyResourceWithCustomName]) {
+) krt.Collection[ADPResource] {
 	// Build ports and binds
 	ports := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj Gateway) *IndexObject[string, Gateway] {
 		port := fmt.Sprint(obj.parentInfo.Port)
@@ -399,12 +403,6 @@ func (s *AgentGwSyncer) buildADPResources(
 		return s.buildListenerFromGateway(ctx, obj, repMap)
 	}, krtopts.ToOptions("Listeners")...)
 
-	// Build backends
-	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []*envoyResourceWithCustomName {
-		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, repMap)
-	}, krtopts.ToOptions("ADPBackends")...)
-	logger.Debug("backends", "backends", backends)
-
 	// Build routes
 	routeParents := BuildRouteParents(gateways)
 	routeInputs := RouteContextInputs{
@@ -421,7 +419,18 @@ func (s *AgentGwSyncer) buildADPResources(
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResource]{binds, listeners, adpRoutes}, krtopts.ToOptions("ADPResources")...)
 
-	return allADPResources, backends
+	return allADPResources
+}
+
+// buildBackendCollections builds a collection of all backend resources
+func (s *AgentGwSyncer) buildBackendCollections(inputs Inputs, krtopts krtutil.KrtOptions, repMap reports.ReportMap) krt.Collection[*envoyResourceWithCustomName] {
+	// Build backends
+	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []*envoyResourceWithCustomName {
+		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, repMap)
+	}, krtopts.ToOptions("ADPBackends")...)
+	logger.Debug("backends", "backends", backends)
+
+	return backends
 }
 
 // buildListenerFromGateway creates a listener resource from a gateway
@@ -909,12 +918,13 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 	})
 }
 
-func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[Gateway], adpResources krt.Collection[ADPResource], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
+func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[Gateway], adpResources krt.Collection[ADPResource], adpBackends krt.Collection[*envoyResourceWithCustomName], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
 		gateways.HasSynced,
 		// resources
 		adpResources.HasSynced,
+		adpBackends.HasSynced,
 		s.xDS.HasSynced,
 		// addresses
 		addresses.HasSynced,
