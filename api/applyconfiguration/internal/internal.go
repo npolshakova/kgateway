@@ -1537,8 +1537,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTarget
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTargetSelector
           elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpSelector
+  map:
+    fields:
+    - name: namespaceSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: serviceSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTarget
   map:
     fields:
@@ -1557,6 +1566,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: protocol
       type:
         scalar: string
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTargetSelector
+  map:
+    fields:
+    - name: selectors
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpSelector
+    - name: static
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.McpTarget
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Message
   map:
     fields:

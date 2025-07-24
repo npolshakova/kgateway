@@ -573,7 +573,7 @@ func (tc TestCase) Run(
 			testBackend,
 		}),
 		BackendInit: ir.BackendInit{
-			InitBackend: func(ctx context.Context, in ir.BackendObjectIR, out *clusterv3.Cluster) *ir.EndpointsForBackend {
+			InitEnvoyBackend: func(ctx context.Context, in ir.BackendObjectIR, out *clusterv3.Cluster) *ir.EndpointsForBackend {
 				return nil
 			},
 		},

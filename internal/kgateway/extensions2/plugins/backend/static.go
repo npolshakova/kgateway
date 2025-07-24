@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 
+	"github.com/agentgateway/agentgateway/go/api"
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_endpoint_v3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
@@ -12,7 +13,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 )
 
-func processStatic(in *v1alpha1.StaticBackend, out *envoy_config_cluster_v3.Cluster) error {
+func processStaticBackendForEnvoy(in *v1alpha1.StaticBackend, out *envoy_config_cluster_v3.Cluster) error {
 	var hostname string
 	out.ClusterDiscoveryType = &envoy_config_cluster_v3.Cluster_Type{
 		Type: envoy_config_cluster_v3.Cluster_STATIC,
@@ -80,6 +81,27 @@ func processStatic(in *v1alpha1.StaticBackend, out *envoy_config_cluster_v3.Clus
 		//		out.DnsLookupFamily = envoy_config_cluster_v3.Cluster_V4_ONLY
 	}
 	return nil
+}
+
+func processStaticBackendForAgentGateway(be *v1alpha1.Backend) (*api.Backend, error) {
+	if len(be.Spec.Static.Hosts) > 1 {
+		// TODO(jmcguire98): as of now agentgateway does not support multiple hosts for static backends
+		// if we want to have similar behavior to envoy (load balancing across all hosts provided)
+		// we will need to add support for this in agentgateway
+		return nil, fmt.Errorf("multiple hosts are currently not supported for static backends in agentgateway")
+	}
+	if len(be.Spec.Static.Hosts) == 0 {
+		return nil, fmt.Errorf("static backends must have at least one host")
+	}
+	return &api.Backend{
+		Name: be.Namespace + "/" + be.Name,
+		Kind: &api.Backend_Static{
+			Static: &api.StaticBackend{
+				Host: be.Spec.Static.Hosts[0].Host,
+				Port: int32(be.Spec.Static.Hosts[0].Port),
+			},
+		},
+	}, nil
 }
 
 func processEndpointsStatic(_ *v1alpha1.StaticBackend) *ir.EndpointsForBackend {

@@ -619,28 +619,93 @@ spec:
                   targets:
                     items:
                       properties:
-                        host:
-                          minLength: 1
-                          type: string
-                        name:
-                          minLength: 1
-                          type: string
-                        port:
-                          format: int32
-                          maximum: 65535
-                          minimum: 1
-                          type: integer
-                        protocol:
-                          enum:
-                          - Undefined
-                          - SSE
-                          - StreamableHTTP
-                          type: string
-                      required:
-                      - host
-                      - name
-                      - port
+                        selectors:
+                          properties:
+                            namespaceSelector:
+                              properties:
+                                matchExpressions:
+                                  items:
+                                    properties:
+                                      key:
+                                        type: string
+                                      operator:
+                                        type: string
+                                      values:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                    required:
+                                    - key
+                                    - operator
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                                matchLabels:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            serviceSelector:
+                              properties:
+                                matchExpressions:
+                                  items:
+                                    properties:
+                                      key:
+                                        type: string
+                                      operator:
+                                        type: string
+                                      values:
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                    required:
+                                    - key
+                                    - operator
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                                matchLabels:
+                                  additionalProperties:
+                                    type: string
+                                  type: object
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                          x-kubernetes-validations:
+                          - message: at least one of namespaceSelector and serviceSelector
+                              must be set
+                            rule: has(self.namespaceSelector) || has(self.serviceSelector)
+                        static:
+                          properties:
+                            host:
+                              minLength: 1
+                              type: string
+                            name:
+                              minLength: 1
+                              type: string
+                            port:
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                              type: integer
+                            protocol:
+                              enum:
+                              - Undefined
+                              - SSE
+                              - StreamableHTTP
+                              type: string
+                          required:
+                          - host
+                          - name
+                          - port
+                          type: object
                       type: object
+                      x-kubernetes-validations:
+                      - message: exactly one of static or selectors must be set
+                        rule: '!(has(self.static) && has(self.selectors))'
                     minItems: 1
                     type: array
                 required:
