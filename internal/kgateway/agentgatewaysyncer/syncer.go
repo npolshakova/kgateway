@@ -317,7 +317,7 @@ func (s *AgentGwSyncer) buildGatewayCollection(
 	gatewayClasses krt.Collection[GatewayClass],
 	refGrants ReferenceGrants,
 	krtopts krtutil.KrtOptions,
-) krt.Collection[Gateway] {
+) krt.Collection[GatewayListener] {
 	return GatewayCollection(
 		s.agentGatewayClassName,
 		inputs.Gateways,
@@ -331,21 +331,21 @@ func (s *AgentGwSyncer) buildGatewayCollection(
 }
 
 func (s *AgentGwSyncer) buildADPResources(
-	gateways krt.Collection[Gateway],
+	gateways krt.Collection[GatewayListener],
 	inputs Inputs,
 	refGrants ReferenceGrants,
 	krtopts krtutil.KrtOptions,
 ) krt.Collection[ADPResourcesForGateway] {
 	// Build ports and binds
-	ports := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj Gateway) *IndexObject[string, Gateway] {
+	ports := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj GatewayListener) *IndexObject[string, GatewayListener] {
 		port := fmt.Sprint(obj.parentInfo.Port)
-		return &IndexObject[string, Gateway]{
+		return &IndexObject[string, GatewayListener]{
 			Key:     port,
-			Objects: []Gateway{obj},
+			Objects: []GatewayListener{obj},
 		}
 	}, krtopts.ToOptions("ports")...)
 
-	binds := krt.NewManyCollection(ports, func(ctx krt.HandlerContext, object IndexObject[string, Gateway]) []ADPResourcesForGateway {
+	binds := krt.NewManyCollection(ports, func(ctx krt.HandlerContext, object IndexObject[string, GatewayListener]) []ADPResourcesForGateway {
 		port, _ := strconv.Atoi(object.Key)
 		gwReports := make(map[types.NamespacedName]reports.ReportMap, 0)
 		for _, gw := range object.Objects {
@@ -377,7 +377,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	}, krtopts.ToOptions("Binds")...)
 
 	// Build listeners
-	listeners := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj Gateway) *ADPResourcesForGateway {
+	listeners := krt.NewCollection(gateways, func(ctx krt.HandlerContext, obj GatewayListener) *ADPResourcesForGateway {
 		return s.buildListenerFromGateway(obj)
 	}, krtopts.ToOptions("Listeners")...)
 
@@ -401,7 +401,7 @@ func (s *AgentGwSyncer) buildADPResources(
 }
 
 // buildListenerFromGateway creates a listener resource from a gateway
-func (s *AgentGwSyncer) buildListenerFromGateway(obj Gateway) *ADPResourcesForGateway {
+func (s *AgentGwSyncer) buildListenerFromGateway(obj GatewayListener) *ADPResourcesForGateway {
 	l := &api.Listener{
 		Key:         obj.ResourceName(),
 		Name:        string(obj.parentInfo.SectionName),
@@ -427,7 +427,7 @@ func (s *AgentGwSyncer) buildListenerFromGateway(obj Gateway) *ADPResourcesForGa
 }
 
 // getProtocolAndTLSConfig extracts protocol and TLS configuration from a gateway
-func (s *AgentGwSyncer) getProtocolAndTLSConfig(obj Gateway) (api.Protocol, *api.TLSConfig, bool) {
+func (s *AgentGwSyncer) getProtocolAndTLSConfig(obj GatewayListener) (api.Protocol, *api.TLSConfig, bool) {
 	var tlsConfig *api.TLSConfig
 
 	// Build TLS config if needed
@@ -553,7 +553,6 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway]
 		// Use index to fetch only resources for this gateway instead of all resources
 		resourceList := krt.Fetch(kctx, adpResources, krt.FilterIndex(adpResourcesByGateway, gwNamespacedName))
 		for _, resource := range resourceList {
-
 			// 1. merge GW Reports for all Proxies' status reports
 			maps.Copy(gwReports.Gateways, resource.report.Gateways)
 
@@ -583,7 +582,6 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway]
 				gwReports.GatewayNamespaceName(gwNamespacedName).ListenerName(listenerName).SetAttachedRoutes(count)
 			}
 
-			// TODO: flatten collection to be per gateway
 			for _, res := range resource.Resources {
 				cacheResources = append(cacheResources, &envoyResourceWithCustomName{
 					Message: res,
@@ -625,7 +623,7 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 	})
 }
 
-func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[Gateway], adpResources krt.Collection[ADPResourcesForGateway], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
+func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[GatewayListener], adpResources krt.Collection[ADPResourcesForGateway], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
 		gateways.HasSynced,

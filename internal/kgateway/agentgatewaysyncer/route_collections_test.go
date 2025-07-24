@@ -32,7 +32,7 @@ func TestADPRouteCollection(t *testing.T) {
 		httpRoutes     []*gwv1.HTTPRoute
 		services       []*corev1.Service
 		namespaces     []*corev1.Namespace
-		gateways       []Gateway
+		gateways       []GatewayListener
 		refGrants      []ReferenceGrant
 		expectedCount  int
 		expectedRoutes []*api.Route
@@ -101,7 +101,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -253,7 +253,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -394,7 +394,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -520,7 +520,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -588,7 +588,7 @@ func TestADPRouteCollection(t *testing.T) {
 			httpRoutes:     []*gwv1.HTTPRoute{},
 			services:       []*corev1.Service{},
 			namespaces:     []*corev1.Namespace{},
-			gateways:       []Gateway{},
+			gateways:       []GatewayListener{},
 			refGrants:      []ReferenceGrant{},
 			expectedCount:  0,
 			expectedRoutes: []*api.Route{},
@@ -617,7 +617,7 @@ func TestADPRouteCollection(t *testing.T) {
 
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
-			gateways := krttest.GetMockCollection[Gateway](mock)
+			gateways := krttest.GetMockCollection[GatewayListener](mock)
 			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
@@ -747,7 +747,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 		grpcRoutes     []*gwv1.GRPCRoute
 		services       []*corev1.Service
 		namespaces     []*corev1.Namespace
-		gateways       []Gateway
+		gateways       []GatewayListener
 		refGrants      []ReferenceGrant
 		expectedCount  int
 		expectedRoutes []*api.Route
@@ -816,7 +816,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -968,7 +968,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -1116,7 +1116,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -1184,7 +1184,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			grpcRoutes:     []*gwv1.GRPCRoute{},
 			services:       []*corev1.Service{},
 			namespaces:     []*corev1.Namespace{},
-			gateways:       []Gateway{},
+			gateways:       []GatewayListener{},
 			refGrants:      []ReferenceGrant{},
 			expectedCount:  0,
 			expectedRoutes: []*api.Route{},
@@ -1213,7 +1213,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
-			gateways := krttest.GetMockCollection[Gateway](mock)
+			gateways := krttest.GetMockCollection[GatewayListener](mock)
 			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
@@ -1474,7 +1474,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 				},
 			}
 
-			gateway := Gateway{
+			gateway := GatewayListener{
 				Config: &Config{
 					Meta: Meta{
 						Name:      "test-gateway",
@@ -1507,7 +1507,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
-			gateways := krttest.GetMockCollection[Gateway](mock)
+			gateways := krttest.GetMockCollection[GatewayListener](mock)
 			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)

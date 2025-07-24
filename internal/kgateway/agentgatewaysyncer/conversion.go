@@ -965,7 +965,7 @@ func buildListener(
 	}
 	server := &istio.Server{
 		Port: &istio.Port{
-			// Name is required. We only have one server per Gateway, so we can just name them all the same
+			// Name is required. We only have one server per GatewayListener, so we can just name them all the same
 			Name:     "default",
 			Number:   uint32(l.Port),
 			Protocol: protocol,

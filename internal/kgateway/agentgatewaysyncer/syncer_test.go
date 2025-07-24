@@ -174,14 +174,14 @@ func TestBuildADPFilters(t *testing.T) {
 func TestGetProtocolAndTLSConfig(t *testing.T) {
 	testCases := []struct {
 		name          string
-		gateway       Gateway
+		gateway       GatewayListener
 		expectedProto api.Protocol
 		expectedTLS   *api.TLSConfig
 		expectedOk    bool
 	}{
 		{
 			name: "HTTP protocol",
-			gateway: Gateway{
+			gateway: GatewayListener{
 				parentInfo: parentInfo{
 					Protocol: gwv1.HTTPProtocolType,
 				},
@@ -193,7 +193,7 @@ func TestGetProtocolAndTLSConfig(t *testing.T) {
 		},
 		{
 			name: "HTTPS protocol with TLS",
-			gateway: Gateway{
+			gateway: GatewayListener{
 				parentInfo: parentInfo{
 					Protocol: gwv1.HTTPSProtocolType,
 				},
@@ -211,7 +211,7 @@ func TestGetProtocolAndTLSConfig(t *testing.T) {
 		},
 		{
 			name: "HTTPS protocol without TLS (should fail)",
-			gateway: Gateway{
+			gateway: GatewayListener{
 				parentInfo: parentInfo{
 					Protocol: gwv1.HTTPSProtocolType,
 				},
@@ -223,7 +223,7 @@ func TestGetProtocolAndTLSConfig(t *testing.T) {
 		},
 		{
 			name: "TCP protocol",
-			gateway: Gateway{
+			gateway: GatewayListener{
 				parentInfo: parentInfo{
 					Protocol: gwv1.TCPProtocolType,
 				},
@@ -235,7 +235,7 @@ func TestGetProtocolAndTLSConfig(t *testing.T) {
 		},
 		{
 			name: "TLS protocol with TLS",
-			gateway: Gateway{
+			gateway: GatewayListener{
 				parentInfo: parentInfo{
 					Protocol: gwv1.TLSProtocolType,
 				},
