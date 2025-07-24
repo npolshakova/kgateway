@@ -404,7 +404,7 @@ func (s *AgentGwSyncer) buildResourceCollections(inputs Inputs, krtopts krtutil.
 	adpResources := s.buildADPResources(gateways, inputs, refGrants, krtopts)
 
 	// Build backend collections,
-	// this is done seperately from other resources because backends are not a per gateway resource
+	// this is done separately from other resources because backends are not a per gateway resource
 	adpBackends := s.buildBackendCollections(inputs, krtopts)
 
 	// Build address collections
@@ -1050,11 +1050,6 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 			}
 			for listener, counts := range p.attachedRoutes {
 				attachedRoutes[p.NamespacedName][listener] += counts
-
-				// Also set the attached routes on the gateway report itself
-				if gwReport := merged[p.NamespacedName]; gwReport != nil {
-					gwReport.ListenerName(listener).SetAttachedRoutes(counts)
-				}
 			}
 		}
 
