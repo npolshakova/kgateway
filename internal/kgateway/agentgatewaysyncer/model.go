@@ -92,13 +92,23 @@ func (r ADPCacheAddress) Equals(in ADPCacheAddress) bool {
 		r.AddressResourceName == in.AddressResourceName
 }
 
-type ADPResource struct {
-	Resource *api.Resource        `json:"resource"`
-	Gateway  types.NamespacedName `json:"gateway"`
+type ADPResourcesForGateway struct {
+	// agent gateway dataplane resources
+	Resources []*api.Resource
+	// gateway name
+	Gateway types.NamespacedName
+	// status for the gateway
+	report reports.ReportMap
+	// track which routes are attached to the gateway listener for each resource type (HTTPRoute, TCPRoute, etc)
+	attachedRoutes map[string]uint
 }
 
-func (g ADPResource) ResourceName() string {
-	switch t := g.Resource.GetKind().(type) {
+func (g ADPResourcesForGateway) ResourceName() string {
+	return g.Gateway.String()
+}
+
+func getADPResourceName(r *api.Resource) string {
+	switch t := r.GetKind().(type) {
 	case *api.Resource_Bind:
 		return "bind/" + t.Bind.GetKey()
 	case *api.Resource_Listener:
@@ -106,12 +116,17 @@ func (g ADPResource) ResourceName() string {
 	case *api.Resource_Route:
 		return "route/" + t.Route.GetKey()
 	}
-	panic("unknown resource kind")
+	return "unknown/" + r.String()
 }
 
-func (g ADPResource) Equals(other ADPResource) bool {
+func (g ADPResourcesForGateway) Equals(other ADPResourcesForGateway) bool {
 	// Don't compare reports, as they are not part of the ADPResource equality and synced separately
-	return proto.Equal(g.Resource, other.Resource) && g.Gateway == other.Gateway
+	for i := range g.Resources {
+		if !proto.Equal(g.Resources[i], other.Resources[i]) {
+			return false
+		}
+	}
+	return g.Gateway == other.Gateway
 }
 
 // Meta is metadata attached to each configuration unit.

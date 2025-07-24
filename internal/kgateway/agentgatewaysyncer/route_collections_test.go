@@ -656,7 +656,7 @@ func TestADPRouteCollection(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes, gwStatuses := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -664,25 +664,18 @@ func TestADPRouteCollection(t *testing.T) {
 			// Get results
 			results := adpRoutes.List()
 
-			// Verify expected status
-			if len(tc.expectedRoutes) > 0 {
-				for _, gw := range gwStatuses.List() {
-					assert.NotEmpty(t, gw.attachedRoutes)
-					assert.NotEmpty(t, gw.report.HTTPRoutes)
-				}
-			}
-
-			// Verify expected count
-			assert.Equal(t, tc.expectedCount, len(results), "Expected %d routes but got %d", tc.expectedCount, len(results))
-
 			// Create a map of actual routes by key for easy lookup
 			actualRoutes := make(map[string]*api.Route)
 			for _, result := range results {
-				require.NotNil(t, result.Resource, "Resource should not be nil")
-				routeResource := result.Resource.GetRoute()
-				require.NotNil(t, routeResource, "Route resource should not be nil")
-				actualRoutes[routeResource.GetKey()] = routeResource
+				require.NotNil(t, result.Resources, "Resource should not be nil")
+				for _, resource := range result.Resources {
+					routeResource := resource.GetRoute()
+					require.NotNil(t, routeResource, "Route resource should not be nil")
+					actualRoutes[routeResource.GetKey()] = routeResource
+				}
 			}
+			// Verify expected count
+			assert.Equal(t, tc.expectedCount, len(actualRoutes), "Expected %d routes but got %d", tc.expectedCount, len(actualRoutes))
 
 			// Verify each expected route exists in the actual results
 			for _, expectedRoute := range tc.expectedRoutes {
@@ -1259,7 +1252,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes, gwStatuses := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1267,25 +1260,18 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			// Get results
 			results := adpRoutes.List()
 
-			// Verify expected status
-			if len(tc.expectedRoutes) > 0 {
-				for _, gw := range gwStatuses.List() {
-					assert.NotEmpty(t, gw.attachedRoutes)
-					assert.NotEmpty(t, gw.report.GRPCRoutes)
-				}
-			}
-
-			// Verify expected count
-			assert.Equal(t, tc.expectedCount, len(results), "Expected %d routes but got %d", tc.expectedCount, len(results))
-
 			// Create a map of actual routes by key for easy lookup
 			actualRoutes := make(map[string]*api.Route)
 			for _, result := range results {
-				require.NotNil(t, result.Resource, "Resource should not be nil")
-				routeResource := result.Resource.GetRoute()
-				require.NotNil(t, routeResource, "Route resource should not be nil")
-				actualRoutes[routeResource.GetKey()] = routeResource
+				require.NotNil(t, result.Resources, "Resource should not be nil")
+				for _, resource := range result.Resources {
+					routeResource := resource.GetRoute()
+					require.NotNil(t, routeResource, "Route resource should not be nil")
+					actualRoutes[routeResource.GetKey()] = routeResource
+				}
 			}
+			// Verify expected count
+			assert.Equal(t, tc.expectedCount, len(actualRoutes), "Expected %d routes but got %d", tc.expectedCount, len(actualRoutes))
 
 			// Verify each expected route exists in the actual results
 			for _, expectedRoute := range tc.expectedRoutes {
@@ -1560,7 +1546,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			adpRoutes, gwStatuses := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gatewayObjs, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1568,19 +1554,13 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			// Get results
 			results := adpRoutes.List()
 
-			// Verify expected status
-			for _, gw := range gwStatuses.List() {
-				assert.NotEmpty(t, gw.attachedRoutes)
-				assert.NotEmpty(t, gw.report.HTTPRoutes)
-			}
-
 			// Verify we got a result
 			require.Len(t, results, 1, "Expected exactly one route")
 
 			result := results[0]
-			require.NotNil(t, result.Resource, "Resource should not be nil")
+			require.NotNil(t, result.Resources, "Resource should not be nil")
 
-			routeResource := result.Resource.GetRoute()
+			routeResource := result.Resources[0].GetRoute()
 			require.NotNil(t, routeResource, "Route resource should not be nil")
 
 			// Verify filters
@@ -1617,29 +1597,8 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 	}
 }
 
-func TestADPRouteCollectionResourceName(t *testing.T) {
-	// Test that ADPResource implements ResourceName correctly
-	adpResource := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: &api.Route{
-					Key: "test-key",
-				},
-			},
-		},
-		Gateway: types.NamespacedName{
-			Name:      "test-gateway",
-			Namespace: "default",
-		},
-	}
-
-	expectedName := "route/test-key"
-	actualName := adpResource.ResourceName()
-	assert.Equal(t, expectedName, actualName, "Resource name should match expected format")
-}
-
 func TestADPRouteCollectionEquals(t *testing.T) {
-	// Test that ADPResource implements Equals correctly
+	// Test that ADPResourcesForGateway implements Equals correctly
 	route1 := &api.Route{
 		Key:       "test-key",
 		RouteName: "test-route",
@@ -1660,28 +1619,34 @@ func TestADPRouteCollectionEquals(t *testing.T) {
 		Namespace: "default",
 	}
 
-	adpResource1 := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: route1,
+	adpResource1 := ADPResourcesForGateway{
+		Resources: []*api.Resource{
+			{
+				Kind: &api.Resource_Route{
+					Route: route1,
+				},
 			},
 		},
 		Gateway: gateway,
 	}
 
-	adpResource2 := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: route2,
+	adpResource2 := ADPResourcesForGateway{
+		Resources: []*api.Resource{
+			{
+				Kind: &api.Resource_Route{
+					Route: route2,
+				},
 			},
 		},
 		Gateway: gateway,
 	}
 
-	adpResource3 := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: route3,
+	adpResource3 := ADPResourcesForGateway{
+		Resources: []*api.Resource{
+			{
+				Kind: &api.Resource_Route{
+					Route: route3,
+				},
 			},
 		},
 		Gateway: gateway,

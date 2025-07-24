@@ -274,89 +274,6 @@ func TestGetProtocolAndTLSConfig(t *testing.T) {
 	}
 }
 
-func TestADPResourceCreation(t *testing.T) {
-	testCases := []struct {
-		name                 string
-		expectedResource     *api.Resource
-		expectedResourceName string
-	}{
-		{
-			name: "Create Bind resource",
-			expectedResource: &api.Resource{
-				Kind: &api.Resource_Bind{
-					Bind: &api.Bind{
-						Key:  "8080/default/test-gateway",
-						Port: 8080,
-					},
-				},
-			},
-			expectedResourceName: "bind/8080/default/test-gateway",
-		},
-		{
-			name: "Create Listener resource",
-			expectedResource: &api.Resource{
-				Kind: &api.Resource_Listener{
-					Listener: &api.Listener{
-						Key:         "default/test-gateway",
-						Name:        "http",
-						BindKey:     "8080/default/test-gateway",
-						GatewayName: "default/test-gateway",
-						Protocol:    api.Protocol_HTTP,
-						Hostname:    "example.com",
-					},
-				},
-			},
-			expectedResourceName: "listener/default/test-gateway",
-		},
-		{
-			name: "Create Route resource",
-			expectedResource: &api.Resource{
-				Kind: &api.Resource_Route{
-					Route: &api.Route{
-						Key:         "default.test-route.0.0",
-						RouteName:   "default/test-route",
-						ListenerKey: "http",
-						Hostnames:   []string{"example.com"},
-						Matches: []*api.RouteMatch{
-							{
-								Path: &api.PathMatch{
-									Kind: &api.PathMatch_PathPrefix{
-										PathPrefix: "/api",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedResourceName: "route/default.test-route.0.0",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			gateway := types.NamespacedName{
-				Name:      "test-gateway",
-				Namespace: "default",
-			}
-
-			adpResource := ADPResource{
-				Resource: tc.expectedResource,
-				Gateway:  gateway,
-			}
-
-			assert.Equal(t, tc.expectedResourceName, adpResource.ResourceName())
-
-			// Test that two identical resources are equal
-			adpResource2 := ADPResource{
-				Resource: tc.expectedResource,
-				Gateway:  gateway,
-			}
-			assert.True(t, adpResource.Equals(adpResource2))
-		})
-	}
-}
-
 func TestMergeProxyReports(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -552,87 +469,87 @@ func TestMergeProxyReports(t *testing.T) {
 	}
 }
 
-func TestADPResourceEquals(t *testing.T) {
+func TestADPResourcesForGatewayEquals(t *testing.T) {
 	testCases := []struct {
 		name      string
-		resource1 ADPResource
-		resource2 ADPResource
+		resource1 ADPResourcesForGateway
+		resource2 ADPResourcesForGateway
 		expected  bool
 	}{
 		{
 			name: "Equal bind resources",
-			resource1: ADPResource{
-				Resource: &api.Resource{
+			resource1: ADPResourcesForGateway{
+				Resources: []*api.Resource{{
 					Kind: &api.Resource_Bind{
 						Bind: &api.Bind{
 							Key:  "test-key",
 							Port: 8080,
 						},
 					},
-				},
+				}},
 				Gateway: types.NamespacedName{Name: "test", Namespace: "default"},
 			},
-			resource2: ADPResource{
-				Resource: &api.Resource{
+			resource2: ADPResourcesForGateway{
+				Resources: []*api.Resource{{
 					Kind: &api.Resource_Bind{
 						Bind: &api.Bind{
 							Key:  "test-key",
 							Port: 8080,
 						},
 					},
-				},
+				}},
 				Gateway: types.NamespacedName{Name: "test", Namespace: "default"},
 			},
 			expected: true,
 		},
 		{
 			name: "Different gateway",
-			resource1: ADPResource{
-				Resource: &api.Resource{
+			resource1: ADPResourcesForGateway{
+				Resources: []*api.Resource{{
 					Kind: &api.Resource_Bind{
 						Bind: &api.Bind{
 							Key:  "test-key",
 							Port: 8080,
 						},
 					},
-				},
+				}},
 				Gateway: types.NamespacedName{Name: "test", Namespace: "default"},
 			},
-			resource2: ADPResource{
-				Resource: &api.Resource{
+			resource2: ADPResourcesForGateway{
+				Resources: []*api.Resource{{
 					Kind: &api.Resource_Bind{
 						Bind: &api.Bind{
 							Key:  "test-key",
 							Port: 8080,
 						},
 					},
-				},
+				}},
 				Gateway: types.NamespacedName{Name: "other", Namespace: "default"},
 			},
 			expected: false,
 		},
 		{
 			name: "Different resource port",
-			resource1: ADPResource{
-				Resource: &api.Resource{
+			resource1: ADPResourcesForGateway{
+				Resources: []*api.Resource{{
 					Kind: &api.Resource_Bind{
 						Bind: &api.Bind{
 							Key:  "test-key",
 							Port: 8080,
 						},
 					},
-				},
+				}},
 				Gateway: types.NamespacedName{Name: "test", Namespace: "default"},
 			},
-			resource2: ADPResource{
-				Resource: &api.Resource{
+			resource2: ADPResourcesForGateway{
+				Resources: []*api.Resource{{
 					Kind: &api.Resource_Bind{
 						Bind: &api.Bind{
 							Key:  "test-key",
 							Port: 9090,
 						},
 					},
-				},
+				}},
 				Gateway: types.NamespacedName{Name: "test", Namespace: "default"},
 			},
 			expected: false,
@@ -641,7 +558,7 @@ func TestADPResourceEquals(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := proto.Equal(tc.resource1.Resource, tc.resource2.Resource) && tc.resource1.Gateway == tc.resource2.Gateway
+			result := proto.Equal(tc.resource1.Resources[0], tc.resource2.Resources[0]) && tc.resource1.Gateway == tc.resource2.Gateway
 			assert.Equal(t, tc.expected, result)
 		})
 	}

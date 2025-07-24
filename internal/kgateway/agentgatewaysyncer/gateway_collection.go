@@ -22,21 +22,43 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
-func toResourcep(gw types.NamespacedName, t any) *ADPResource {
-	res := toResource(gw, t)
+func toResourcepWithRoutes(gw types.NamespacedName, resources []*api.Resource, attachedRoutes map[string]uint, rm reports.ReportMap) *ADPResourcesForGateway {
+	res := toResourceWithRoutes(gw, resources, attachedRoutes, rm)
 	return &res
 }
 
-func toResource(gw types.NamespacedName, t any) ADPResource {
+func toResourcep(gw types.NamespacedName, resources []*api.Resource, rm reports.ReportMap) *ADPResourcesForGateway {
+	res := toResource(gw, resources, rm)
+	return &res
+}
+
+func toADPResource(t any) *api.Resource {
 	switch tt := t.(type) {
 	case Bind:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}, Gateway: gw}
+		return &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}
 	case ADPListener:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}, Gateway: gw}
+		return &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}
 	case ADPRoute:
-		return ADPResource{Resource: &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}, Gateway: gw}
+		return &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}
 	}
 	panic("unknown resource kind")
+}
+
+func toResourceWithRoutes(gw types.NamespacedName, resources []*api.Resource, attachedRoutes map[string]uint, rm reports.ReportMap) ADPResourcesForGateway {
+	return ADPResourcesForGateway{
+		Resources:      resources,
+		Gateway:        gw,
+		report:         rm,
+		attachedRoutes: attachedRoutes,
+	}
+}
+
+func toResource(gw types.NamespacedName, resources []*api.Resource, rm reports.ReportMap) ADPResourcesForGateway {
+	return ADPResourcesForGateway{
+		Resources: resources,
+		Gateway:   gw,
+		report:    rm,
+	}
 }
 
 type Bind struct {
@@ -94,12 +116,16 @@ func (g PortBindings) Equals(other PortBindings) bool {
 		g.Port == other.Port
 }
 
+// TODO: rename
+// Gateway is a wrapper type that contains the listener on the gateway, as well as the status for the listener
 type Gateway struct {
 	*Config
 	parent     parentKey
 	parentInfo parentInfo
 	TLSInfo    *TLSInfo
 	Valid      bool
+	// status for the gateway listener
+	report reports.ReportMap
 }
 
 func (g Gateway) ResourceName() string {
@@ -121,10 +147,10 @@ func GatewayCollection(
 	secrets krt.Collection[*corev1.Secret],
 	domainSuffix string,
 	krtopts krtutil.KrtOptions,
-) (krt.Collection[Gateway], reports.ReportMap) {
-	rm := reports.NewReportMap()
-	statusReporter := reports.NewReporter(&rm)
+) krt.Collection[Gateway] {
 	gw := krt.NewManyCollection(gateways, func(ctx krt.HandlerContext, obj *gwv1.Gateway) []Gateway {
+		rm := reports.NewReportMap()
+		statusReporter := reports.NewReporter(&rm)
 		gwReporter := statusReporter.Gateway(obj)
 		logger.Debug("translating Gateway", "gw_name", obj.GetName(), "resource_version", obj.GetResourceVersion())
 
@@ -214,19 +240,19 @@ func GatewayCollection(
 				TLSInfo:    tlsInfo,
 				parent:     ref,
 				parentInfo: pri,
+				report:     rm,
 			}
+			gwReporter.SetCondition(reporter.GatewayCondition{
+				Type:   gwv1.GatewayConditionAccepted,
+				Status: metav1.ConditionTrue,
+				Reason: gwv1.GatewayReasonAccepted,
+			})
 			result = append(result, res)
 		}
-
-		gwReporter.SetCondition(reporter.GatewayCondition{
-			Type:   gwv1.GatewayConditionAccepted,
-			Status: metav1.ConditionTrue,
-			Reason: gwv1.GatewayReasonAccepted,
-		})
 		return result
 	}, krtopts.ToOptions("KubernetesGateway")...)
 
-	return gw, rm
+	return gw
 }
 
 // RouteParents holds information about things routes can reference as parents.
