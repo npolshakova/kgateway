@@ -401,8 +401,9 @@ func (s *AgentGwSyncer) buildADPResources(
 
 	// Build backends
 	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []ADPResource {
-		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, repMap)
+		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces, inputs.HTTPRoutes, repMap)
 	}, krtopts.ToOptions("ADPBackends")...)
+	logger.Debug("backends", "backends", backends)
 
 	// Build routes
 	routeParents := BuildRouteParents(gateways)
@@ -452,9 +453,59 @@ const (
 	mcpProtocol = "kgateway.dev/mcp"
 )
 
+// findParentGatewaysForBackend finds the gateways associated with a backend by
+// 1. traversing all routes and filtering to only those that reference the backend
+// 2. for each route referencing the backend, find the parent gateways
+// 3. return the set of parent gateways
+func (s *AgentGwSyncer) findParentGatewaysForBackend(
+	ctx krt.HandlerContext,
+	backend *v1alpha1.Backend,
+	httpRoutes krt.Collection[*gwv1.HTTPRoute],
+) sets.Set[types.NamespacedName] {
+	gateways := sets.New[types.NamespacedName]()
+	backendKey := types.NamespacedName{Name: backend.Name, Namespace: backend.Namespace}
+
+	allHTTPRoutes := krt.Fetch(ctx, httpRoutes)
+	for _, route := range allHTTPRoutes {
+		for _, rule := range route.Spec.Rules {
+			for _, backendRef := range rule.BackendRefs {
+				ref := backendRef.BackendObjectReference
+				if ref.Group != nil && string(*ref.Group) == v1alpha1.GroupName &&
+					ref.Kind != nil && string(*ref.Kind) == "Backend" {
+					refNamespace := route.Namespace
+					if ref.Namespace != nil {
+						refNamespace = string(*ref.Namespace)
+					}
+
+					if ref.Name == gwv1.ObjectName(backendKey.Name) && refNamespace == backendKey.Namespace {
+						for _, parentRef := range route.Spec.ParentRefs {
+							parentNamespace := route.Namespace
+							if parentRef.Namespace != nil {
+								parentNamespace = string(*parentRef.Namespace)
+							}
+							gateways.Insert(types.NamespacedName{
+								Name:      string(parentRef.Name),
+								Namespace: parentNamespace,
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+	return gateways
+}
+
 // buildBackendFromBackend creates a backend resource
-func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace], repMap reports.ReportMap) []ADPResource {
+func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace], httpRoutes krt.Collection[*gwv1.HTTPRoute], repMap reports.ReportMap) []ADPResource {
 	var results []ADPResource
+
+	parentGateways := s.findParentGatewaysForBackend(ctx, obj, httpRoutes)
+	if parentGateways.Len() == 0 {
+		logger.Debug("no gateways found for backend", "backend", obj.Name)
+		return nil
+	}
+
 	// Translate the backend type from Kubernetes Backend to agentgateway API
 	switch obj.Spec.Type {
 	case v1alpha1.BackendTypeAI:
@@ -485,10 +536,9 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 			},
 		}
 		logger.Debug("creating AI backend", "backend", obj.Name)
-		results = append(results, toResourceWithReports(types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
-		}, ADPBackend{aiBackend}, repMap))
+		for gw := range parentGateways {
+			results = append(results, toResourceWithReports(gw, ADPBackend{aiBackend}, repMap))
+		}
 	case v1alpha1.BackendTypeStatic:
 		if len(obj.Spec.Static.Hosts) > 1 {
 			// TODO: support multiple hosts
@@ -506,10 +556,9 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 			},
 		}
 		logger.Debug("creating static backend", "backend", staticBackend)
-		results = append(results, toResourceWithReports(types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
-		}, ADPBackend{staticBackend}, repMap))
+		for gw := range parentGateways {
+			results = append(results, toResourceWithReports(gw, ADPBackend{staticBackend}, repMap))
+		}
 	case v1alpha1.BackendTypeMCP:
 		// Convert Kubernetes MCP targets to agentgateway format
 		var mcpTargets []*api.MCPTarget
@@ -641,10 +690,9 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 			},
 		}
 
-		results = append(results, toResourceWithReports(types.NamespacedName{
-			Namespace: obj.Namespace,
-			Name:      obj.Name,
-		}, ADPBackend{mcpBackend}, repMap))
+		for gw := range parentGateways {
+			results = append(results, toResourceWithReports(gw, ADPBackend{mcpBackend}, repMap))
+		}
 	}
 
 	return results
