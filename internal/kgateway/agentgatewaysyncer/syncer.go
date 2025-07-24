@@ -107,7 +107,8 @@ type agentGwXdsResources struct {
 	types.NamespacedName
 
 	// Status reports for this gateway
-	reports reports.ReportMap
+	reports        reports.ReportMap
+	attachedRoutes map[string]uint
 
 	// Resources config for gateway (Bind, Listener, Route)
 	ResourceConfig envoycache.Resources
@@ -123,7 +124,7 @@ func (r agentGwXdsResources) ResourceName() string {
 
 func (r agentGwXdsResources) Equals(in agentGwXdsResources) bool {
 	return r.NamespacedName == in.NamespacedName &&
-		report{r.reports}.Equals(report{in.reports}) &&
+		report{reportMap: r.reports, attachedRoutes: r.attachedRoutes}.Equals(report{reportMap: in.reports, attachedRoutes: in.attachedRoutes}) &&
 		r.ResourceConfig.Version == in.ResourceConfig.Version &&
 		r.AddressConfig.Version == in.AddressConfig.Version
 }
@@ -180,7 +181,8 @@ var _ envoytypes.ResourceWithName = envoyResourceWithCustomName{}
 
 type report struct {
 	// lower case so krt doesn't error in debug handler
-	reportMap reports.ReportMap
+	reportMap      reports.ReportMap
+	attachedRoutes map[string]uint
 }
 
 func (r report) ResourceName() string {
@@ -550,6 +552,7 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway]
 		gwReports := reports.NewReportMap()
 
 		var cacheResources []envoytypes.Resource
+		attachedRoutes := make(map[string]uint)
 		// Use index to fetch only resources for this gateway instead of all resources
 		resourceList := krt.Fetch(kctx, adpResources, krt.FilterIndex(adpResourcesByGateway, gwNamespacedName))
 		for _, resource := range resourceList {
@@ -577,17 +580,15 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway]
 				maps.Copy(gwReports.Policies[key].Ancestors, rr.Ancestors)
 			}
 
-			// Set the aggregated count for each listener
-			for listenerName, count := range resource.attachedRoutes {
-				gwReports.GatewayNamespaceName(gwNamespacedName).ListenerName(listenerName).SetAttachedRoutes(count)
-			}
-
 			for _, res := range resource.Resources {
 				cacheResources = append(cacheResources, &envoyResourceWithCustomName{
 					Message: res,
 					Name:    getADPResourceName(res),
 					version: utils.HashProto(res),
 				})
+				for listenerName, count := range resource.attachedRoutes {
+					attachedRoutes[listenerName] += count
+				}
 			}
 		}
 
@@ -605,6 +606,7 @@ func (s *AgentGwSyncer) buildXDSCollection(gateway krt.Collection[*gwv1.Gateway]
 		result := &agentGwXdsResources{
 			NamespacedName: gwNamespacedName,
 			reports:        gwReports,
+			attachedRoutes: attachedRoutes,
 			ResourceConfig: envoycache.NewResources(fmt.Sprintf("%d", resourceVersion), cacheResources),
 			AddressConfig:  envoycache.NewResources(fmt.Sprintf("%d", addrVersion), envoytypesAddresses),
 		}
@@ -619,7 +621,7 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 	s.statusReport = krt.NewSingleton(func(kctx krt.HandlerContext) *report {
 		proxies := krt.Fetch(kctx, s.xDS)
 		merged := mergeProxyReports(proxies)
-		return &report{merged}
+		return &report{reportMap: merged}
 	})
 }
 
@@ -1006,6 +1008,11 @@ func mergeProxyReports(proxies []agentGwXdsResources) reports.ReportMap {
 	for _, p := range proxies {
 		// 1. merge GW Reports for all Proxies' status reports
 		maps.Copy(merged.Gateways, p.reports.Gateways)
+
+		// set the attached routes
+		for listener, counts := range p.attachedRoutes {
+			merged.GatewayNamespaceName(p.NamespacedName).ListenerName(listener).SetAttachedRoutes(counts)
+		}
 
 		// 2. merge LS Reports for all Proxies' status reports
 		maps.Copy(merged.ListenerSets, p.reports.ListenerSets)

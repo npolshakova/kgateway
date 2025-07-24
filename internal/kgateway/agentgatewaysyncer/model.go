@@ -9,7 +9,6 @@ import (
 
 	"github.com/agentgateway/agentgateway/go/api"
 	udpa "github.com/cncf/xds/go/udpa/type/v1"
-	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"istio.io/istio/pkg/config/schema/kind"
@@ -50,25 +49,6 @@ func (key ConfigKey) String() string {
 	return key.Kind.String() + "/" + key.Namespace + "/" + key.Name
 }
 
-type ADPCacheResource struct {
-	Gateway types.NamespacedName `json:"gateway"`
-	reports reports.ReportMap
-
-	Resources envoycache.Resources
-
-	VersionMap map[string]map[string]string
-}
-
-func (r ADPCacheResource) ResourceName() string {
-	return fmt.Sprintf("%s~%s", r.Gateway.Namespace, r.Gateway.Name)
-}
-
-func (r ADPCacheResource) Equals(in ADPCacheResource) bool {
-	return r.Gateway == in.Gateway &&
-		report{r.reports}.Equals(report{in.reports}) &&
-		r.Resources.Version == in.Resources.Version
-}
-
 type ADPCacheAddress struct {
 	NamespacedName types.NamespacedName
 
@@ -85,7 +65,7 @@ func (r ADPCacheAddress) ResourceName() string {
 }
 
 func (r ADPCacheAddress) Equals(in ADPCacheAddress) bool {
-	return report{r.reports}.Equals(report{in.reports}) &&
+	return report{reportMap: r.reports}.Equals(report{reportMap: in.reports}) &&
 		r.NamespacedName.Name == in.NamespacedName.Name && r.NamespacedName.Namespace == in.NamespacedName.Namespace &&
 		proto.Equal(r.Address, in.Address) &&
 		r.AddressVersion == in.AddressVersion &&
