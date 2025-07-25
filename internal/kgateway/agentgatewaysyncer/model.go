@@ -5,6 +5,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
@@ -84,7 +85,16 @@ type ADPResourcesForGateway struct {
 }
 
 func (g ADPResourcesForGateway) ResourceName() string {
-	return g.Gateway.String()
+	// need a unique name per resource
+	return g.Gateway.String() + getResourceListName(g.Resources)
+}
+
+func getResourceListName(resources []*api.Resource) string {
+	names := make([]string, len(resources))
+	for i, res := range resources {
+		names[i] = getADPResourceName(res)
+	}
+	return strings.Join(names, ",")
 }
 
 func getADPResourceName(r *api.Resource) string {
@@ -107,6 +117,9 @@ func (g ADPResourcesForGateway) Equals(other ADPResourcesForGateway) bool {
 		if !proto.Equal(g.Resources[i], other.Resources[i]) {
 			return false
 		}
+	}
+	if !maps.Equal(g.attachedRoutes, other.attachedRoutes) {
+		return false
 	}
 	return g.Gateway == other.Gateway
 }
