@@ -17,7 +17,6 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
@@ -33,7 +32,7 @@ func TestADPRouteCollection(t *testing.T) {
 		httpRoutes     []*gwv1.HTTPRoute
 		services       []*corev1.Service
 		namespaces     []*corev1.Namespace
-		gateways       []Gateway
+		gateways       []GatewayListener
 		refGrants      []ReferenceGrant
 		expectedCount  int
 		expectedRoutes []*api.Route
@@ -102,7 +101,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -254,7 +253,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -395,7 +394,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -521,7 +520,7 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -589,7 +588,7 @@ func TestADPRouteCollection(t *testing.T) {
 			httpRoutes:     []*gwv1.HTTPRoute{},
 			services:       []*corev1.Service{},
 			namespaces:     []*corev1.Namespace{},
-			gateways:       []Gateway{},
+			gateways:       []GatewayListener{},
 			refGrants:      []ReferenceGrant{},
 			expectedCount:  0,
 			expectedRoutes: []*api.Route{},
@@ -618,7 +617,7 @@ func TestADPRouteCollection(t *testing.T) {
 
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
-			gateways := krttest.GetMockCollection[Gateway](mock)
+			gateways := krttest.GetMockCollection[GatewayListener](mock)
 			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
@@ -631,7 +630,6 @@ func TestADPRouteCollection(t *testing.T) {
 			inferencePools := krttest.GetMockCollection[*inf.InferencePool](mock)
 
 			// Wait for collections to sync
-			gateways.WaitUntilSynced(context.Background().Done())
 			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
@@ -658,9 +656,7 @@ func TestADPRouteCollection(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			rm := reports.NewReportMap()
-			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -668,17 +664,18 @@ func TestADPRouteCollection(t *testing.T) {
 			// Get results
 			results := adpRoutes.List()
 
-			// Verify expected count
-			assert.Equal(t, tc.expectedCount, len(results), "Expected %d routes but got %d", tc.expectedCount, len(results))
-
 			// Create a map of actual routes by key for easy lookup
 			actualRoutes := make(map[string]*api.Route)
 			for _, result := range results {
-				require.NotNil(t, result.Resource, "Resource should not be nil")
-				routeResource := result.Resource.GetRoute()
-				require.NotNil(t, routeResource, "Route resource should not be nil")
-				actualRoutes[routeResource.GetKey()] = routeResource
+				require.NotNil(t, result.Resources, "Resource should not be nil")
+				for _, resource := range result.Resources {
+					routeResource := resource.GetRoute()
+					require.NotNil(t, routeResource, "Route resource should not be nil")
+					actualRoutes[routeResource.GetKey()] = routeResource
+				}
 			}
+			// Verify expected count
+			assert.Equal(t, tc.expectedCount, len(actualRoutes), "Expected %d routes but got %d", tc.expectedCount, len(actualRoutes))
 
 			// Verify each expected route exists in the actual results
 			for _, expectedRoute := range tc.expectedRoutes {
@@ -750,7 +747,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 		grpcRoutes     []*gwv1.GRPCRoute
 		services       []*corev1.Service
 		namespaces     []*corev1.Namespace
-		gateways       []Gateway
+		gateways       []GatewayListener
 		refGrants      []ReferenceGrant
 		expectedCount  int
 		expectedRoutes []*api.Route
@@ -819,7 +816,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -971,7 +968,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -1119,7 +1116,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 				},
 			},
-			gateways: []Gateway{
+			gateways: []GatewayListener{
 				{
 					Config: &Config{
 						Meta: Meta{
@@ -1187,7 +1184,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			grpcRoutes:     []*gwv1.GRPCRoute{},
 			services:       []*corev1.Service{},
 			namespaces:     []*corev1.Namespace{},
-			gateways:       []Gateway{},
+			gateways:       []GatewayListener{},
 			refGrants:      []ReferenceGrant{},
 			expectedCount:  0,
 			expectedRoutes: []*api.Route{},
@@ -1216,7 +1213,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
-			gateways := krttest.GetMockCollection[Gateway](mock)
+			gateways := krttest.GetMockCollection[GatewayListener](mock)
 			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
@@ -1229,7 +1226,6 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			inferencePools := krttest.GetMockCollection[*inf.InferencePool](mock)
 
 			// Wait for collections to sync
-			gateways.WaitUntilSynced(context.Background().Done())
 			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
@@ -1256,9 +1252,7 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			rm := reports.NewReportMap()
-			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1266,17 +1260,18 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 			// Get results
 			results := adpRoutes.List()
 
-			// Verify expected count
-			assert.Equal(t, tc.expectedCount, len(results), "Expected %d routes but got %d", tc.expectedCount, len(results))
-
 			// Create a map of actual routes by key for easy lookup
 			actualRoutes := make(map[string]*api.Route)
 			for _, result := range results {
-				require.NotNil(t, result.Resource, "Resource should not be nil")
-				routeResource := result.Resource.GetRoute()
-				require.NotNil(t, routeResource, "Route resource should not be nil")
-				actualRoutes[routeResource.GetKey()] = routeResource
+				require.NotNil(t, result.Resources, "Resource should not be nil")
+				for _, resource := range result.Resources {
+					routeResource := resource.GetRoute()
+					require.NotNil(t, routeResource, "Route resource should not be nil")
+					actualRoutes[routeResource.GetKey()] = routeResource
+				}
 			}
+			// Verify expected count
+			assert.Equal(t, tc.expectedCount, len(actualRoutes), "Expected %d routes but got %d", tc.expectedCount, len(actualRoutes))
 
 			// Verify each expected route exists in the actual results
 			for _, expectedRoute := range tc.expectedRoutes {
@@ -1479,7 +1474,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 				},
 			}
 
-			gateway := Gateway{
+			gateway := GatewayListener{
 				Config: &Config{
 					Meta: Meta{
 						Name:      "test-gateway",
@@ -1512,7 +1507,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 
 			// Create mock collections
 			mock := krttest.NewMock(t, inputs)
-			gateways := krttest.GetMockCollection[Gateway](mock)
+			gateways := krttest.GetMockCollection[GatewayListener](mock)
 			gatewayObjs := krttest.GetMockCollection[*gwv1.Gateway](mock)
 			httpRoutes := krttest.GetMockCollection[*gwv1.HTTPRoute](mock)
 			grpcRoutes := krttest.GetMockCollection[*gwv1.GRPCRoute](mock)
@@ -1525,7 +1520,6 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			inferencePools := krttest.GetMockCollection[*inf.InferencePool](mock)
 
 			// Wait for collections to sync
-			gateways.WaitUntilSynced(context.Background().Done())
 			gatewayObjs.WaitUntilSynced(context.Background().Done())
 			httpRoutes.WaitUntilSynced(context.Background().Done())
 			grpcRoutes.WaitUntilSynced(context.Background().Done())
@@ -1552,9 +1546,7 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			krtopts := krtutil.KrtOptions{}
 
 			// Call ADPRouteCollection
-			rm := reports.NewReportMap()
-			rep := reports.NewReporter(&rm)
-			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, gateways, gatewayObjs, routeInputs, krtopts, rm, rep, pluginsdk.Plugin{})
+			adpRoutes := ADPRouteCollection(httpRoutes, grpcRoutes, tcpRoutes, tlsRoutes, routeInputs, krtopts, pluginsdk.Plugin{})
 
 			// Wait for the collection to process
 			adpRoutes.WaitUntilSynced(context.Background().Done())
@@ -1566,9 +1558,9 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 			require.Len(t, results, 1, "Expected exactly one route")
 
 			result := results[0]
-			require.NotNil(t, result.Resource, "Resource should not be nil")
+			require.NotNil(t, result.Resources, "Resource should not be nil")
 
-			routeResource := result.Resource.GetRoute()
+			routeResource := result.Resources[0].GetRoute()
 			require.NotNil(t, routeResource, "Route resource should not be nil")
 
 			// Verify filters
@@ -1605,29 +1597,8 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 	}
 }
 
-func TestADPRouteCollectionResourceName(t *testing.T) {
-	// Test that ADPResource implements ResourceName correctly
-	adpResource := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: &api.Route{
-					Key: "test-key",
-				},
-			},
-		},
-		Gateway: types.NamespacedName{
-			Name:      "test-gateway",
-			Namespace: "default",
-		},
-	}
-
-	expectedName := "route/test-key"
-	actualName := adpResource.ResourceName()
-	assert.Equal(t, expectedName, actualName, "Resource name should match expected format")
-}
-
 func TestADPRouteCollectionEquals(t *testing.T) {
-	// Test that ADPResource implements Equals correctly
+	// Test that ADPResourcesForGateway implements Equals correctly
 	route1 := &api.Route{
 		Key:       "test-key",
 		RouteName: "test-route",
@@ -1648,28 +1619,34 @@ func TestADPRouteCollectionEquals(t *testing.T) {
 		Namespace: "default",
 	}
 
-	adpResource1 := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: route1,
+	adpResource1 := ADPResourcesForGateway{
+		Resources: []*api.Resource{
+			{
+				Kind: &api.Resource_Route{
+					Route: route1,
+				},
 			},
 		},
 		Gateway: gateway,
 	}
 
-	adpResource2 := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: route2,
+	adpResource2 := ADPResourcesForGateway{
+		Resources: []*api.Resource{
+			{
+				Kind: &api.Resource_Route{
+					Route: route2,
+				},
 			},
 		},
 		Gateway: gateway,
 	}
 
-	adpResource3 := ADPResource{
-		Resource: &api.Resource{
-			Kind: &api.Resource_Route{
-				Route: route3,
+	adpResource3 := ADPResourcesForGateway{
+		Resources: []*api.Resource{
+			{
+				Kind: &api.Resource_Route{
+					Route: route3,
+				},
 			},
 		},
 		Gateway: gateway,
