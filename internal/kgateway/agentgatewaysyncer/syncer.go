@@ -510,9 +510,9 @@ func (s *AgentGwSyncer) buildADPResources(
 }
 
 // buildBackendCollections builds a collection of all backend resources
-func (s *AgentGwSyncer) buildBackendCollections(inputs Inputs, krtopts krtutil.KrtOptions) krt.Collection[*envoyResourceWithCustomName] {
+func (s *AgentGwSyncer) buildBackendCollections(inputs Inputs, krtopts krtutil.KrtOptions) krt.Collection[envoyResourceWithCustomName] {
 	// Build backends
-	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []*envoyResourceWithCustomName {
+	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []envoyResourceWithCustomName {
 		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces)
 	}, krtopts.ToOptions("ADPBackends")...)
 	logger.Debug("backends", "backends", backends)
@@ -551,8 +551,8 @@ const (
 )
 
 // buildBackendFromBackend creates a backend resource
-func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace]) []*envoyResourceWithCustomName {
-	var results []*envoyResourceWithCustomName
+func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1alpha1.Backend, svcCol krt.Collection[*corev1.Service], nsCol krt.Collection[*corev1.Namespace]) []envoyResourceWithCustomName {
+	var results []envoyResourceWithCustomName
 	// Translate the backend type from Kubernetes Backend to agentgateway API
 	// TODO (Jmcguire98): this should all be moved into the plugin system
 	// after we have validated the approach with static backends
@@ -590,7 +590,7 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 				Backend: aiBackend,
 			},
 		}
-		results = append(results, &envoyResourceWithCustomName{
+		results = append(results, envoyResourceWithCustomName{
 			Message: resourceWrapper,
 			Name:    aiBackend.Name,
 			version: utils.HashProto(resourceWrapper),
@@ -613,7 +613,7 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 				Backend: backend,
 			},
 		}
-		results = append(results, &envoyResourceWithCustomName{
+		results = append(results, envoyResourceWithCustomName{
 			Message: resourceWrapper,
 			Name:    backend.Name,
 			version: utils.HashProto(resourceWrapper),
@@ -641,7 +641,7 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 							Backend: staticBackend,
 						},
 					}
-					results = append(results, &envoyResourceWithCustomName{
+					results = append(results, envoyResourceWithCustomName{
 						Message: resourceWrapper,
 						Name:    staticBackend.Name,
 						version: utils.HashProto(resourceWrapper),
@@ -760,7 +760,7 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 				Backend: mcpBackend,
 			},
 		}
-		results = append(results, &envoyResourceWithCustomName{
+		results = append(results, envoyResourceWithCustomName{
 			Message: resourceWrapper,
 			Name:    mcpBackend.Name,
 			version: utils.HashProto(resourceWrapper),
@@ -940,7 +940,7 @@ func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.K
 	}, krtopts.ToOptions("XDSAddresses")...)
 }
 
-func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[*envoyResourceWithCustomName], xdsAddresses krt.Collection[envoyResourceWithCustomName]) {
+func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[envoyResourceWithCustomName], xdsAddresses krt.Collection[envoyResourceWithCustomName]) {
 	// Create an index on adpResources by Gateway to avoid fetching all resources
 	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResourcesForGateway) []types.NamespacedName {
 		return []types.NamespacedName{resource.Gateway}
@@ -952,7 +952,7 @@ func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResour
 		cacheAddresses := krt.Fetch(kctx, xdsAddresses)
 		envoytypesAddresses := make([]envoytypes.Resource, 0, len(cacheAddresses))
 		for _, addr := range cacheAddresses {
-			envoytypesAddresses = append(envoytypesAddresses, addr)
+			envoytypesAddresses = append(envoytypesAddresses, &addr)
 		}
 
 		// Create a copy of the shared ReportMap to avoid concurrent modification
@@ -1002,7 +1002,7 @@ func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResour
 		// Fetch all backends and add them to the resources for every gateway
 		cachedBackends := krt.Fetch(kctx, adpBackends)
 		for _, backend := range cachedBackends {
-			cacheResources = append(cacheResources, backend)
+			cacheResources = append(cacheResources, &backend)
 		}
 
 		// Create the resource wrappers
@@ -1096,7 +1096,7 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 	s.routeReports = routeReports
 }
 
-func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[GatewayListener], adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[*envoyResourceWithCustomName], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
+func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[GatewayListener], adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[envoyResourceWithCustomName], addresses krt.Collection[envoyResourceWithCustomName], inputs Inputs) {
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
 		gateways.HasSynced,

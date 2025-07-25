@@ -71,6 +71,7 @@ spec:
 #          port: 8000
 #          protocol: StreamableHTTP
 ---
+# curl localhost:8080/sse -v -H "host: www.example.com"
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
 metadata:
