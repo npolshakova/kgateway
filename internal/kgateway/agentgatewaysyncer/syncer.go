@@ -13,6 +13,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	envoytypes "github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
@@ -650,7 +651,9 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 					mcpTarget := &api.MCPTarget{
 						Name: targetSelector.StaticTarget.Name,
 						Port: targetSelector.StaticTarget.Port, // TODO: which port should be set (static vs. parent)?
-						Kind: &api.MCPTarget_Backend{Backend: staticBackendRef},
+						Kind: &api.BackendReference{Kind: &api.BackendReference_Backend{
+							Backend: staticBackendRef,
+						}},
 					}
 
 					// Convert protocol if specified
@@ -730,8 +733,8 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext, obj *v1a
 							mcpTarget := &api.MCPTarget{
 								Name: service.Name + "-" + port.Name,
 								Port: port.Port,
-								Kind: &api.MCPTarget_Service{
-									Service: service.Namespace + "/" + service.Name,
+								Kind: &api.BackendReference{
+									Kind: &api.BackendReference_Service{Service: service.Namespace + "/" + service.Name},
 								},
 							}
 
@@ -779,9 +782,11 @@ func (s *AgentGwSyncer) buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AI
 	provider := llm.Provider
 
 	if provider.OpenAI != nil {
-		model := ""
+		var model *wrappers.StringValue
 		if provider.OpenAI.Model != nil {
-			model = *provider.OpenAI.Model
+			model = &wrappers.StringValue{
+				Value: *provider.OpenAI.Model,
+			}
 		}
 		aiBackend.Provider = &api.AIBackend_Openai{
 			Openai: &api.AIBackend_OpenAI{
@@ -789,10 +794,11 @@ func (s *AgentGwSyncer) buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AI
 			},
 		}
 	} else if provider.AzureOpenAI != nil {
-		// TODO: is this the same as open ai
-		model := ""
+		var model *wrappers.StringValue
 		if provider.OpenAI.Model != nil {
-			model = *provider.OpenAI.Model
+			model = &wrappers.StringValue{
+				Value: *provider.OpenAI.Model,
+			}
 		}
 		aiBackend.Provider = &api.AIBackend_Openai{
 			Openai: &api.AIBackend_OpenAI{
@@ -800,9 +806,11 @@ func (s *AgentGwSyncer) buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AI
 			},
 		}
 	} else if provider.Anthropic != nil {
-		model := ""
+		var model *wrappers.StringValue
 		if provider.Anthropic.Model != nil {
-			model = *provider.Anthropic.Model
+			model = &wrappers.StringValue{
+				Value: *provider.Anthropic.Model,
+			}
 		}
 		aiBackend.Provider = &api.AIBackend_Anthropic_{
 			Anthropic: &api.AIBackend_Anthropic{
@@ -810,14 +818,18 @@ func (s *AgentGwSyncer) buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AI
 			},
 		}
 	} else if provider.Gemini != nil {
-		model := provider.Gemini.Model
+		model := &wrappers.StringValue{
+			Value: provider.Gemini.Model,
+		}
 		aiBackend.Provider = &api.AIBackend_Gemini_{
 			Gemini: &api.AIBackend_Gemini{
 				Model: model,
 			},
 		}
 	} else if provider.VertexAI != nil {
-		model := provider.VertexAI.Model
+		model := &wrappers.StringValue{
+			Value: provider.VertexAI.Model,
+		}
 		aiBackend.Provider = &api.AIBackend_Vertex_{
 			Vertex: &api.AIBackend_Vertex{
 				Model: model,
