@@ -364,6 +364,11 @@ func sortTranslationResult(tr *translationResult) *translationResult {
 		return tr.Backends[i].GetName() < tr.Backends[j].GetName()
 	})
 
+	// Sort addresses
+	sort.Slice(tr.Addresses, func(i, j int) bool {
+		return tr.Addresses[i].String() < tr.Addresses[j].String()
+	})
+
 	return tr
 }
 
