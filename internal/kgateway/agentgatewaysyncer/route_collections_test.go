@@ -157,6 +157,185 @@ func TestADPRouteCollection(t *testing.T) {
 			},
 		},
 		{
+			name: "Two HTTP routes on same gateway",
+			httpRoutes: []*gwv1.HTTPRoute{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-route-1",
+						Namespace: "default",
+					},
+					Spec: gwv1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
+								{
+									Name: "test-gateway",
+								},
+							},
+						},
+						Hostnames: []gwv1.Hostname{"example.com"},
+						Rules: []gwv1.HTTPRouteRule{
+							{
+								Matches: []gwv1.HTTPRouteMatch{
+									{
+										Path: &gwv1.HTTPPathMatch{
+											Type:  ptr.To(gwv1.PathMatchPathPrefix),
+											Value: ptr.To("/api"),
+										},
+									},
+								},
+								BackendRefs: []gwv1.HTTPBackendRef{
+									{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
+												Name: "test-service",
+												Port: ptr.To(gwv1.PortNumber(80)),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-route-2",
+						Namespace: "default",
+					},
+					Spec: gwv1.HTTPRouteSpec{
+						CommonRouteSpec: gwv1.CommonRouteSpec{
+							ParentRefs: []gwv1.ParentReference{
+								{
+									Name: "test-gateway",
+								},
+							},
+						},
+						Hostnames: []gwv1.Hostname{"example2.com"},
+						Rules: []gwv1.HTTPRouteRule{
+							{
+								Matches: []gwv1.HTTPRouteMatch{
+									{
+										Path: &gwv1.HTTPPathMatch{
+											Type:  ptr.To(gwv1.PathMatchPathPrefix),
+											Value: ptr.To("/api2"),
+										},
+									},
+								},
+								BackendRefs: []gwv1.HTTPBackendRef{
+									{
+										BackendRef: gwv1.BackendRef{
+											BackendObjectReference: gwv1.BackendObjectReference{
+												Name: "test-service",
+												Port: ptr.To(gwv1.PortNumber(80)),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			services: []*corev1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-service",
+						Namespace: "default",
+					},
+					Spec: corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{
+							{
+								Port: 80,
+							},
+						},
+					},
+				},
+			},
+			namespaces: []*corev1.Namespace{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "default",
+					},
+				},
+			},
+			gateways: []GatewayListener{
+				{
+					Config: &Config{
+						Meta: Meta{
+							Name:      "test-gateway",
+							Namespace: "default",
+						},
+					},
+					parent: parentKey{
+						Kind:      wellknown.GatewayGVK,
+						Name:      "test-gateway",
+						Namespace: "default",
+					},
+					parentInfo: parentInfo{
+						InternalName: "default/test-gateway",
+						Protocol:     gwv1.HTTPProtocolType,
+						Port:         80,
+						SectionName:  "http",
+						AllowedKinds: []gwv1.RouteGroupKind{
+							{
+								Group: &groupName,
+								Kind:  gwv1.Kind(wellknown.HTTPRouteKind),
+							},
+						},
+					},
+					Valid: true,
+				},
+			},
+			refGrants:     []ReferenceGrant{},
+			expectedCount: 2,
+			expectedRoutes: []*api.Route{
+				{
+					Key:       "default.test-route-1.0.0.http",
+					RouteName: "default/test-route-1",
+					Hostnames: []string{"example.com"},
+					Matches: []*api.RouteMatch{
+						{
+							Path: &api.PathMatch{
+								Kind: &api.PathMatch_PathPrefix{
+									PathPrefix: "/api",
+								},
+							},
+						},
+					},
+					Backends: []*api.RouteBackend{
+						{
+							Kind: &api.RouteBackend_Service{
+								Service: "default/test-service.default.svc.cluster.local",
+							},
+							Port: 80,
+						},
+					},
+				},
+				{
+					Key:       "default.test-route-2.0.0.http",
+					RouteName: "default/test-route-2",
+					Hostnames: []string{"example2.com"},
+					Matches: []*api.RouteMatch{
+						{
+							Path: &api.PathMatch{
+								Kind: &api.PathMatch_PathPrefix{
+									PathPrefix: "/api2",
+								},
+							},
+						},
+					},
+					Backends: []*api.RouteBackend{
+						{
+							Kind: &api.RouteBackend_Service{
+								Service: "default/test-service.default.svc.cluster.local",
+							},
+							Port: 80,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "HTTP route with multiple rules",
 			httpRoutes: []*gwv1.HTTPRoute{
 				{

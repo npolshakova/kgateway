@@ -357,7 +357,7 @@ func readExpectedDump(t *testing.T, filename string) (agentGwDump, error) {
 
 				// Parse Kind field
 				if kindData, ok := resourceMap["Kind"].(map[string]interface{}); ok {
-					if bindData, ok := kindData["ADPBind"].(map[string]interface{}); ok {
+					if bindData, ok := kindData["Bind"].(map[string]interface{}); ok {
 						bindJSON, err := json.Marshal(bindData)
 						if err != nil {
 							t.Logf("failed to marshal bind data: %v", err)
