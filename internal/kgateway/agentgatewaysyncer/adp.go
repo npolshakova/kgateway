@@ -57,6 +57,9 @@ func createADPQueryMatch(match gwv1.HTTPRouteMatch) ([]*api.QueryMatch, *reporte
 
 func createADPPathMatch(match gwv1.HTTPRouteMatch) (*api.PathMatch, *reporter.RouteCondition) {
 	tp := gwv1.PathMatchPathPrefix
+	if match.Path == nil {
+		return nil, nil
+	}
 	if match.Path.Type != nil {
 		tp = *match.Path.Type
 	}
