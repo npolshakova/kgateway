@@ -1,17 +1,5 @@
 Addresses:
   - service:
-      hostname: bar-svc.default.svc.cluster.local
-      name: bar-svc
-      namespace: default
-      ports:
-        - servicePort: 80
-  - service:
-      hostname: bar-svc-canary.default.svc.cluster.local
-      name: bar-svc-canary
-      namespace: default
-      ports:
-        - servicePort: 80
-  - service:
       hostname: example-svc.default.svc.cluster.local
       name: example-svc
       namespace: default
@@ -20,6 +8,18 @@ Addresses:
   - service:
       hostname: foo-svc.default.svc.cluster.local
       name: foo-svc
+      namespace: default
+      ports:
+        - servicePort: 80
+  - service:
+      hostname: bar-svc.default.svc.cluster.local
+      name: bar-svc
+      namespace: default
+      ports:
+        - servicePort: 80
+  - service:
+      hostname: bar-svc-canary.default.svc.cluster.local
+      name: bar-svc-canary
       namespace: default
       ports:
         - servicePort: 80
@@ -34,8 +34,10 @@ Listeners:
     protocol: HTTP
 Routes:
   - backends:
-      - port: 80
-        service: default/foo-svc.default.svc.cluster.local
+      - kind:
+          port: 80
+          service: default/foo-svc.default.svc.cluster.local
+        port: 80
         weight: 1
     hostnames:
       - foo.example.com
@@ -46,8 +48,10 @@ Routes:
           pathPrefix: /login
     routeName: default/foo-route
   - backends:
-      - port: 80
-        service: default/bar-svc-canary.default.svc.cluster.local
+      - kind:
+          port: 80
+          service: default/bar-svc-canary.default.svc.cluster.local
+        port: 80
         weight: 1
     hostnames:
       - bar.example.com
@@ -59,8 +63,10 @@ Routes:
             name: env
     routeName: default/bar-route
   - backends:
-      - port: 80
-        service: default/bar-svc.default.svc.cluster.local
+      - kind:
+          port: 80
+          service: default/bar-svc.default.svc.cluster.local
+        port: 80
         weight: 1
     hostnames:
       - bar.example.com
