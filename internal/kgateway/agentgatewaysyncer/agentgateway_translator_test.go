@@ -13,7 +13,6 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
 )
 
@@ -153,12 +152,12 @@ var _ = DescribeTable("Basic agentgateway Tests",
 			Name:      "example-gateway",
 		},
 	}),
-	//Entry("Static Backend with no appProtocol", translatorTestCase{
-	//	inputFile:  "backend-protocol/backend-default.yaml",
-	//	outputFile: "backend-protocol/backend-default.yaml",
-	//	gwNN: types.NamespacedName{
-	//		Namespace: "default",
-	//		Name:      "example-gateway",
-	//	},
-	//}),
+	Entry("Static Backend with no appProtocol", translatorTestCase{
+		inputFile:  "backend-protocol/backend-default.yaml",
+		outputFile: "backend-protocol/backend-default.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
 )
