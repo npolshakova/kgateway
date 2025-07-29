@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"fmt"
+
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
@@ -37,8 +39,12 @@ func processMCPBackendForAgentGateway(ctx krt.HandlerContext, nsCol krt.Collecti
 
 				mcpTarget := &api.MCPTarget{
 					Name: targetSelector.StaticTarget.Name,
-					Port: targetSelector.StaticTarget.Port, // TODO: which port should be set (static vs. parent)?
-					Kind: &api.MCPTarget_Backend{Backend: staticBackendRef},
+					Backend: &api.BackendReference{
+						Kind: &api.BackendReference_Backend{
+							Backend: staticBackendRef,
+						},
+						Port: uint32(targetSelector.StaticTarget.Port),
+					},
 				}
 
 				// Convert protocol if specified
@@ -114,12 +120,16 @@ func processMCPBackendForAgentGateway(ctx krt.HandlerContext, nsCol krt.Collecti
 						if port.AppProtocol == nil || *port.AppProtocol != mcpProtocol {
 							continue
 						}
+						targetName := service.Name + fmt.Sprintf("-%d", port.Port)
+						if port.Name != "" {
+							targetName = service.Name + "-" + port.Name
+						}
 						// For each mcp port on the service, create an MCP target
 						mcpTarget := &api.MCPTarget{
-							Name: service.Name + "-" + port.Name,
-							Port: port.Port,
-							Kind: &api.MCPTarget_Service{
-								Service: service.Namespace + "/" + service.Name,
+							Name: targetName,
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{Service: service.Namespace + "/" + service.Name},
+								Port: uint32(port.Port),
 							},
 						}
 

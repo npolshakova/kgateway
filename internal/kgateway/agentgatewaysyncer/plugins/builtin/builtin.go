@@ -6,9 +6,9 @@ import (
 
 	"github.com/agentgateway/agentgateway/go/api"
 	"google.golang.org/protobuf/types/known/durationpb"
-	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
@@ -37,8 +37,16 @@ func NewPass() *Pass {
 
 // ApplyForRoute applies the builtin transformations for the given route.
 func (p *Pass) ApplyForRoute(pctx *ir.AgentGatewayRouteContext, route *api.Route) error {
+	var errs []error
 	err := applyTimeouts(pctx.Rule, route)
-	return err
+	if err != nil {
+		errs = append(errs, err)
+	}
+	err = applyRetries(pctx.Rule, route)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 func applyTimeouts(rule *gwv1.HTTPRouteRule, route *api.Route) error {
@@ -59,6 +67,33 @@ func applyTimeouts(rule *gwv1.HTTPRouteRule, route *api.Route) error {
 			} else {
 				return fmt.Errorf("failed to parse backend request timeout: %v", err)
 			}
+		}
+	}
+	return nil
+}
+
+func applyRetries(rule *gwv1.HTTPRouteRule, route *api.Route) error {
+	if rule.Retry != nil {
+		if route.TrafficPolicy == nil {
+			route.TrafficPolicy = &api.TrafficPolicy{}
+		}
+		route.TrafficPolicy.Retry = &api.Retry{}
+		if rule.Retry.Codes != nil {
+			var codes []int32
+			for _, c := range rule.Retry.Codes {
+				codes = append(codes, int32(c))
+			}
+			route.TrafficPolicy.Retry.RetryStatusCodes = codes
+		}
+		if rule.Retry.Backoff != nil {
+			var ttl *durationpb.Duration
+			if parsed, err := time.ParseDuration(string(*rule.Retry.Backoff)); err == nil {
+				ttl = durationpb.New(parsed)
+			}
+			route.TrafficPolicy.Retry.Backoff = ttl
+		}
+		if rule.Retry.Attempts != nil {
+			route.TrafficPolicy.Retry.Attempts = int32(*rule.Retry.Attempts)
 		}
 	}
 	return nil

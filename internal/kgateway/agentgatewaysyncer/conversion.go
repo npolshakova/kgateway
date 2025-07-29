@@ -434,7 +434,11 @@ func buildADPDestination(
 				Reason:  gwv1.RouteReasonBackendNotFound,
 				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
-		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
+		rb.Backend = &api.BackendReference{
+			Kind: &api.BackendReference_Service{
+				Service: namespace + "/" + hostname,
+			},
+		}
 	case wellknown.ServiceGVK.GroupKind():
 		port = to.Port
 		if strings.Contains(string(to.Name), ".") {
@@ -454,7 +458,6 @@ func buildADPDestination(
 				Reason:  gwv1.RouteReasonBackendNotFound,
 				Message: fmt.Sprintf("backend(%s) not found", hostname)}
 		}
-		rb.Kind = &api.RouteBackend_Service{Service: namespace + "/" + hostname}
 		// TODO: All kubernetes service types currently require a Port, so we do this for everything; consider making this per-type if we have future types
 		// that do not require port.
 		if port == nil {
@@ -465,7 +468,12 @@ func buildADPDestination(
 				Reason:  gwv1.RouteReasonUnsupportedValue,
 				Message: "port is required in backendRef"}
 		}
-		rb.Port = int32(*port)
+		rb.Backend = &api.BackendReference{
+			Kind: &api.BackendReference_Service{
+				Service: namespace + "/" + hostname,
+			},
+			Port: uint32(*port),
+		}
 	case wellknown.BackendGVK.GroupKind():
 		// Create the source ObjectSource representing the route object making the reference
 		routeSrc := ir.ObjectSource{
@@ -495,8 +503,10 @@ func buildADPDestination(
 		}
 
 		logger.Debug("successfully resolved kgateway Backend", "backend", kgwBackend.Name)
-		rb.Kind = &api.RouteBackend_Backend{
-			Backend: kgwBackend.Namespace + "/" + kgwBackend.Name,
+		rb.Backend = &api.BackendReference{
+			Kind: &api.BackendReference_Backend{
+				Backend: kgwBackend.Namespace + "/" + kgwBackend.Name,
+			},
 		}
 	default:
 		return nil, &reporter.RouteCondition{
@@ -1207,7 +1217,7 @@ func GetCommonRouteInfo(spec any) ([]gwv1.ParentReference, []gwv1.Hostname, sche
 		return t.Spec.ParentRefs, t.Spec.Hostnames, wellknown.TLSRouteGVK
 	case *gwv1.HTTPRoute:
 		return t.Spec.ParentRefs, t.Spec.Hostnames, wellknown.HTTPRouteGVK
-	case *gwv1beta1.HTTPRoute: // TODO: support both v1 and v1beta1?
+	case *gwv1beta1.HTTPRoute:
 		return t.Spec.ParentRefs, t.Spec.Hostnames, wellknown.HTTPRouteGVK
 	case *gwv1.GRPCRoute:
 		return t.Spec.ParentRefs, t.Spec.Hostnames, wellknown.GRPCRouteGVK

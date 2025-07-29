@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestTranslator(t *testing.T) {
+func TestAgentgatewayTranslator(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "agentgateway Translator Suite")
 }

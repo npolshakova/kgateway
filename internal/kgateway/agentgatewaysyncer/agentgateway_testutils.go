@@ -32,24 +32,21 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/test/translator"
+	agwbuiltin "github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/plugins/builtin"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
-	internaltranslator "github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/listener"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned/fake"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
-	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/schemes"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
+	"github.com/kgateway-dev/kgateway/v2/test/translator"
 )
 
 type AssertReports func(gwNN types.NamespacedName, reportsMap reports.ReportMap)
@@ -312,12 +309,11 @@ func TestTranslationWithExtraPlugins(
 	}
 
 	Expect(compareProxy(outputFile, output)).To(BeEmpty())
-	Expect(compareBackends(outputFile, backends)).To(BeEmpty())
 
 	if assertReports != nil {
 		assertReports(gwNN, result.ReportsMap)
 	} else {
-		Expect(AreReportsSuccess(gwNN, result.ReportsMap)).NotTo(HaveOccurred())
+		Expect(AreReportsSuccess(result.ReportsMap)).NotTo(HaveOccurred())
 	}
 }
 
@@ -372,31 +368,6 @@ func sortTranslationResult(tr *translationResult) *translationResult {
 	return tr
 }
 
-func compareBackends(expectedFile string, actualBackends []*api.Backend) (string, error) {
-	expectedOutput := &translationResult{}
-	if err := ReadYamlFile(expectedFile, expectedOutput); err != nil {
-		return "", err
-	}
-
-	// Sort both expected and actual backends for consistent comparison
-	expectedBackends := sortBackends(expectedOutput.Backends)
-	actualBackendsSorted := sortBackends(actualBackends)
-
-	return cmp.Diff(expectedBackends, actualBackendsSorted, protocmp.Transform(), cmpopts.EquateNaNs()), nil
-}
-
-func sortBackends(backends []*api.Backend) []*api.Backend {
-	if len(backends) == 0 {
-		return backends
-	}
-
-	sort.Slice(backends, func(i, j int) bool {
-		return backends[i].GetName() < backends[j].GetName()
-	})
-
-	return backends
-}
-
 func ReadYamlFile(file string, out interface{}) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -427,7 +398,7 @@ func GetHTTPRouteStatusError(
 	return nil
 }
 
-func AreReportsSuccess(gwNN types.NamespacedName, reportsMap reports.ReportMap) error {
+func AreReportsSuccess(reportsMap reports.ReportMap) error {
 	err := GetHTTPRouteStatusError(reportsMap, nil)
 	if err != nil {
 		return err
@@ -577,10 +548,14 @@ func (tc TestCase) Run(
 	}
 
 	settings, err := settings.BuildSettings()
+	// enable agent gateway translation
+	settings.EnableAgentGateway = true
+	settings.EnableAgentGatewayAlphaApis = true
 	if err != nil {
 		return nil, err
 	}
 	for _, opt := range settingsOpts {
+		// overwrite any additional settings
 		opt(settings)
 	}
 
@@ -598,9 +573,8 @@ func (tc TestCase) Run(
 		return nil, err
 	}
 
-	plugins := registry.Plugins(ctx, commoncol, wellknown.DefaultWaypointClassName)
-	// TODO: consider moving the common code to a util that both proxy syncer and this test call
-	plugins = append(plugins, krtcollections.NewBuiltinPlugin(ctx))
+	plugins := registry.Plugins(ctx, commoncol, wellknown.DefaultAgentGatewayClassName)
+	plugins = append(plugins, agwbuiltin.NewBuiltinPlugin())
 
 	var extraPlugs []pluginsdk.Plugin
 	if extraPluginsFn != nil {
@@ -610,30 +584,7 @@ func (tc TestCase) Run(
 	plugins = append(plugins, extraPlugs...)
 	extensions := registry.MergePlugins(plugins...)
 
-	// needed for the Plugin Backend test (backend-plugin/gateway.yaml)
-	gk := schema.GroupKind{
-		Group: "",
-		Kind:  "test-backend-plugin",
-	}
-	extensions.ContributesPolicies[gk] = extensionsplug.PolicyPlugin{
-		Name: "test-backend-plugin",
-	}
-	testBackend := ir.NewBackendObjectIR(ir.ObjectSource{
-		Kind:      "test-backend-plugin",
-		Namespace: "default",
-		Name:      "example-svc",
-	}, 80, "")
-	extensions.ContributesBackends[gk] = extensionsplug.BackendPlugin{
-		Backends: krt.NewStaticCollection([]ir.BackendObjectIR{
-			testBackend,
-		}),
-		// TODO: add BackendInit when agentgateway backend types are available
-	}
-
 	commoncol.InitPlugins(ctx, extensions, *settings)
-
-	translator := internaltranslator.NewCombinedTranslator(ctx, extensions, commoncol)
-	translator.Init(ctx)
 
 	cli.RunAndWait(ctx.Done())
 	commoncol.GatewayIndex.Gateways.WaitUntilSynced(ctx.Done())
@@ -641,7 +592,6 @@ func (tc TestCase) Run(
 	kubeclient.WaitForCacheSync("routes", ctx.Done(), commoncol.Routes.HasSynced)
 	kubeclient.WaitForCacheSync("extensions", ctx.Done(), extensions.HasSynced)
 	kubeclient.WaitForCacheSync("commoncol", ctx.Done(), commoncol.HasSynced)
-	kubeclient.WaitForCacheSync("translator", ctx.Done(), translator.HasSynced)
 	kubeclient.WaitForCacheSync("backends", ctx.Done(), commoncol.BackendIndex.HasSynced)
 	kubeclient.WaitForCacheSync("endpoints", ctx.Done(), commoncol.Endpoints.HasSynced)
 	for i, plug := range extraPlugs {

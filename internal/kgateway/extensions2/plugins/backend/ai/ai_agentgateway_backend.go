@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/golang/protobuf/ptypes/wrappers"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 )
@@ -44,9 +45,11 @@ func buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AIBackend {
 	provider := llm.Provider
 
 	if provider.OpenAI != nil {
-		model := ""
+		var model *wrappers.StringValue
 		if provider.OpenAI.Model != nil {
-			model = *provider.OpenAI.Model
+			model = &wrappers.StringValue{
+				Value: *provider.OpenAI.Model,
+			}
 		}
 		aiBackend.Provider = &api.AIBackend_Openai{
 			Openai: &api.AIBackend_OpenAI{
@@ -54,10 +57,11 @@ func buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AIBackend {
 			},
 		}
 	} else if provider.AzureOpenAI != nil {
-		// TODO: is this the same as open ai
-		model := ""
+		var model *wrappers.StringValue
 		if provider.OpenAI.Model != nil {
-			model = *provider.OpenAI.Model
+			model = &wrappers.StringValue{
+				Value: *provider.OpenAI.Model,
+			}
 		}
 		aiBackend.Provider = &api.AIBackend_Openai{
 			Openai: &api.AIBackend_OpenAI{
@@ -65,9 +69,11 @@ func buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AIBackend {
 			},
 		}
 	} else if provider.Anthropic != nil {
-		model := ""
+		var model *wrappers.StringValue
 		if provider.Anthropic.Model != nil {
-			model = *provider.Anthropic.Model
+			model = &wrappers.StringValue{
+				Value: *provider.Anthropic.Model,
+			}
 		}
 		aiBackend.Provider = &api.AIBackend_Anthropic_{
 			Anthropic: &api.AIBackend_Anthropic{
@@ -75,14 +81,18 @@ func buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AIBackend {
 			},
 		}
 	} else if provider.Gemini != nil {
-		model := provider.Gemini.Model
+		model := &wrappers.StringValue{
+			Value: provider.Gemini.Model,
+		}
 		aiBackend.Provider = &api.AIBackend_Gemini_{
 			Gemini: &api.AIBackend_Gemini{
 				Model: model,
 			},
 		}
 	} else if provider.VertexAI != nil {
-		model := provider.VertexAI.Model
+		model := &wrappers.StringValue{
+			Value: provider.VertexAI.Model,
+		}
 		aiBackend.Provider = &api.AIBackend_Vertex_{
 			Vertex: &api.AIBackend_Vertex{
 				Model: model,

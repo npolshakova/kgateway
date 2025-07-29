@@ -147,10 +147,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/test-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/test-service.default.svc.cluster.local",
+								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -304,10 +306,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/test-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/test-service.default.svc.cluster.local",
+								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -326,10 +330,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/test-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/test-service.default.svc.cluster.local",
+								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -478,10 +484,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/test-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/test-service.default.svc.cluster.local",
+								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -500,10 +508,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/admin-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/admin-service.default.svc.cluster.local",
+								},
+								Port: 8080,
 							},
-							Port: 8080,
 						},
 					},
 				},
@@ -619,10 +629,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/test-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/test-service.default.svc.cluster.local",
+								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -753,10 +765,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/test-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/test-service.default.svc.cluster.local",
+								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -905,14 +919,19 @@ func TestADPRouteCollection(t *testing.T) {
 				require.Equal(t, len(expected.GetBackends()), len(routeResource.GetBackends()), "Backends count mismatch")
 				for j, expectedBackend := range expected.GetBackends() {
 					actualBackend := routeResource.GetBackends()[j]
-					assert.Equal(t, expectedBackend.GetPort(), actualBackend.GetPort(), "Backend port mismatch")
+					assert.Equal(t, expectedBackend.GetBackend().GetPort(), actualBackend.GetBackend().GetPort(), "Backend port mismatch")
 
 					// Verify service backend
-					switch expectedKind := expectedBackend.GetKind().(type) {
-					case *api.RouteBackend_Service:
-						actualKind, ok := actualBackend.GetKind().(*api.RouteBackend_Service)
+					expectedKind := expectedBackend.GetBackend()
+					actualKind := actualBackend.GetBackend()
+					require.NotNil(t, expectedKind, "Expected backend kind should not be nil")
+					require.NotNil(t, actualKind, "Actual backend kind should not be nil")
+
+					switch expectedService := expectedKind.GetKind().(type) {
+					case *api.BackendReference_Service:
+						actualService, ok := actualKind.GetKind().(*api.BackendReference_Service)
 						require.True(t, ok, "Expected service backend")
-						assert.Equal(t, expectedKind.Service, actualKind.Service, "Service mismatch")
+						assert.Equal(t, expectedService.Service, actualService.Service, "Service mismatch")
 					}
 				}
 			}
@@ -1041,10 +1060,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/grpc-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/grpc-service.default.svc.cluster.local",
+								},
+								Port: 9090,
 							},
-							Port: 9090,
 						},
 					},
 				},
@@ -1193,10 +1214,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/user-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/user-service.default.svc.cluster.local",
+								},
+								Port: 9090,
 							},
-							Port: 9090,
 						},
 					},
 				},
@@ -1215,10 +1238,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/order-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/order-service.default.svc.cluster.local",
+								},
+								Port: 9091,
 							},
-							Port: 9091,
 						},
 					},
 				},
@@ -1349,10 +1374,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.RouteBackend_Service{
-								Service: "default/grpc-service.default.svc.cluster.local",
+							Backend: &api.BackendReference{
+								Kind: &api.BackendReference_Service{
+									Service: "default/grpc-service.default.svc.cluster.local",
+								},
+								Port: 9090,
 							},
-							Port: 9090,
 						},
 					},
 				},
@@ -1501,14 +1528,19 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 				require.Equal(t, len(expected.GetBackends()), len(routeResource.GetBackends()), "Backends count mismatch")
 				for j, expectedBackend := range expected.GetBackends() {
 					actualBackend := routeResource.GetBackends()[j]
-					assert.Equal(t, expectedBackend.GetPort(), actualBackend.GetPort(), "Backend port mismatch")
+					assert.Equal(t, expectedBackend.GetBackend().GetPort(), actualBackend.GetBackend().GetPort(), "Backend port mismatch")
 
 					// Verify service backend
-					switch expectedKind := expectedBackend.GetKind().(type) {
-					case *api.RouteBackend_Service:
-						actualKind, ok := actualBackend.GetKind().(*api.RouteBackend_Service)
+					expectedKind := expectedBackend.GetBackend()
+					actualKind := actualBackend.GetBackend()
+					require.NotNil(t, expectedKind, "Expected backend kind should not be nil")
+					require.NotNil(t, actualKind, "Actual backend kind should not be nil")
+
+					switch expectedService := expectedKind.GetKind().(type) {
+					case *api.BackendReference_Service:
+						actualService, ok := actualKind.GetKind().(*api.BackendReference_Service)
 						require.True(t, ok, "Expected service backend")
-						assert.Equal(t, expectedKind.Service, actualKind.Service, "Service mismatch")
+						assert.Equal(t, expectedService.Service, actualService.Service, "Service mismatch")
 					}
 				}
 			}
