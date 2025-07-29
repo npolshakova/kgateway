@@ -121,7 +121,7 @@ type agentGwXdsResources struct {
 	AddressConfig envoycache.Resources
 }
 
-// ResourceName needs to match agentgateway role configured in client.rs (https://github.com/agentgateway/agentgateway/blob/main/crates/agentgateway/src/xds/client.rs)
+// ResourceName needs to match agentgateway role configured in agentgateway
 func (r agentGwXdsResources) ResourceName() string {
 	return fmt.Sprintf(resourceNameFormat, r.Namespace, r.Name)
 }

@@ -634,7 +634,6 @@ func (s *ProxySyncer) syncGatewayStatus(ctx context.Context, logger *slog.Logger
 			// Skip agentgateway classes, they are handled by agentgateway syncer
 			if string(gw.Spec.GatewayClassName) == s.agentGatewayClassName {
 				logger.Debug("skipping status sync for agentgateway", "gateway", gwnn.String())
-				continue
 			}
 
 			// Build the desired status
