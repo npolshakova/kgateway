@@ -323,7 +323,6 @@ func attachRoutePolicies(ctx *RouteContext, route *gwv1.HTTPRoute) {
 		Name:      route.Name,
 	}
 
-	// TODO: empty?
 	pols := pi.LookupTargetingPolicies(ctx.Krt,
 		pluginsdk.RouteAttachmentPoint,
 		target,

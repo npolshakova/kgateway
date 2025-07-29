@@ -26,3 +26,9 @@ Routes:
     routeName: default/example-route
 Backends:
   - name: default/mcp-backend
+    mcp:
+      targets:
+        - name: example-svc-80
+          backend:
+            service: default/example-svc
+            port: 80

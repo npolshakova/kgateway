@@ -21,5 +21,4 @@ Backends:
   - name: default/openai
     ai:
       openai:
-        model:
-          value: gpt-4o-mini
+        model: gpt-4o-mini

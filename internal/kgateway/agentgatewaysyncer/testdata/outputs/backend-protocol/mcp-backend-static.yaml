@@ -21,7 +21,7 @@ Backends:
   - name: default/mcp-backend
     mcp:
       targets:
-        name: mcp-target
+      - name: mcp-target
         backend:
           backend: default/mcp-target
           port: 8000
