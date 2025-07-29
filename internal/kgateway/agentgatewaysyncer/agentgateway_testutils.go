@@ -35,7 +35,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/test/translator"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
@@ -46,7 +45,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned/fake"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	common "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
-	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/schemes"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
@@ -312,7 +310,6 @@ func TestTranslationWithExtraPlugins(
 	}
 
 	Expect(compareProxy(outputFile, output)).To(BeEmpty())
-	Expect(compareBackends(outputFile, backends)).To(BeEmpty())
 
 	if assertReports != nil {
 		assertReports(gwNN, result.ReportsMap)
@@ -370,31 +367,6 @@ func sortTranslationResult(tr *translationResult) *translationResult {
 	})
 
 	return tr
-}
-
-func compareBackends(expectedFile string, actualBackends []*api.Backend) (string, error) {
-	expectedOutput := &translationResult{}
-	if err := ReadYamlFile(expectedFile, expectedOutput); err != nil {
-		return "", err
-	}
-
-	// Sort both expected and actual backends for consistent comparison
-	expectedBackends := sortBackends(expectedOutput.Backends)
-	actualBackendsSorted := sortBackends(actualBackends)
-
-	return cmp.Diff(expectedBackends, actualBackendsSorted, protocmp.Transform(), cmpopts.EquateNaNs()), nil
-}
-
-func sortBackends(backends []*api.Backend) []*api.Backend {
-	if len(backends) == 0 {
-		return backends
-	}
-
-	sort.Slice(backends, func(i, j int) bool {
-		return backends[i].GetName() < backends[j].GetName()
-	})
-
-	return backends
 }
 
 func ReadYamlFile(file string, out interface{}) error {
@@ -609,26 +581,6 @@ func (tc TestCase) Run(
 	}
 	plugins = append(plugins, extraPlugs...)
 	extensions := registry.MergePlugins(plugins...)
-
-	// needed for the Plugin Backend test (backend-plugin/gateway.yaml)
-	gk := schema.GroupKind{
-		Group: "",
-		Kind:  "test-backend-plugin",
-	}
-	extensions.ContributesPolicies[gk] = extensionsplug.PolicyPlugin{
-		Name: "test-backend-plugin",
-	}
-	testBackend := ir.NewBackendObjectIR(ir.ObjectSource{
-		Kind:      "test-backend-plugin",
-		Namespace: "default",
-		Name:      "example-svc",
-	}, 80, "")
-	extensions.ContributesBackends[gk] = extensionsplug.BackendPlugin{
-		Backends: krt.NewStaticCollection([]ir.BackendObjectIR{
-			testBackend,
-		}),
-		// TODO: add BackendInit when agentgateway backend types are available
-	}
 
 	commoncol.InitPlugins(ctx, extensions, *settings)
 

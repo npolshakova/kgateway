@@ -6,7 +6,7 @@ metadata:
   name: bar-route
 spec:
   parentRefs:
-  - name: agentgateway-example
+  - name: example-gateway
   hostnames:
   - "bar.example.com"
   rules:
