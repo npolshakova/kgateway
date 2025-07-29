@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	envoycore "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	envoycorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -513,8 +513,8 @@ func newAgentGatewayXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gw
 
 	d := xdsDumper{
 		conn: conn,
-		dr: &discovery_v3.DiscoveryRequest{
-			Node: &envoycore.Node{
+		dr: &envoy_service_discovery_v3.DiscoveryRequest{
+			Node: &envoycorev3.Node{
 				Id: "gateway.gwtest",
 				Metadata: &structpb.Struct{
 					Fields: map[string]*structpb.Value{
@@ -525,7 +525,7 @@ func newAgentGatewayXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gw
 		},
 	}
 
-	ads := discovery_v3.NewAggregatedDiscoveryServiceClient(d.conn)
+	ads := envoy_service_discovery_v3.NewAggregatedDiscoveryServiceClient(d.conn)
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30) // long timeout - just in case. we should never reach it.
 	adsClient, err := ads.StreamAggregatedResources(ctx)
 	if err != nil {
@@ -554,7 +554,7 @@ func (x xdsDumper) DumpAgentGateway(t *testing.T, ctx context.Context) agentGwDu
 }
 
 func (x xdsDumper) GetResources(t *testing.T, ctx context.Context) []*api.Resource {
-	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+	dr := proto.Clone(x.dr).(*envoy_service_discovery_v3.DiscoveryRequest)
 	dr.TypeUrl = agentgatewaysyncer.TargetTypeResourceUrl
 	x.adsClient.Send(dr)
 	var resources []*api.Resource
@@ -596,7 +596,7 @@ func (x xdsDumper) GetResources(t *testing.T, ctx context.Context) []*api.Resour
 }
 
 func (x xdsDumper) GetAddress(t *testing.T, ctx context.Context) []*api.Address {
-	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+	dr := proto.Clone(x.dr).(*envoy_service_discovery_v3.DiscoveryRequest)
 	dr.TypeUrl = agentgatewaysyncer.TargetTypeAddressUrl
 	x.adsClient.Send(dr)
 	var address []*api.Address

@@ -563,8 +563,15 @@ var _ = Describe("Deployer", func() {
 			Expect(*expectedSecurityContext.RunAsUser).To(Equal(int64(333)))
 			Expect(deployment.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().Equal(resource.MustParse("101m"))).To(BeTrue())
 			// check env values are appended to the end of the list
-			Expect(deployment.Spec.Template.Spec.Containers[0].Env[9].Name).To(Equal("test"))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Env[9].Value).To(Equal("value"))
+			var testEnvVar corev1.EnvVar
+			for _, envVar := range deployment.Spec.Template.Spec.Containers[0].Env {
+				if envVar.Name == "test" {
+					testEnvVar = envVar
+					break
+				}
+			}
+			Expect(testEnvVar.Name).To(Equal("test"))
+			Expect(testEnvVar.Value).To(Equal("value"))
 			// check the service is using the agentgateway port
 			svc := objs.findService(defaultNamespace, "agent-gateway")
 			Expect(svc).ToNot(BeNil())

@@ -57,16 +57,8 @@ func buildAIBackendFromLLM(llm *v1alpha1.LLMProvider) *api.AIBackend {
 			},
 		}
 	} else if provider.AzureOpenAI != nil {
-		var model *wrappers.StringValue
-		if provider.OpenAI.Model != nil {
-			model = &wrappers.StringValue{
-				Value: *provider.OpenAI.Model,
-			}
-		}
 		aiBackend.Provider = &api.AIBackend_Openai{
-			Openai: &api.AIBackend_OpenAI{
-				Model: model,
-			},
+			Openai: &api.AIBackend_OpenAI{},
 		}
 	} else if provider.Anthropic != nil {
 		var model *wrappers.StringValue

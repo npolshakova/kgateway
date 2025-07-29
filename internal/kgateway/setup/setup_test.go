@@ -23,7 +23,7 @@ import (
 	envoylistenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoyroutev3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	envoyhttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
-	discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	envoy_service_discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
@@ -464,8 +464,8 @@ func logKrtState(t *testing.T, msg string, kdbg *krt.DebugHandler) {
 
 type xdsDumper struct {
 	conn      *grpc.ClientConn
-	adsClient discovery_v3.AggregatedDiscoveryService_StreamAggregatedResourcesClient
-	dr        *discovery_v3.DiscoveryRequest
+	adsClient envoy_service_discovery_v3.AggregatedDiscoveryService_StreamAggregatedResourcesClient
+	dr        *envoy_service_discovery_v3.DiscoveryRequest
 	cancel    context.CancelFunc
 }
 
@@ -492,7 +492,7 @@ func newXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gwname string)
 
 	d := xdsDumper{
 		conn: conn,
-		dr: &discovery_v3.DiscoveryRequest{
+		dr: &envoy_service_discovery_v3.DiscoveryRequest{
 			Node: &envoycorev3.Node{
 				Id: "gateway.gwtest",
 				Metadata: &structpb.Struct{
@@ -504,7 +504,7 @@ func newXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gwname string)
 		},
 	}
 
-	ads := discovery_v3.NewAggregatedDiscoveryServiceClient(d.conn)
+	ads := envoy_service_discovery_v3.NewAggregatedDiscoveryServiceClient(d.conn)
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30) // long timeout - just in case. we should never reach it.
 	adsClient, err := ads.StreamAggregatedResources(ctx)
 	if err != nil {
@@ -517,10 +517,10 @@ func newXdsDumper(t *testing.T, ctx context.Context, xdsPort int, gwname string)
 }
 
 func (x xdsDumper) Dump(t *testing.T, ctx context.Context) (xdsDump, error) {
-	dr := proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+	dr := proto.Clone(x.dr).(*envoy_service_discovery_v3.DiscoveryRequest)
 	dr.TypeUrl = "type.googleapis.com/envoy.config.cluster.v3.Cluster"
 	x.adsClient.Send(dr)
-	dr = proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+	dr = proto.Clone(x.dr).(*envoy_service_discovery_v3.DiscoveryRequest)
 	dr.TypeUrl = "type.googleapis.com/envoy.config.listener.v3.Listener"
 	x.adsClient.Send(dr)
 
@@ -566,7 +566,7 @@ func (x xdsDumper) Dump(t *testing.T, ctx context.Context) (xdsDump, error) {
 					// the control plane processes the listeners
 					sent += 1
 					listeners = nil
-					dr = proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+					dr = proto.Clone(x.dr).(*envoy_service_discovery_v3.DiscoveryRequest)
 					dr.TypeUrl = "type.googleapis.com/envoy.config.listener.v3.Listener"
 					dr.VersionInfo = dresp.GetVersionInfo()
 					dr.ResponseNonce = dresp.GetNonce()
@@ -607,11 +607,11 @@ func (x xdsDumper) Dump(t *testing.T, ctx context.Context) (xdsDump, error) {
 		routenames = append(routenames, getroutesnames(l)...)
 	}
 
-	dr = proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+	dr = proto.Clone(x.dr).(*envoy_service_discovery_v3.DiscoveryRequest)
 	dr.ResourceNames = routenames
 	dr.TypeUrl = "type.googleapis.com/envoy.config.route.v3.RouteConfiguration"
 	x.adsClient.Send(dr)
-	dr = proto.Clone(x.dr).(*discovery_v3.DiscoveryRequest)
+	dr = proto.Clone(x.dr).(*envoy_service_discovery_v3.DiscoveryRequest)
 	dr.TypeUrl = "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"
 	dr.ResourceNames = clusterServiceNames
 	x.adsClient.Send(dr)
