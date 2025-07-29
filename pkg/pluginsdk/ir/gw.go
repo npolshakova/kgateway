@@ -34,7 +34,11 @@ type BackendInit struct {
 	// AgentBackendInit defines the translation hook for agentgateway backends. Implementations
 	// should translate the provided backend object into one or more api.Backend objects
 	// understood by the agentgateway data-plane.
-	InitAgentBackend func(ctx krt.HandlerContext, nsCol krt.Collection[*corev1.Namespace], svcCol krt.Collection[*corev1.Service], be *v1alpha1.Backend) ([]*api.Backend, error)
+	InitAgentBackend func(ctx krt.HandlerContext,
+		nsCol krt.Collection[*corev1.Namespace],
+		svcCol krt.Collection[*corev1.Service],
+		secrets krt.Collection[*corev1.Secret],
+		be *v1alpha1.Backend) ([]*api.Backend, error)
 }
 
 type PolicyRef struct {
