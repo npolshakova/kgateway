@@ -10,16 +10,16 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
+	reportssdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
 
 func NewBuiltinPlugin() pluginsdk.Plugin {
 	return pluginsdk.Plugin{
 		ContributesPolicies: map[schema.GroupKind]pluginsdk.PolicyPlugin{
 			ir.VirtualBuiltInGK: {
-				NewAgentGatewayPass: func(reporter reports.Reporter) ir.AgentGatewayTranslationPass {
+				NewAgentGatewayPass: func(reporter reportssdk.Reporter) ir.AgentGatewayTranslationPass {
 					return NewPass()
 				},
 			},

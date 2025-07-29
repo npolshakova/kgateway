@@ -15,7 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
+	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
@@ -276,7 +277,7 @@ func (p RouteParents) fetch(ctx krt.HandlerContext, pk parentKey) []*parentInfo 
 func BuildRouteParents(
 	gateways krt.Collection[GatewayListener],
 ) RouteParents {
-	idx := krt.NewIndex(gateways, func(o GatewayListener) []parentKey {
+	idx := krt.NewIndex(gateways, "parent", func(o GatewayListener) []parentKey {
 		return []parentKey{o.parent}
 	})
 	return RouteParents{

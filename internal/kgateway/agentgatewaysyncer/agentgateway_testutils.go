@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
@@ -32,11 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
+
 	agwbuiltin "github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/plugins/builtin"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/listener"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
@@ -566,7 +566,6 @@ func (tc TestCase) Run(
 		ourCli,
 		nil,
 		wellknown.DefaultGatewayControllerName,
-		logr.Discard(),
 		*settings,
 	)
 	if err != nil {
@@ -615,6 +614,7 @@ func (tc TestCase) Run(
 		"istio-system",
 		"Kubernetes",
 		true, // enableAlphaGwAPIs
+		true, // enableInferExt
 	)
 
 	// Build input collections for agentgateway syncer

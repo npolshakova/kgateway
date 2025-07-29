@@ -43,13 +43,13 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	kgwversioned "github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
+	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
 )
 
 var logger = logging.New("agentgateway/syncer")
@@ -89,9 +89,8 @@ type AgentGwSyncer struct {
 	clusterID             string
 
 	// XDS and caching
-	xDS                 krt.Collection[agentGwXdsResources]
-	xdsCache            envoycache.SnapshotCache
-	xdsSnapshotsMetrics krtcollections.CollectionMetricsRecorder
+	xDS      krt.Collection[agentGwXdsResources]
+	xdsCache envoycache.SnapshotCache
 
 	// Status reporting
 	gatewayReports     krt.Singleton[GatewayReports]
@@ -104,6 +103,7 @@ type AgentGwSyncer struct {
 
 	// features
 	EnableAlphaGatewayAPI bool
+	EnableInferExt        bool
 }
 
 // agentGwXdsResources represents XDS resources for a single agent gateway
@@ -144,7 +144,7 @@ func NewAgentGwSyncer(
 	domainSuffix string,
 	systemNamespace string,
 	clusterID string,
-	enableAlphaGwAPIs bool,
+	enableAlphaGwAPIs, enableInferExt bool,
 ) *AgentGwSyncer {
 	// TODO: register types (auth, policy, etc.) if necessary
 	return &AgentGwSyncer{
@@ -158,8 +158,8 @@ func NewAgentGwSyncer(
 		domainSuffix:          domainSuffix,
 		systemNamespace:       systemNamespace,
 		clusterID:             clusterID,
-		xdsSnapshotsMetrics:   krtcollections.NewCollectionMetricsRecorder("AgentGatewayXDSSnapshots"),
 		EnableAlphaGatewayAPI: enableAlphaGwAPIs,
+		EnableInferExt:        enableInferExt,
 	}
 }
 
@@ -371,12 +371,17 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 
 		ReferenceGrants: krt.WrapClient(kclient.NewFiltered[*gwv1beta1.ReferenceGrant](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/ReferenceGrants")...),
 		//ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
-		InferencePools: krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools"), kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...),
 
 		// kgateway resources
 		Backends: s.commonCols.BackendIndex,
 		// TODO: remove
 		BackendsTemp: krt.NewInformer[*v1alpha1.Backend](s.client),
+	}
+
+	if s.EnableInferExt {
+		inputs.InferencePools = krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools"), kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...)
+	} else {
+		inputs.InferencePools = krt.NewStaticCollection[*inf.InferencePool](nil, nil, krtopts.ToOptions("disable/inferencepools")...)
 	}
 
 	if s.EnableAlphaGatewayAPI {
@@ -386,8 +391,8 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 	} else {
 		logger.Debug("alpha gateway apis are disabled")
 		// If disabled, still build a collection but make it always empty
-		inputs.TCPRoutes = krt.NewStaticCollection[*gwv1alpha2.TCPRoute](nil, krtopts.ToOptions("disable/TCPRoutes")...)
-		inputs.TLSRoutes = krt.NewStaticCollection[*gwv1alpha2.TLSRoute](nil, krtopts.ToOptions("disable/TLSRoutes")...)
+		inputs.TCPRoutes = krt.NewStaticCollection[*gwv1alpha2.TCPRoute](nil, nil, krtopts.ToOptions("disable/TCPRoutes")...)
+		inputs.TLSRoutes = krt.NewStaticCollection[*gwv1alpha2.TLSRoute](nil, nil, krtopts.ToOptions("disable/TLSRoutes")...)
 	}
 
 	return inputs
@@ -680,7 +685,7 @@ func (s *AgentGwSyncer) buildAddressCollections(inputs Inputs, krtopts krtutil.K
 
 func (s *AgentGwSyncer) buildXDSCollection(adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[envoyResourceWithCustomName], xdsAddresses krt.Collection[envoyResourceWithCustomName]) {
 	// Create an index on adpResources by Gateway to avoid fetching all resources
-	adpResourcesByGateway := krt.NewIndex(adpResources, func(resource ADPResourcesForGateway) []types.NamespacedName {
+	adpResourcesByGateway := krt.NewIndex(adpResources, "gateway", func(resource ADPResourcesForGateway) []types.NamespacedName {
 		return []types.NamespacedName{resource.Gateway}
 	})
 
@@ -937,7 +942,7 @@ func (s *AgentGwSyncer) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.xDS.RegisterBatch(func(events []krt.Event[agentGwXdsResources], _ bool) {
+	s.xDS.RegisterBatch(func(events []krt.Event[agentGwXdsResources]) {
 		for _, e := range events {
 			snap := e.Latest()
 			if e.Event == controllers.EventDelete {
