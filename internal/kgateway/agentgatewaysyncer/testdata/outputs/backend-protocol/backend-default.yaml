@@ -9,7 +9,7 @@ Listeners:
     protocol: HTTP
 Routes:
   - backends:
-      - kind:
+      - backend:
           backend: default/example-backend
         weight: 1
     hostnames:

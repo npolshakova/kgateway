@@ -221,8 +221,7 @@ func createADPMirrorFilter(
 	}
 	rm := &api.RequestMirror{
 		Percentage: percent,
-		Port:       dst.GetPort(),
-		Kind:       dst.GetKind(),
+		Backend:    dst.GetBackend(),
 	}
 	return &api.RouteFilter{Kind: &api.RouteFilter_RequestMirror{RequestMirror: rm}}, nil
 }

@@ -147,12 +147,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/test-service.default.svc.cluster.local",
 								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -306,12 +306,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/test-service.default.svc.cluster.local",
 								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -330,12 +330,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/test-service.default.svc.cluster.local",
 								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -484,12 +484,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/test-service.default.svc.cluster.local",
 								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -508,12 +508,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/admin-service.default.svc.cluster.local",
 								},
+								Port: 8080,
 							},
-							Port: 8080,
 						},
 					},
 				},
@@ -629,12 +629,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/test-service.default.svc.cluster.local",
 								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -765,12 +765,12 @@ func TestADPRouteCollection(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/test-service.default.svc.cluster.local",
 								},
+								Port: 80,
 							},
-							Port: 80,
 						},
 					},
 				},
@@ -919,11 +919,11 @@ func TestADPRouteCollection(t *testing.T) {
 				require.Equal(t, len(expected.GetBackends()), len(routeResource.GetBackends()), "Backends count mismatch")
 				for j, expectedBackend := range expected.GetBackends() {
 					actualBackend := routeResource.GetBackends()[j]
-					assert.Equal(t, expectedBackend.GetPort(), actualBackend.GetPort(), "Backend port mismatch")
+					assert.Equal(t, expectedBackend.GetBackend().GetPort(), actualBackend.GetBackend().GetPort(), "Backend port mismatch")
 
 					// Verify service backend
-					expectedKind := expectedBackend.GetKind()
-					actualKind := actualBackend.GetKind()
+					expectedKind := expectedBackend.GetBackend()
+					actualKind := actualBackend.GetBackend()
 					require.NotNil(t, expectedKind, "Expected backend kind should not be nil")
 					require.NotNil(t, actualKind, "Actual backend kind should not be nil")
 
@@ -1060,12 +1060,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/grpc-service.default.svc.cluster.local",
 								},
+								Port: 9090,
 							},
-							Port: 9090,
 						},
 					},
 				},
@@ -1214,12 +1214,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/user-service.default.svc.cluster.local",
 								},
+								Port: 9090,
 							},
-							Port: 9090,
 						},
 					},
 				},
@@ -1238,12 +1238,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/order-service.default.svc.cluster.local",
 								},
+								Port: 9091,
 							},
-							Port: 9091,
 						},
 					},
 				},
@@ -1374,12 +1374,12 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 					},
 					Backends: []*api.RouteBackend{
 						{
-							Kind: &api.BackendReference{
+							Backend: &api.BackendReference{
 								Kind: &api.BackendReference_Service{
 									Service: "default/grpc-service.default.svc.cluster.local",
 								},
+								Port: 9090,
 							},
-							Port: 9090,
 						},
 					},
 				},
@@ -1528,11 +1528,11 @@ func TestADPRouteCollectionGRPC(t *testing.T) {
 				require.Equal(t, len(expected.GetBackends()), len(routeResource.GetBackends()), "Backends count mismatch")
 				for j, expectedBackend := range expected.GetBackends() {
 					actualBackend := routeResource.GetBackends()[j]
-					assert.Equal(t, expectedBackend.GetPort(), actualBackend.GetPort(), "Backend port mismatch")
+					assert.Equal(t, expectedBackend.GetBackend().GetPort(), actualBackend.GetBackend().GetPort(), "Backend port mismatch")
 
 					// Verify service backend
-					expectedKind := expectedBackend.GetKind()
-					actualKind := actualBackend.GetKind()
+					expectedKind := expectedBackend.GetBackend()
+					actualKind := actualBackend.GetBackend()
 					require.NotNil(t, expectedKind, "Expected backend kind should not be nil")
 					require.NotNil(t, actualKind, "Actual backend kind should not be nil")
 

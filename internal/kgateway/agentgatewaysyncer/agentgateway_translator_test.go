@@ -160,4 +160,28 @@ var _ = DescribeTable("Basic agentgateway Tests",
 			Name:      "example-gateway",
 		},
 	}),
+	//Entry("MCP Backend with selector target", translatorTestCase{
+	//	inputFile:  "backend-protocol/mcp-backend-selector.yaml",
+	//	outputFile: "backend-protocol/mcp-backend-selector.yaml",
+	//	gwNN: types.NamespacedName{
+	//		Namespace: "default",
+	//		Name:      "example-gateway",
+	//	},
+	//}),
+	//Entry("MCP Backend with static target", translatorTestCase{
+	//	inputFile:  "backend-protocol/mcp-backend-static.yaml",
+	//	outputFile: "backend-protocol/mcp-backend-static.yaml",
+	//	gwNN: types.NamespacedName{
+	//		Namespace: "default",
+	//		Name:      "example-gateway",
+	//	},
+	//}),
+	//Entry("AI Backend with openai provider", translatorTestCase{
+	//	inputFile:  "backend-protocol/openai-backend.yaml",
+	//	outputFile: "backend-protocol/openai-backend.yaml",
+	//	gwNN: types.NamespacedName{
+	//		Namespace: "default",
+	//		Name:      "example-gateway",
+	//	},
+	//}),
 )

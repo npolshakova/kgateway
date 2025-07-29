@@ -127,7 +127,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.1 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
-	github.com/agentgateway/agentgateway v0.6.3-0.20250728194206-5c7cf9331d34
+	github.com/agentgateway/agentgateway v0.6.3-0.20250729150130-9fc90fe02a57
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.6 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
@@ -615,10 +615,7 @@ require (
 // Remove once https://github.com/kubernetes-sigs/controller-tools/pull/1224 merges
 replace sigs.k8s.io/controller-tools => github.com/shashankram/controller-tools v0.0.0-20250626172831-f7be064a9132
 
-replace (
-	github.com/agentgateway/agentgateway => github.com/npolshakova/agentgateway v0.0.0-20250729045453-151a45b38253
-	github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
-)
+replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
 
 // Use a patched version of gengo to produce consistent zz_generated.openapi.go
 // Ref: https://github.com/kubernetes/gengo/issues/292

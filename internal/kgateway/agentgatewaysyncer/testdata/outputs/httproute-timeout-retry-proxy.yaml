@@ -16,10 +16,9 @@ Listeners:
     protocol: HTTP
 Routes:
   - backends:
-      - kind:
+      - backend:
           port: 80
           service: default/example-svc.default.svc.cluster.local
-        port: 80
         weight: 1
     hostnames:
       - example-retry-backend-request.com
@@ -35,10 +34,9 @@ Routes:
           - 500
           - 503
   - backends:
-      - kind:
+      - backend:
           port: 80
           service: default/example-svc.default.svc.cluster.local
-        port: 80
         weight: 1
     hostnames:
       - example-retry-both-timeouts.com
@@ -51,10 +49,9 @@ Routes:
       retry:
         attempts: 3
   - backends:
-      - kind:
+      - backend:
           port: 80
           service: default/example-svc.default.svc.cluster.local
-        port: 80
         weight: 1
     hostnames:
       - example.com
@@ -64,10 +61,9 @@ Routes:
     trafficPolicy:
       requestTimeout: 9s
   - backends:
-      - kind:
+      - backend:
           port: 80
           service: default/example-svc.default.svc.cluster.local
-        port: 80
         weight: 1
     hostnames:
       - example-backend-request-both-timeout.com
@@ -78,10 +74,9 @@ Routes:
       backendRequestTimeout: 9s
       requestTimeout: 10s
   - backends:
-      - kind:
+      - backend:
           port: 80
           service: default/example-svc.default.svc.cluster.local
-        port: 80
         weight: 1
     hostnames:
       - example-backend-request-timeout.com
@@ -91,10 +86,9 @@ Routes:
     trafficPolicy:
       backendRequestTimeout: 7s
   - backends:
-      - kind:
+      - backend:
           port: 80
           service: default/example-svc.default.svc.cluster.local
-        port: 80
         weight: 1
     hostnames:
       - example-retry.com
