@@ -201,6 +201,7 @@ func createADPMirrorFilter(
 			Weight:                 &weightOne,
 		},
 	}, ns, k, ctx.Backends)
+	_ = dst
 	if err != nil {
 		return nil, err
 	}

@@ -438,6 +438,7 @@ func buildADPDestination(
 			Kind: &api.BackendReference_Service{
 				Service: namespace + "/" + hostname,
 			},
+			Port: uint32(svc.Spec.TargetPortNumber),
 		}
 	case wellknown.ServiceGVK.GroupKind():
 		port = to.Port
