@@ -295,17 +295,21 @@ func processBackendForEnvoy(ctx context.Context, in ir.BackendObjectIR, out *env
 	return nil
 }
 
-func processBackendForAgentGateway(ctx krt.HandlerContext, nsCol krt.Collection[*corev1.Namespace], svcCol krt.Collection[*corev1.Service], be *v1alpha1.Backend) ([]*api.Backend, error) {
+func processBackendForAgentGateway(ctx krt.HandlerContext,
+	nsCol krt.Collection[*corev1.Namespace],
+	svcCol krt.Collection[*corev1.Service],
+	secrets krt.Collection[*corev1.Secret],
+	be *v1alpha1.Backend) ([]*api.Backend, []*api.Policy, error) {
 	spec := be.Spec
 	switch spec.Type {
 	case v1alpha1.BackendTypeStatic:
 		return processStaticBackendForAgentGateway(be)
 	case v1alpha1.BackendTypeAI:
-		return ai.ProcessAIBackendForAgentGateway(be)
+		return ai.ProcessAIBackendForAgentGateway(ctx, be, secrets)
 	case v1alpha1.BackendTypeMCP:
 		return processMCPBackendForAgentGateway(ctx, nsCol, svcCol, be)
 	default:
-		return nil, fmt.Errorf("backend of type %s is not supported for agent gateway", spec.Type)
+		return nil, nil, fmt.Errorf("backend of type %s is not supported for agent gateway", spec.Type)
 	}
 }
 
