@@ -114,7 +114,7 @@ Backends in kgateway are represented by the Backend CRD and support multiple bac
 **Backend Types:**
 - **AI**: Routes traffic to AI/LLM providers (OpenAI, Anthropic, etc.) with model-specific configurations
 - **Static**: Routes to static host/IP with configurable ports and protocols. Note: In agentgateway only one host is supported (not list of hosts). 
-- **MCP**: Model Context Protocol backends for virtual MCP servers
+- **MCP**: Model Context Protocol backends for virtual MCP servers. Note if a static MCP backend target is used, kgateway will translate out two backends (one static, one mcp).
 
 **Usage in Routes:**
 Backends are referenced by HTTPRoute, GRPCRoute, TCPRoute, and TLSRoute resources using `backendRefs`:
@@ -239,6 +239,15 @@ make run HELM_ADDITIONAL_VALUES=test/kubernetes/e2e/tests/manifests/agent-gatewa
 ```
 
 ## Examples 
+
+Setup a kind cluster and install kgateway with the kubernetes Gateway APIs:
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
+
+helm upgrade -i -n kgateway-system kgateway-crds ./_test/kgateway-crds-1.0.0-ci1.tgz --create-namespace
+
+helm upgrade -i -n kgateway-system kgateway ./_test/kgateway-1.0.0-ci1.tgz --create-namespace --values test/kubernetes/e2e/tests/manifests/agent-gateway-integration.yaml
+```
 
 #### HTTPRoute
 
@@ -394,8 +403,8 @@ Port-forward, and send a request through the gateway:
 ```shell
 grpcurl \
   -plaintext \
-  -authority grpc.example.com \
-  -d '{"message": "hello"}' localhost:8080 yages.Echo/Ping
+  -authority example.com \
+  -d '{}' localhost:8080 yages.Echo/Ping 
 ```
 
 #### TCPRoute
@@ -410,15 +419,9 @@ metadata:
 spec:
   gatewayClassName: agentgateway
   listeners:
-    - name: foo
+    - name: tcp
       protocol: TCP
       port: 8080
-      allowedRoutes:
-        kinds:
-          - kind: TCPRoute
-    - name: bar
-      protocol: TCP
-      port: 8090
       allowedRoutes:
         kinds:
           - kind: TCPRoute
@@ -430,7 +433,6 @@ metadata:
 spec:
   parentRefs:
     - name: tcp-gw-for-test
-      sectionName: foo
   rules:
     - backendRefs:
         - name: tcp-backend
@@ -488,7 +490,7 @@ EOF
 
 Port-forward, and send a request through the gateway:
 ```shell
-curl localhost:8080/ -v
+curl localhost:8080/ -i
 ```
 
 #### Static Backend routing
@@ -731,6 +733,30 @@ EOF
 Port-forward, and send a request through the gateway:
 ```shell
 curl localhost:8080/sse -v -H "host: www.example.com"
+```
+
+You can also use static targets. This will create two backends 1) static backend for the target, 2) mcp backend.
+
+Apply the following config to set up the HTTPRoute pointing to the MCP Backend with a static target:
+```shell
+kubectl apply -f- <<EOF
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  labels:
+    app: kgateway
+  name: mcp-backend
+spec:
+  type: MCP
+  mcp:
+    name: mcp-server
+    targets:
+      - static:
+          name: mcp-target
+          host: mcp-website-fetcher.default.svc.cluster.local
+          port: 8000
+          protocol: StreamableHTTP
+EOF
 ```
 
 #### A2A Backend 
