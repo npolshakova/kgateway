@@ -84,7 +84,7 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 			if port.AppProtocol != nil && *port.AppProtocol == a2aProtocol {
 				svcRef := fmt.Sprintf("%v/%v", svc.Namespace, svc.Name)
 				a2aPolicies = append(a2aPolicies, ADPPolicy{&api.Policy{
-					Name:   svc.Namespace + "/" + svc.Name + "/" + port.String(),
+					Name:   fmt.Sprintf("a2a/%s/%s/%d", svc.Namespace, svc.Name, port.Port),
 					Target: &api.PolicyTarget{Kind: &api.PolicyTarget_Backend{Backend: svcRef}},
 					Spec: &api.PolicySpec{Kind: &api.PolicySpec_A2A_{
 						A2A: &api.PolicySpec_A2A{},

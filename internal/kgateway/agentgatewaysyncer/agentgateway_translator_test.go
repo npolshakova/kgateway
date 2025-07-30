@@ -184,4 +184,12 @@ var _ = DescribeTable("Basic agentgateway Tests",
 			Name:      "example-gateway",
 		},
 	}),
+	Entry("AI Backend with openai provider", translatorTestCase{
+		inputFile:  "backend-protocol/a2a-backend.yaml",
+		outputFile: "backend-protocol/a2a-backend.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
 )
