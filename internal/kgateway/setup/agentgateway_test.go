@@ -158,7 +158,7 @@ func testAgentGatewayScenario(
 		t.Logf("Total resources: %d", len(dump.Resources))
 
 		// Count different types of resources
-		var bindCount, listenerCount, routeCount, worklodCount, serviceCount int
+		var bindCount, listenerCount, routeCount, policyCount, worklodCount, serviceCount int
 		for _, resource := range dump.Resources {
 			switch resource.GetKind().(type) {
 			case *api.Resource_Bind:
@@ -170,9 +170,12 @@ func testAgentGatewayScenario(
 			case *api.Resource_Route:
 				routeCount++
 				t.Logf("Route resource: %+v", resource.GetRoute())
+			case *api.Resource_Policy:
+				policyCount++
+				t.Logf("Policy resource: %+v", resource.GetPolicy())
 			}
 		}
-		t.Logf("Resource counts - Binds: %d, Listeners: %d, Routes: %d", bindCount, listenerCount, routeCount)
+		t.Logf("Resource counts - Binds: %d, Listeners: %d, Routes: %d, Policy: %d", bindCount, listenerCount, routeCount, policyCount)
 
 		for _, resource := range dump.Addresses {
 			switch resource.GetType().(type) {
@@ -286,6 +289,8 @@ func getResourceType(resource *api.Resource) string {
 		return "listener"
 	case *api.Resource_Route:
 		return "route"
+	case *api.Resource_Policy:
+		return "policy"
 	default:
 		return "unknown"
 	}
@@ -300,6 +305,8 @@ func getResourceKey(resource *api.Resource) string {
 		return x.Listener.GetKey()
 	case *api.Resource_Route:
 		return x.Route.GetKey()
+	case *api.Resource_Policy:
+		return x.Policy.GetName()
 	default:
 		return ""
 	}
@@ -393,6 +400,18 @@ func readExpectedDump(t *testing.T, filename string) (agentGwDump, error) {
 							continue
 						}
 						resource.Kind = &api.Resource_Route{Route: route}
+					} else if policyData, ok := kindData["Policy"].(map[string]interface{}); ok {
+						policyJSON, err := json.Marshal(policyData)
+						if err != nil {
+							t.Logf("failed to marshal policy data: %v", err)
+							continue
+						}
+						policy := &api.Policy{}
+						if err := unmarshaler.Unmarshal(policyJSON, policy); err != nil {
+							t.Logf("failed to unmarshal policy: %v", err)
+							continue
+						}
+						resource.Kind = &api.Resource_Policy{Policy: policy}
 					}
 				}
 

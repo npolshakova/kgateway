@@ -8,7 +8,7 @@ spec:
       enabled: true
       logLevel: trace
       image:
-        tag: b1b9c00
+        tag: 2c48676
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1
@@ -56,9 +56,19 @@ spec:
           group: gateway.kgateway.dev
           kind: Backend
 ---
+# create secret:
 #  kubectl create secret generic openai-secret \
 #  --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 #  --dry-run=client -oyaml | kubectl apply -f -
+# Send request:
+# curl localhost:8080/openai -H content-type:application/json -v -d'{
+#"model": "gpt-3.5-turbo",
+#"messages": [
+#  {
+#    "role": "user",
+#    "content": "Whats your favorite poem?"
+#  }
+#]}'
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
 metadata:

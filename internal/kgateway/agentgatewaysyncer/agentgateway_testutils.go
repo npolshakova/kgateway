@@ -56,6 +56,7 @@ type translationResult struct {
 	Listeners []*api.Listener
 	Binds     []*api.Bind
 	Backends  []*api.Backend
+	Policies  []*api.Policy
 	Addresses []*api.Address
 }
 
@@ -176,6 +177,21 @@ func (tr *translationResult) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	if policiesData, ok := result["Policies"]; ok {
+		var policies []json.RawMessage
+		if err := json.Unmarshal(policiesData, &policies); err != nil {
+			return err
+		}
+		tr.Policies = make([]*api.Policy, len(policies))
+		for i, policyData := range policies {
+			policy := &api.Policy{}
+			if err := m.Unmarshal(policyData, policy); err != nil {
+				return err
+			}
+			tr.Policies[i] = policy
+		}
+	}
+
 	if addressesData, ok := result["Addresses"]; ok {
 		var addresses []json.RawMessage
 		if err := json.Unmarshal(addressesData, &addresses); err != nil {
@@ -263,6 +279,7 @@ func TestTranslationWithExtraPlugins(
 	var listeners []*api.Listener
 	var binds []*api.Bind
 	var backends []*api.Backend
+	var policies []*api.Policy
 	var addresses []*api.Address
 
 	// Extract agentgateway API types from ADPResources
@@ -279,6 +296,8 @@ func TestTranslationWithExtraPlugins(
 				binds = append(binds, r.Bind)
 			case *api.Resource_Backend:
 				backends = append(backends, r.Backend)
+			case *api.Resource_Policy:
+				policies = append(policies, r.Policy)
 			}
 		}
 		for _, item := range adpRes.AddressConfig.Items {
@@ -293,6 +312,7 @@ func TestTranslationWithExtraPlugins(
 		Listeners: listeners,
 		Binds:     binds,
 		Backends:  backends,
+		Policies:  policies,
 		Addresses: addresses,
 	}
 	outputYaml, err := translator.MarshalAnyYaml(output)
@@ -358,6 +378,11 @@ func sortTranslationResult(tr *translationResult) *translationResult {
 	// Sort backends by name
 	sort.Slice(tr.Backends, func(i, j int) bool {
 		return tr.Backends[i].GetName() < tr.Backends[j].GetName()
+	})
+
+	// Sort policies by name
+	sort.Slice(tr.Policies, func(i, j int) bool {
+		return tr.Policies[i].GetName() < tr.Policies[j].GetName()
 	})
 
 	// Sort addresses

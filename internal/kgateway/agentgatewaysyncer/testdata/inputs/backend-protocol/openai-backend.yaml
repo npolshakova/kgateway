@@ -41,3 +41,11 @@ spec:
             kind: "SecretRef"
             secretRef:
               name: openai-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openai-secret
+type: Opaque
+data:
+  Authorization: bXlzZWNyZXRrZXk=
