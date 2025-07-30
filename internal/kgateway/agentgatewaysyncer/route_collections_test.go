@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
@@ -1660,6 +1661,77 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Route with CORS filter",
+			httpRoute: &gwv1.HTTPRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cors-route",
+					Namespace: "default",
+				},
+				Spec: gwv1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1.CommonRouteSpec{
+						ParentRefs: []gwv1.ParentReference{
+							{
+								Name: "test-gateway",
+							},
+						},
+					},
+					Rules: []gwv1.HTTPRouteRule{
+						{
+							Filters: []gwv1.HTTPRouteFilter{
+								{
+									Type: gwv1.HTTPRouteFilterCORS,
+									CORS: &gwv1.HTTPCORSFilter{
+										AllowCredentials: true,
+										AllowHeaders: []gwv1.HTTPHeaderName{
+											"Content-Type",
+											"Authorization",
+										},
+										AllowMethods: []gwv1.HTTPMethodWithWildcard{
+											"GET",
+											"POST",
+											"PUT",
+										},
+										AllowOrigins: []gwv1.AbsoluteURI{
+											"https://example.com",
+											"https://*.example.org",
+										},
+										ExposeHeaders: []gwv1.HTTPHeaderName{
+											"X-Custom-Header",
+										},
+										MaxAge: 300,
+									},
+								},
+							},
+							BackendRefs: []gwv1.HTTPBackendRef{
+								{
+									BackendRef: gwv1.BackendRef{
+										BackendObjectReference: gwv1.BackendObjectReference{
+											Name: "test-service",
+											Port: ptr.To(gwv1.PortNumber(80)),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedFilter: &api.RouteFilter{
+				Kind: &api.RouteFilter_Cors{
+					Cors: &api.CORS{
+						AllowCredentials: true,
+						AllowHeaders:     []string{"Content-Type", "Authorization"},
+						AllowMethods:     []string{"GET", "POST", "PUT"},
+						AllowOrigins:     []string{"https://example.com", "https://*.example.org"},
+						ExposeHeaders:    []string{"X-Custom-Header"},
+						MaxAge: &duration.Duration{
+							Seconds: 300,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1803,6 +1875,19 @@ func TestADPRouteCollectionWithFilters(t *testing.T) {
 
 				assert.Equal(t, expectedRedirect.GetScheme(), actualRedirect.GetScheme(), "Redirect scheme mismatch")
 				assert.Equal(t, expectedRedirect.GetStatus(), actualRedirect.GetStatus(), "Redirect status mismatch")
+			case *api.RouteFilter_Cors:
+				actualKind, ok := actualFilter.GetKind().(*api.RouteFilter_Cors)
+				require.True(t, ok, "Expected CORS filter")
+
+				expectedCors := expectedKind.Cors
+				actualCors := actualKind.Cors
+
+				assert.Equal(t, expectedCors.GetAllowCredentials(), actualCors.GetAllowCredentials(), "CORS AllowCredentials mismatch")
+				assert.Equal(t, expectedCors.GetAllowHeaders(), actualCors.GetAllowHeaders(), "CORS AllowHeaders mismatch")
+				assert.Equal(t, expectedCors.GetAllowMethods(), actualCors.GetAllowMethods(), "CORS AllowMethods mismatch")
+				assert.Equal(t, expectedCors.GetAllowOrigins(), actualCors.GetAllowOrigins(), "CORS AllowOrigins mismatch")
+				assert.Equal(t, expectedCors.GetExposeHeaders(), actualCors.GetExposeHeaders(), "CORS ExposeHeaders mismatch")
+				assert.Equal(t, expectedCors.GetMaxAge().GetSeconds(), actualCors.GetMaxAge().GetSeconds(), "CORS MaxAge mismatch")
 			}
 		})
 	}

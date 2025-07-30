@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/golang/protobuf/ptypes/duration"
 	"istio.io/api/annotation"
 	istio "istio.io/api/networking/v1alpha3"
 	kubecreds "istio.io/istio/pilot/pkg/credentials/kube"
@@ -330,10 +331,11 @@ func buildADPFilters(
 			}
 			filters = append(filters, h)
 		case gwv1.HTTPRouteFilterCORS:
-			//return nil, &reporter.RouteCondition{
-			//	Reason:  InvalidFilter,
-			//	Message: fmt.Sprintf("unsupported filter type %q", filter.Type),
-			//}
+			h := createADPCorsFilter(filter.CORS)
+			if h == nil {
+				continue
+			}
+			filters = append(filters, h)
 		default:
 			return nil, &reporter.RouteCondition{
 				Type:    gwv1.RouteConditionAccepted,
@@ -344,6 +346,24 @@ func buildADPFilters(
 		}
 	}
 	return filters, mirrorBackendErr
+}
+
+func createADPCorsFilter(cors *gwv1.HTTPCORSFilter) *api.RouteFilter {
+	if cors == nil {
+		return nil
+	}
+	return &api.RouteFilter{
+		Kind: &api.RouteFilter_Cors{Cors: &api.CORS{
+			AllowCredentials: bool(cors.AllowCredentials),
+			AllowHeaders:     slices.Map(cors.AllowHeaders, func(h gwv1.HTTPHeaderName) string { return string(h) }),
+			AllowMethods:     slices.Map(cors.AllowMethods, func(m gwv1.HTTPMethodWithWildcard) string { return string(m) }),
+			AllowOrigins:     slices.Map(cors.AllowOrigins, func(o gwv1.AbsoluteURI) string { return string(o) }),
+			ExposeHeaders:    slices.Map(cors.ExposeHeaders, func(h gwv1.HTTPHeaderName) string { return string(h) }),
+			MaxAge: &duration.Duration{
+				Seconds: int64(cors.MaxAge),
+			},
+		}},
+	}
 }
 
 func buildADPHTTPDestination(
