@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
@@ -149,7 +150,9 @@ func buildAuthPolicy(ctx krt.HandlerContext, authToken *v1alpha1.SingleAuthToken
 		authKey := ""
 		if (*secret).Data != nil {
 			if val, ok := (*secret).Data["Authorization"]; ok {
-				authKey = string(val)
+				// Strip the "Bearer " prefix if present, as it will be added by the provider
+				authValue := strings.TrimSpace(string(val))
+				authKey = strings.TrimSpace(strings.TrimPrefix(authValue, "Bearer "))
 			}
 		}
 
