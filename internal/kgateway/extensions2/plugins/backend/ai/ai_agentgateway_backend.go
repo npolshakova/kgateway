@@ -4,39 +4,34 @@ import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
-	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 )
 
-func ProcessAIBackendForAgentGateway(ctx krt.HandlerContext, be *v1alpha1.Backend, secrets krt.Collection[*corev1.Secret]) ([]*api.Backend, error) {
+func ProcessAIBackendForAgentGateway(ctx krt.HandlerContext, be *v1alpha1.Backend, secrets krt.Collection[*corev1.Secret]) ([]*api.Backend, []*api.Policy, error) {
 	if be.Spec.AI == nil {
-		return nil, fmt.Errorf("ai backend spec must not be nil for AI backend type")
+		return nil, nil, fmt.Errorf("ai backend spec must not be nil for AI backend type")
 	}
 
 	// Extract the provider configuration
+	var authPolicy *api.Policy
 	var aiBackend *api.Backend
 	beName := be.Namespace + "/" + be.Name
 
 	if be.Spec.AI.LLM != nil {
-		aiBackend = buildAIBackendFromLLM(be.Spec.AI.LLM)
+		aiBackend, authPolicy = buildAIBackendFromLLM(ctx, beName, be.Spec.AI.LLM, secrets, be.Namespace)
 	} else if be.Spec.AI.MultiPool != nil && len(be.Spec.AI.MultiPool.Priorities) > 0 &&
 		len(be.Spec.AI.MultiPool.Priorities[0].Pool) > 0 {
 		// For MultiPool, use the first provider from the first priority pool
-		aiBackend = buildAIBackendFromLLM(&be.Spec.AI.MultiPool.Priorities[0].Pool[0])
+		aiBackend, authPolicy = buildAIBackendFromLLM(ctx, beName, &be.Spec.AI.MultiPool.Priorities[0].Pool[0], secrets, be.Namespace)
 	} else {
-		return nil, fmt.Errorf("AI backend has no valid LLM or MultiPool configuration")
+		return nil, nil, fmt.Errorf("AI backend has no valid LLM or MultiPool configuration")
 	}
 
-	aiBackend := &api.Backend{
-		Name: be.Namespace + "/" + be.Name,
-		Kind: &api.Backend_Ai{
-			Ai: providerConfig,
-		},
-	}
-	return []*api.Backend{aiBackend}, nil
+	return []*api.Backend{aiBackend}, []*api.Policy{authPolicy}, nil
 }
 
 // buildAIBackendFromLLM converts a kgateway LLMProvider to an agentgateway AIBackend
@@ -45,7 +40,7 @@ func buildAIBackendFromLLM(
 	beName string,
 	llm *v1alpha1.LLMProvider,
 	secrets krt.Collection[*corev1.Secret],
-	namespace string) *api.Backend {
+	namespace string) (*api.Backend, *api.Policy) {
 	// Create AIBackend structure with provider-specific configuration
 	aiBackend := &api.AIBackend{}
 
@@ -116,12 +111,19 @@ func buildAIBackendFromLLM(
 	}
 
 	return &api.Backend{
-		Name: beName,
-		Kind: &api.Backend_Ai{
-			Ai: aiBackend,
-		},
-		Auth: auth,
-	}
+			Name: beName,
+			Kind: &api.Backend_Ai{
+				Ai: aiBackend,
+			},
+		}, &api.Policy{
+			Name: fmt.Sprintf("auth-%s", beName),
+			Target: &api.PolicyTarget{Kind: &api.PolicyTarget_Backend{
+				Backend: beName,
+			}},
+			Spec: &api.PolicySpec{Kind: &api.PolicySpec_Auth{
+				Auth: auth,
+			}},
+		}
 }
 
 // buildAuthPolicy creates auth policy for the given auth token configuration

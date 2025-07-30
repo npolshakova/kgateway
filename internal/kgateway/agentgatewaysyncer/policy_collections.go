@@ -9,10 +9,18 @@ import (
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
 	"istio.io/istio/pkg/slices"
+	corev1 "k8s.io/api/core/v1"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 )
 
-func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGateway], domainSuffix string, krtopts krtutil.KrtOptions) krt.Collection[ADPResourcesForGateway] {
+const (
+	a2aProtocol = "kgateway.dev/a2a"
+)
+
+func ADPPolicyCollection(
+	inputs Inputs,
+	binds krt.Collection[ADPResourcesForGateway],
+	domainSuffix string, krtopts krtutil.KrtOptions) krt.Collection[ADPResourcesForGateway] {
 	inference := krt.NewManyCollection(inputs.InferencePools, func(ctx krt.HandlerContext, i *inf.InferencePool) []ADPPolicy {
 		// 'service/{namespace}/{hostname}:{port}'
 		svc := fmt.Sprintf("service/%v/%v.%v.inference.%v:%v", i.Namespace, i.Name, i.Namespace, domainSuffix, i.Spec.TargetPortNumber)
@@ -67,13 +75,33 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 		return []ADPPolicy{{inferencePolicy}, {inferencePolicyTLS}}
 	}, krtopts.ToOptions("InferencePoolPolicies")...)
 
+	a2a := krt.NewManyCollection(inputs.Services, func(ctx krt.HandlerContext, svc *corev1.Service) []ADPPolicy {
+		var a2aPolicies []ADPPolicy
+		for _, port := range svc.Spec.Ports {
+			if port.AppProtocol != nil && *port.AppProtocol == a2aProtocol {
+				svcRef := fmt.Sprintf("%v/%v", svc.Namespace, svc.Name)
+				a2aPolicies = append(a2aPolicies, ADPPolicy{&api.Policy{
+					Name:   svc.Namespace + "/" + svc.Name + "/" + port.String(),
+					Target: &api.PolicyTarget{Kind: &api.PolicyTarget_Backend{Backend: svcRef}},
+					Spec: &api.PolicySpec{Kind: &api.PolicySpec_A2A_{
+						A2A: &api.PolicySpec_A2A{},
+					}},
+				}})
+			}
+		}
+		return a2aPolicies
+	}, krtopts.ToOptions("A2APolicies")...)
+
 	// For now, we apply all policies to all gateways. In the future, we can more precisely bind them to only relevant ones
 	policiesByGateway := krt.NewCollection(binds, func(ctx krt.HandlerContext, i ADPResourcesForGateway) *ADPResourcesForGateway {
 		inferences := slices.Map(krt.Fetch(ctx, inference), func(e ADPPolicy) *api.Resource {
 			return toADPResource(e)
 		})
+		a2aPolicies := slices.Map(krt.Fetch(ctx, a2a), func(e ADPPolicy) *api.Resource {
+			return toADPResource(e)
+		})
 		return &ADPResourcesForGateway{
-			Resources: inferences,
+			Resources: append(inferences, a2aPolicies...),
 			Gateway:   i.Gateway,
 		}
 	})

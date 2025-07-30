@@ -519,7 +519,7 @@ func (s *AgentGwSyncer) buildADPResources(
 func (s *AgentGwSyncer) buildBackendCollections(inputs Inputs, krtopts krtutil.KrtOptions) krt.Collection[envoyResourceWithCustomName] {
 	// Build backends
 	backends := krt.NewManyCollection(inputs.BackendsTemp, func(ctx krt.HandlerContext, obj *v1alpha1.Backend) []envoyResourceWithCustomName {
-		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Namespaces)
+		return s.buildBackendFromBackend(ctx, obj, inputs.Services, inputs.Secrets, inputs.Namespaces)
 	}, krtopts.ToOptions("ADPBackends")...)
 	logger.Debug("backends", "backends", backends)
 
@@ -552,10 +552,6 @@ func (s *AgentGwSyncer) buildListenerFromGateway(obj GatewayListener) *ADPResour
 	}, resources, obj.report)
 }
 
-func buildA2APolicy(ctx krt.HandlerContext, svcCol krt.Collection[*corev1.Service]) []envoyResourceWithCustomName {
-
-}
-
 // buildBackendFromBackend creates a backend resource
 func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext,
 	obj *v1alpha1.Backend,
@@ -565,9 +561,10 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext,
 	var results []envoyResourceWithCustomName
 	// Translate the backend type from Kubernetes Backend to agentgateway API
 	var backends []*api.Backend
+	var backendPolicy []*api.Policy
 	var err error
 	if plug, ok := s.plugins.ContributesBackends[wellknown.BackendGVK.GroupKind()]; ok && plug.BackendInit.InitAgentBackend != nil {
-		backends, err = plug.BackendInit.InitAgentBackend(ctx, nsCol, svcCol, secretsCol, obj)
+		backends, backendPolicy, err = plug.BackendInit.InitAgentBackend(ctx, nsCol, svcCol, secretsCol, obj)
 		if err != nil {
 			// TODO(jmcguire98): should we report an error here instead of just logging it
 			logger.Error("failed to translate backend", "error", err, "backend", obj.Name)
@@ -585,6 +582,19 @@ func (s *AgentGwSyncer) buildBackendFromBackend(ctx krt.HandlerContext,
 		results = append(results, envoyResourceWithCustomName{
 			Message: resourceWrapper,
 			Name:    backend.Name,
+			version: utils.HashProto(resourceWrapper),
+		})
+	}
+	for _, policy := range backendPolicy {
+		logger.Debug("creating backend policy", "policy", policy.Name)
+		resourceWrapper := &api.Resource{
+			Kind: &api.Resource_Policy{
+				Policy: policy,
+			},
+		}
+		results = append(results, envoyResourceWithCustomName{
+			Message: resourceWrapper,
+			Name:    policy.Name,
 			version: utils.HashProto(resourceWrapper),
 		})
 	}

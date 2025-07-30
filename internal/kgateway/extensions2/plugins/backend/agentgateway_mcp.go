@@ -16,7 +16,7 @@ const (
 	mcpProtocol = "kgateway.dev/mcp"
 )
 
-func processMCPBackendForAgentGateway(ctx krt.HandlerContext, nsCol krt.Collection[*corev1.Namespace], svcCol krt.Collection[*corev1.Service], be *v1alpha1.Backend) ([]*api.Backend, error) {
+func processMCPBackendForAgentGateway(ctx krt.HandlerContext, nsCol krt.Collection[*corev1.Namespace], svcCol krt.Collection[*corev1.Service], be *v1alpha1.Backend) ([]*api.Backend, []*api.Policy, error) {
 	// Convert Kubernetes MCP targets to agentgateway format
 	var mcpTargets []*api.MCPTarget
 	var backends []*api.Backend
@@ -153,5 +153,6 @@ func processMCPBackendForAgentGateway(ctx krt.HandlerContext, nsCol krt.Collecti
 		},
 	}
 	backends = append(backends, mcpBackend)
-	return backends, nil
+	// TODO: add support for backend auth policy for mcp
+	return backends, nil, nil
 }
