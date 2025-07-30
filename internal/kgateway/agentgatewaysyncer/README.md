@@ -240,7 +240,7 @@ make run HELM_ADDITIONAL_VALUES=test/kubernetes/e2e/tests/manifests/agent-gatewa
 
 ## Examples 
 
-Setup a kind cluster and install kgateway with the kubernetes Gateway APIs:
+Set up a kind cluster and install kgateway with the kubernetes Gateway APIs:
 ```shell
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
 
