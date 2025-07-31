@@ -209,10 +209,10 @@ func (t *Translator) runListenerPlugins(
 func (t *Translator) newPass(reporter sdkreporter.Reporter) TranslationPassPlugins {
 	ret := TranslationPassPlugins{}
 	for k, v := range t.ContributedPolicies {
-		if v.NewEnvoyGatewayTranslationPass == nil {
+		if v.NewGatewayTranslationPass == nil {
 			continue
 		}
-		tp := v.NewEnvoyGatewayTranslationPass(context.TODO(), ir.GwTranslationCtx{}, reporter)
+		tp := v.NewGatewayTranslationPass(context.TODO(), ir.GwTranslationCtx{}, reporter)
 		if tp != nil {
 			ret[k] = &TranslationPass{
 				ProxyTranslationPass: tp,

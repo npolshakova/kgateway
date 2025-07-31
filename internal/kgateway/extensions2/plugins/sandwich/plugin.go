@@ -53,7 +53,7 @@ func NewPlugin() extensionsplug.Plugin {
 		ContributesPolicies: extensionsplug.ContributesPolicies{
 			SandwichedInboundGK: extensionsplug.PolicyPlugin{
 				Name: "sandwich",
-				NewEnvoyGatewayTranslationPass: func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
+				NewGatewayTranslationPass: func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 					// TODO we could read the waypoint-inbound-binding annotation here and set isSandwiched = true
 					// instead of using a policy set by translator?
 					return &sandwichedTranslationPass{

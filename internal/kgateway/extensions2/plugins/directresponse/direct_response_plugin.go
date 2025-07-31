@@ -95,7 +95,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 				//	AttachmentPoints: []ir.AttachmentPoints{ir.HttpAttachmentPoint},
 				Policies: policyCol,
 				//				AttachmentPoints:          []ir.AttachmentPoints{ir.HttpAttachmentPoint},
-				NewEnvoyGatewayTranslationPass: NewGatewayTranslationPass,
+				NewGatewayTranslationPass: NewGatewayTranslationPass,
 			},
 		},
 	}

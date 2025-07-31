@@ -28,6 +28,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/backendref"
 	tmetrics "github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/metrics"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/utils"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/delegation"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/metrics"
@@ -1171,7 +1172,8 @@ func (h *RoutesIndex) transformHttpRoute(kctx krt.HandlerContext, i *gwv1.HTTPRo
 			h.policies.getTargetingPolicies(kctx, extensionsplug.RouteAttachmentPoint, src, "", i.GetLabels()),
 			ir.WithInheritedPolicyPriority(inheritedPolicyPriority),
 		),
-		PrecedenceWeight: precedenceWeight,
+		PrecedenceWeight:               precedenceWeight,
+		DelegationInheritParentMatcher: delegation.ShouldInheritParentMatcher(i.GetAnnotations()),
 	}
 }
 

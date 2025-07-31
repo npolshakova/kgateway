@@ -126,8 +126,8 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 		},
 		ContributesPolicies: map[schema.GroupKind]extensionsplug.PolicyPlugin{
 			wellknown.BackendGVK.GroupKind(): {
-				Name:                           "backend",
-				NewEnvoyGatewayTranslationPass: newPlug,
+				Name:                      "backend",
+				NewGatewayTranslationPass: newPlug,
 			},
 		},
 		ContributesRegistration: map[schema.GroupKind]func(){

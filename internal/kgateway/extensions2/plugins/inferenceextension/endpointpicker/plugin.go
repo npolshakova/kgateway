@@ -161,9 +161,9 @@ func NewPluginFromCollections(
 		},
 		ContributesPolicies: map[schema.GroupKind]extplug.PolicyPlugin{
 			gk: {
-				Name:                           "endpoint-picker",
-				Policies:                       policyCol,
-				NewEnvoyGatewayTranslationPass: newEndpointPickerPass,
+				Name:                      "endpoint-picker",
+				Policies:                  policyCol,
+				NewGatewayTranslationPass: newEndpointPickerPass,
 			},
 		},
 		ContributesRegistration: map[schema.GroupKind]func(){
