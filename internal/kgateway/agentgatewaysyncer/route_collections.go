@@ -22,7 +22,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
-	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	pluginsdkir "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
@@ -209,8 +208,8 @@ func IsNil[O comparable](o O) bool {
 
 func newAgentGatewayPasses(plugs pluginsdk.Plugin,
 	rep reporter.Reporter,
-	aps ir.AttachedPolicies) []ir.AgentGatewayTranslationPass {
-	var out []ir.AgentGatewayTranslationPass
+	aps pluginsdkir.AttachedPolicies) []pluginsdkir.AgentGatewayTranslationPass {
+	var out []pluginsdkir.AgentGatewayTranslationPass
 	if len(aps.Policies) == 0 {
 		return out
 	}
@@ -263,8 +262,8 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 type RouteContext struct {
 	Krt krt.HandlerContext
 	RouteContextInputs
-	AttachedPolicies ir.AttachedPolicies
-	pluginPasses     []ir.AgentGatewayTranslationPass
+	AttachedPolicies pluginsdkir.AttachedPolicies
+	pluginPasses     []pluginsdkir.AgentGatewayTranslationPass
 }
 
 type RouteContextInputs struct {
@@ -317,7 +316,7 @@ func attachRoutePolicies(ctx *RouteContext, route *gwv1.HTTPRoute) {
 		return
 	}
 
-	target := ir.ObjectSource{
+	target := pluginsdkir.ObjectSource{
 		Group:     wellknown.HTTPRouteGVK.Group,
 		Kind:      wellknown.HTTPRouteGVK.Kind,
 		Namespace: route.Namespace,
@@ -330,7 +329,7 @@ func attachRoutePolicies(ctx *RouteContext, route *gwv1.HTTPRoute) {
 		"", // route-level
 		route.GetLabels())
 
-	aps := ir.AttachedPolicies{Policies: map[schema.GroupKind][]ir.PolicyAtt{}}
+	aps := pluginsdkir.AttachedPolicies{Policies: map[schema.GroupKind][]pluginsdkir.PolicyAtt{}}
 	for _, pa := range pols {
 		a := aps.Policies[pa.GroupKind]
 		aps.Policies[pa.GroupKind] = append(a, pa)
