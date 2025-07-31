@@ -215,7 +215,7 @@ func (t *Translator) newPass(reporter sdkreporter.Reporter) TranslationPassPlugi
 		tp := v.NewEnvoyGatewayTranslationPass(context.TODO(), ir.GwTranslationCtx{}, reporter)
 		if tp != nil {
 			ret[k] = &TranslationPass{
-				EnvoyTranslationPass: tp,
+				ProxyTranslationPass: tp,
 				Name:                 v.Name,
 				MergePolicies:        v.MergePolicies,
 			}
@@ -225,7 +225,7 @@ func (t *Translator) newPass(reporter sdkreporter.Reporter) TranslationPassPlugi
 }
 
 type TranslationPass struct {
-	ir.EnvoyTranslationPass
+	ir.ProxyTranslationPass
 	Name string
 	// If the plugin supports policy merging, it must implement MergePolicies
 	// such that policies ordered from high to low priority, both hierarchically

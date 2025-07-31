@@ -18,11 +18,11 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	pluginsdkir "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
@@ -38,6 +38,7 @@ func ADPRouteCollection(
 	krtopts krtutil.KrtOptions,
 	plugins pluginsdk.Plugin,
 ) krt.Collection[ADPResourcesForGateway] {
+	// TODO(npolshak): look into using RouteIndex instead of raw collections to support targetRefs: https://github.com/kgateway-dev/kgateway/issues/11838
 	httpRoutes := createRouteCollection(httpRouteCol, inputs, krtopts, plugins, "ADPHTTPRoutes",
 		func(ctx RouteContext, obj *gwv1.HTTPRoute, rep reporter.Reporter) (RouteContext, iter.Seq2[ADPRoute, *reporter.RouteCondition]) {
 			// HTTP-specific preprocessing: attach policies and setup plugins
@@ -256,8 +257,8 @@ func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, t
 	return parentRefs, gwResult
 }
 
-// RouteContext defines a common set of inputs to a route collection. This should be built once per route translation and
-// not shared outside of that.
+// RouteContext defines a common set of inputs to a route collection for agentgateway.
+// This should be built once per route translation and not shared outside of that.
 // The embedded RouteContextInputs is typically based into a collection, then translated to a RouteContext with RouteContextInputs.WithCtx().
 type RouteContext struct {
 	Krt krt.HandlerContext

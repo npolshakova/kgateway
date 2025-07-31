@@ -113,10 +113,10 @@ type HcmContext struct {
 	Policy PolicyIR
 }
 
-// EnvoyTranslationPass represents a single translation pass for a gateway using envoy. It can hold state
+// ProxyTranslationPass represents a single translation pass for a gateway using envoy. It can hold state
 // for the duration of the translation.
 // Each of the functions here will be called in the order they appear in the interface.
-type EnvoyTranslationPass interface {
+type ProxyTranslationPass interface {
 	//	Name() string
 	// called 1 time for each listener
 	ApplyListenerPlugin(
@@ -193,7 +193,7 @@ type AgentGatewayTranslationPass interface {
 
 type UnimplementedProxyTranslationPass struct{}
 
-var _ EnvoyTranslationPass = UnimplementedProxyTranslationPass{}
+var _ ProxyTranslationPass = UnimplementedProxyTranslationPass{}
 
 func (s UnimplementedProxyTranslationPass) ApplyListenerPlugin(ctx context.Context, pCtx *ListenerContext, out *envoylistenerv3.Listener) {
 }
@@ -306,7 +306,7 @@ var ErrNotAttachable = fmt.Errorf("policy is not attachable to this object")
 
 type PolicyRun interface {
 	// Allocate state for single listener+rotue translation pass.
-	NewGatewayTranslationPass(ctx context.Context, tctx GwTranslationCtx, reporter reports.Reporter) EnvoyTranslationPass
+	NewGatewayTranslationPass(ctx context.Context, tctx GwTranslationCtx, reporter reports.Reporter) ProxyTranslationPass
 	// Process cluster for a backend
 	ProcessBackend(ctx context.Context, in BackendObjectIR, out *envoyclusterv3.Cluster) error
 }

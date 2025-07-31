@@ -161,7 +161,8 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 
 	var agentGatewaySyncer *agentgatewaysyncer.AgentGwSyncer
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
-		domainSuffix := "cluster.local" // TODO: don't hard code
+		// TODO(npolshak): don't hard code https://github.com/kgateway-dev/kgateway/issues/11840
+		domainSuffix := "cluster.local"
 		agentGatewaySyncer = agentgatewaysyncer.NewAgentGwSyncer(
 			cfg.ControllerName,
 			cfg.AgentGatewayClassName,
@@ -173,7 +174,6 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			domainSuffix,
 			namespaces.GetPodNamespace(),
 			cfg.Client.ClusterID().String(),
-			cfg.SetupOpts.GlobalSettings.EnableAgentGatewayAlphaApis,
 			cfg.SetupOpts.GlobalSettings.EnableInferExt,
 		)
 		agentGatewaySyncer.Init(cfg.KrtOptions)

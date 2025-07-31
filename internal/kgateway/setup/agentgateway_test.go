@@ -30,7 +30,6 @@ import (
 func TestAgentgateway(t *testing.T) {
 	st, err := settings.BuildSettings()
 	st.EnableAgentGateway = true
-	st.EnableAgentGatewayAlphaApis = true
 	st.EnableInferExt = true
 
 	if err != nil {

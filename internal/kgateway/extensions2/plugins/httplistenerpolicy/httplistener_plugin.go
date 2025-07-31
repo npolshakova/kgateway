@@ -125,7 +125,7 @@ type httpListenerPolicyPluginGwPass struct {
 	healthCheckPolicy *healthcheckv3.HealthCheck
 }
 
-var _ ir.EnvoyTranslationPass = &httpListenerPolicyPluginGwPass{}
+var _ ir.ProxyTranslationPass = &httpListenerPolicyPluginGwPass{}
 
 func registerTypes(ourCli versioned.Interface) {
 	skubeclient.Register[*v1alpha1.HTTPListenerPolicy](
@@ -217,7 +217,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 	}
 }
 
-func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
+func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 	return &httpListenerPolicyPluginGwPass{
 		reporter: reporter,
 	}

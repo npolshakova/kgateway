@@ -1772,7 +1772,7 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 					},
 					"aws": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Aws is the AWS backend configuration.",
+							Description: "Aws is the AWS backend configuration. The Aws backend type is only supported with envoy-based gateways, it is not supported in agentgateway.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.AwsBackend"),
 						},
 					},
@@ -1784,13 +1784,13 @@ func schema_kgateway_v2_api_v1alpha1_BackendSpec(ref common.ReferenceCallback) c
 					},
 					"dynamicForwardProxy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DynamicForwardProxy is the dynamic forward proxy backend configuration.",
+							Description: "DynamicForwardProxy is the dynamic forward proxy backend configuration. The DynamicForwardProxy backend type is only supported with envoy-based gateways, it is not supported in agentgateway.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.DynamicForwardProxyBackend"),
 						},
 					},
 					"mcp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MCP is the mcp backend configuration.",
+							Description: "MCP is the mcp backend configuration. The MCP backend type is only supported with agentgateway.",
 							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.MCP"),
 						},
 					},

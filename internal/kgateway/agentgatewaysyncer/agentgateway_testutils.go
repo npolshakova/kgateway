@@ -575,7 +575,7 @@ func (tc TestCase) Run(
 	settings, err := settings.BuildSettings()
 	// enable agent gateway translation
 	settings.EnableAgentGateway = true
-	settings.EnableAgentGatewayAlphaApis = true
+	settings.EnableInferExt = true
 	if err != nil {
 		return nil, err
 	}
@@ -638,7 +638,6 @@ func (tc TestCase) Run(
 		"cluster.local",
 		"istio-system",
 		"Kubernetes",
-		true, // enableAlphaGwAPIs
 		true, // enableInferExt
 	)
 

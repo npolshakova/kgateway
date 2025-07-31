@@ -352,9 +352,9 @@ type backendPlugin struct {
 	needsDfpFilter   map[string]bool
 }
 
-var _ ir.EnvoyTranslationPass = &backendPlugin{}
+var _ ir.ProxyTranslationPass = &backendPlugin{}
 
-func newPlug(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
+func newPlug(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 	return &backendPlugin{}
 }
 

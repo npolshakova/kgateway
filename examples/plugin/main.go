@@ -226,7 +226,7 @@ func pluginFactory(ctx context.Context, commoncol *common.CommonCollections) []e
 			ContributesPolicies: extensionsplug.ContributesPolicies{
 				configMapGK: extensionsplug.PolicyPlugin{
 					Name: "metadataPolicy",
-					NewEnvoyGatewayTranslationPass: func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
+					NewEnvoyGatewayTranslationPass: func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 						// Return a fresh new translation pass
 						return &ourPolicyPass{}
 					},

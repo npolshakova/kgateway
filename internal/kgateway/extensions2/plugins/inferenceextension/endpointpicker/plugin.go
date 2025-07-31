@@ -181,9 +181,9 @@ type endpointPickerPass struct {
 	reporter reports.Reporter
 }
 
-var _ ir.EnvoyTranslationPass = &endpointPickerPass{}
+var _ ir.ProxyTranslationPass = &endpointPickerPass{}
 
-func newEndpointPickerPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
+func newEndpointPickerPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 	return &endpointPickerPass{
 		usedPools: make(map[types.NamespacedName]*inferencePool),
 		reporter:  reporter,

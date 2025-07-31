@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/proto"
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
+	"istio.io/istio/pkg/config/schema/gvr"
 	"istio.io/istio/pkg/config/schema/kubeclient"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/controllers"
@@ -102,8 +103,7 @@ type AgentGwSyncer struct {
 	ready       atomic.Bool
 
 	// features
-	EnableAlphaGatewayAPI bool
-	EnableInferExt        bool
+	EnableInferExt bool
 }
 
 // agentGwXdsResources represents XDS resources for a single agent gateway
@@ -144,9 +144,8 @@ func NewAgentGwSyncer(
 	domainSuffix string,
 	systemNamespace string,
 	clusterID string,
-	enableAlphaGwAPIs, enableInferExt bool,
+	enableInferExt bool,
 ) *AgentGwSyncer {
-	// TODO: register types (auth, policy, etc.) if necessary
 	return &AgentGwSyncer{
 		commonCols:            commonCols,
 		controllerName:        controllerName,
@@ -158,7 +157,6 @@ func NewAgentGwSyncer(
 		domainSuffix:          domainSuffix,
 		systemNamespace:       systemNamespace,
 		clusterID:             clusterID,
-		EnableAlphaGatewayAPI: enableAlphaGwAPIs,
 		EnableInferExt:        enableInferExt,
 	}
 }
@@ -304,7 +302,7 @@ type Inputs struct {
 
 	// kgateway resources
 	Backends *krtcollections.BackendIndex
-	// TODO: remove
+	// TODO(npolshak): Update to use BackendIndex directly: https://github.com/kgateway-dev/kgateway/issues/11838
 	BackendsTemp krt.Collection[*v1alpha1.Backend]
 }
 
@@ -372,27 +370,21 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 		ReferenceGrants: krt.WrapClient(kclient.NewFiltered[*gwv1beta1.ReferenceGrant](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/ReferenceGrants")...),
 		//ServiceEntries:  krt.WrapClient(kclient.New[*networkingclient.ServiceEntry](s.client), krtopts.ToOptions("informer/ServiceEntries")...),
 
+		// kubernetes gateway alpha apis
+		TCPRoutes: krt.WrapClient(kclient.NewDelayedInformer[*gwv1alpha2.TCPRoute](s.client, gvr.TCPRoute, kubetypes.StandardInformer, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TCPRoutes")...),
+		TLSRoutes: krt.WrapClient(kclient.NewDelayedInformer[*gwv1alpha2.TLSRoute](s.client, gvr.TLSRoute, kubetypes.StandardInformer, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TLSRoutes")...),
+
+		// inference extensions need to be enabled so control plane has permissions to watch resource. Disable by default
+		InferencePools: krt.NewStaticCollection[*inf.InferencePool](nil, nil, krtopts.ToOptions("disable/inferencepools")...),
+
 		// kgateway resources
-		Backends: s.commonCols.BackendIndex,
-		// TODO: remove
+		Backends:     s.commonCols.BackendIndex,
 		BackendsTemp: krt.NewInformer[*v1alpha1.Backend](s.client),
 	}
 
 	if s.EnableInferExt {
-		inputs.InferencePools = krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, wellknown.InferencePoolGVK.GroupVersion().WithResource("inferencepools"), kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...)
-	} else {
-		inputs.InferencePools = krt.NewStaticCollection[*inf.InferencePool](nil, nil, krtopts.ToOptions("disable/inferencepools")...)
-	}
-
-	if s.EnableAlphaGatewayAPI {
-		logger.Debug("alpha gateway apis are enabled")
-		inputs.TCPRoutes = krt.WrapClient(kclient.NewFiltered[*gwv1alpha2.TCPRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TCPRoutes")...)
-		inputs.TLSRoutes = krt.WrapClient(kclient.NewFiltered[*gwv1alpha2.TLSRoute](s.client, kubetypes.Filter{ObjectFilter: s.client.ObjectFilter()}), krtopts.ToOptions("informer/TLSRoutes")...)
-	} else {
-		logger.Debug("alpha gateway apis are disabled")
-		// If disabled, still build a collection but make it always empty
-		inputs.TCPRoutes = krt.NewStaticCollection[*gwv1alpha2.TCPRoute](nil, nil, krtopts.ToOptions("disable/TCPRoutes")...)
-		inputs.TLSRoutes = krt.NewStaticCollection[*gwv1alpha2.TLSRoute](nil, nil, krtopts.ToOptions("disable/TLSRoutes")...)
+		// inference extensions cluster watch permissions are controlled by enabling EnableInferExt
+		inputs.InferencePools = krt.WrapClient(kclient.NewDelayedInformer[*inf.InferencePool](s.client, gvr.InferencePool, kubetypes.StandardInformer, kclient.Filter{ObjectFilter: s.commonCols.Client.ObjectFilter()}), krtopts.ToOptions("informer/InferencePools")...)
 	}
 
 	return inputs

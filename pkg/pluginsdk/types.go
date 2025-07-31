@@ -60,7 +60,7 @@ type (
 
 type PolicyPlugin struct {
 	Name                           string
-	NewEnvoyGatewayTranslationPass func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass
+	NewEnvoyGatewayTranslationPass func(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass
 	NewAgentGatewayPass            func(reporter reports.Reporter) ir.AgentGatewayTranslationPass
 
 	ProcessBackend            ProcessBackend

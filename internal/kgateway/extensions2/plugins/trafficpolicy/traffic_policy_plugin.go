@@ -157,7 +157,7 @@ type trafficPolicyPluginGwPass struct {
 	bufferInChain         map[string]*bufferv3.Buffer
 }
 
-var _ ir.EnvoyTranslationPass = &trafficPolicyPluginGwPass{}
+var _ ir.ProxyTranslationPass = &trafficPolicyPluginGwPass{}
 
 var useRustformations bool
 
@@ -229,7 +229,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 	}
 }
 
-func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.EnvoyTranslationPass {
+func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 	return &trafficPolicyPluginGwPass{
 		reporter:                 reporter,
 		setTransformationInChain: make(map[string]bool),

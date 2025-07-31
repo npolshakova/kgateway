@@ -59,15 +59,17 @@ type BackendSpec struct {
 	// +optional
 	AI *AIBackend `json:"ai,omitempty"`
 	// Aws is the AWS backend configuration.
+	// The Aws backend type is only supported with envoy-based gateways, it is not supported in agentgateway.
 	// +optional
 	Aws *AwsBackend `json:"aws,omitempty"`
 	// Static is the static backend configuration.
 	// +optional
 	Static *StaticBackend `json:"static,omitempty"`
 	// DynamicForwardProxy is the dynamic forward proxy backend configuration.
+	// The DynamicForwardProxy backend type is only supported with envoy-based gateways, it is not supported in agentgateway.
 	// +optional
 	DynamicForwardProxy *DynamicForwardProxyBackend `json:"dynamicForwardProxy,omitempty"`
-	// MCP is the mcp backend configuration.
+	// MCP is the mcp backend configuration. The MCP backend type is only supported with agentgateway.
 	MCP *MCP `json:"mcp,omitempty"`
 }
 

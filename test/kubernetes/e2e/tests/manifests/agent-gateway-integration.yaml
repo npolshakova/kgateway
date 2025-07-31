@@ -7,4 +7,3 @@ controller:
 
 agentGateway:
   enabled: true
-  enableAlphaAPIs: true

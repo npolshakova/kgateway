@@ -95,10 +95,6 @@ spec:
             - name: KGW_ENABLE_AGENT_GATEWAY
               value: "true"
             {{- end }}
-            {{- if .Values.agentGateway.enableAlphaAPIs }}
-            - name: KGW_ENABLE_AGENT_GATEWAY_ALPHA_APIS
-              value: "true"
-            {{- end }}
             # TODO: Remove this once the cleanup is done. Required as the gloo-system
             # namespace is the default namespace and conformance will fail as a result.
             - name: POD_NAMESPACE
