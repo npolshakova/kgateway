@@ -678,8 +678,6 @@ spec:
   parentRefs:
     - name: agent-gateway
       namespace: default
-  hostnames:
-    - "www.example.com"
   rules:
     - backendRefs:
         - name: mcp-backend
@@ -755,9 +753,38 @@ spec:
 EOF
 ```
 
-Port-forward, and send a request through the gateway:
+Port-forward, and send a request through the gateway to start a session:
 ```shell
-curl localhost:8080/sse -v -H "host: www.example.com"
+curl localhost:8080/sse -v
+```
+
+You should see a response with the session id:
+```shell
+event: endpoint
+data: ?sessionId=c1a54dcb-be11-4f91-91b5-a1abf67deca2
+
+```
+
+Then you can send a request using the sessionId to initialize the connection:
+```shell
+❯ curl -X POST "http://localhost:8080/mcp/messages?sessionId=f2ce66f0-1c98-48c5-9cc4-52959f5a9e3e" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream,application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 0,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {"roots": {}},
+      "clientInfo": {"name": "curl-client", "version": "1.0"}
+    }
+  }'
+```
+
+Or inspect the mcp tool with [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+```shell
+npx @modelcontextprotocol/inspector
 ```
 
 You can also use static targets. This will create two backends 1) static backend for the target, 2) mcp backend.
