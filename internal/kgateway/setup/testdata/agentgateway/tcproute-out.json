@@ -8,7 +8,7 @@
           "hostname": "bar.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAXw=="
+              "address": "CgAArQ=="
             }
           ],
           "ports": [
@@ -30,7 +30,7 @@
           "hostname": "foo.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAfw=="
+              "address": "CgAAQQ=="
             }
           ],
           "ports": [
@@ -52,7 +52,7 @@
           "hostname": "http-grpcroute.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAlw=="
+              "address": "CgAAZA=="
             }
           ],
           "ports": [
@@ -73,7 +73,7 @@
           "hostname": "http-httproute.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAYA=="
+              "address": "CgAAPg=="
             }
           ],
           "ports": [
@@ -94,7 +94,7 @@
           "hostname": "http-inferencepool.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAwQ=="
+              "address": "CgAA9g=="
             }
           ],
           "ports": [
@@ -115,7 +115,7 @@
           "hostname": "http-tcproute.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAsQ=="
+              "address": "CgAAig=="
             }
           ],
           "ports": [
@@ -146,7 +146,7 @@
           "ports": [
             {
               "service_port": 443,
-              "target_port": 65132
+              "target_port": 53678
             }
           ],
           "ip_families": 1

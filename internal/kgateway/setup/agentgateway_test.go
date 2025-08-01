@@ -171,13 +171,13 @@ func testAgentGatewayScenario(
 				t.Logf("Route resource: %+v", resource.GetRoute())
 			case *api.Resource_TcpRoute:
 				tcpCount++
-				t.Logf("TCPRoute resource: %+v", resource.GetTcpRoute())
+				t.Logf("TcpRoute resource: %+v", resource.GetTcpRoute())
 			case *api.Resource_Policy:
 				policyCount++
 				t.Logf("Policy resource: %+v", resource.GetPolicy())
 			}
 		}
-		t.Logf("Resource counts - Binds: %d, Listeners: %d, Routes: %d, TCPRoutes: %d, Policy: %d", bindCount, listenerCount, routeCount, tcpCount, policyCount)
+		t.Logf("Resource counts - Binds: %d, Listeners: %d, Routes: %d, TcpRoutes: %d, Policy: %d", bindCount, listenerCount, routeCount, tcpCount, policyCount)
 
 		for _, resource := range dump.Addresses {
 			switch resource.GetType().(type) {
@@ -406,7 +406,7 @@ func readExpectedDump(t *testing.T, filename string) (agentGwDump, error) {
 							continue
 						}
 						resource.Kind = &api.Resource_Route{Route: route}
-					} else if tcprouteData, ok := kindData["TCPRoute"].(map[string]interface{}); ok {
+					} else if tcprouteData, ok := kindData["TcpRoute"].(map[string]interface{}); ok {
 						tcprouteJSON, err := json.Marshal(tcprouteData)
 						if err != nil {
 							t.Logf("failed to marshal tcp route data: %v", err)
