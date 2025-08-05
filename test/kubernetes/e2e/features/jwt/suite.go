@@ -3,9 +3,7 @@ package jwt
 import (
 	"context"
 	"fmt"
-	"net/http"
 
-	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,14 +11,13 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
-	"github.com/kgateway-dev/kgateway/v2/test/gomega/matchers"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	testdefaults "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
 )
 
 var _ e2e.NewSuiteFunc = NewTestingSuite
 
-// testingSuite is a suite of tests for external processing functionality
+// testingSuite is a suite of tests for jwt functionality
 type testingSuite struct {
 	suite.Suite
 
@@ -81,6 +78,7 @@ func (s *testingSuite) SetupSuite() {
 			LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", gatewayObjectMeta.GetName()),
 		},
 	)
+	s.testInstallation.Assertions.EventuallyHTTPRouteCondition(s.ctx, "httpbin", "httpbin", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
 }
 
 // TearDownSuite cleans up any remaining resources
@@ -120,48 +118,8 @@ func (s *testingSuite) AfterTest(suiteName, testName string) {
 	}
 }
 
-var (
-	expectedJwtMissingFailedResponse = &matchers.HttpResponse{
-		StatusCode: http.StatusUnauthorized,
-		Body:       gomega.ContainSubstring("Jwt is missing"),
-	}
-	expectedJwtVerificationFailedResponse = &matchers.HttpResponse{
-		StatusCode: http.StatusUnauthorized,
-		Body:       gomega.ContainSubstring("Jwt verification fails"),
-	}
-
-	expectStatus200Success = &matchers.HttpResponse{
-		StatusCode: http.StatusOK,
-		Body:       nil,
-	}
-
-	badJwtToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2Rldi5leGFtcGxlLmNvbSIsImV4cCI6NDgwNDMyNDczNiwiaWF0IjoxNjQ4NjUxMTM2LCJvcmciOiJpbnRlcm5hbCIsImVtYWlsIjoiZGV2MUBrZ2F0ZXdheS5pbyIsImdyb3VwIjoiZW5naW5lZXJpbmciLCJzY29wZSI6ImlzOmRldmVsb3BlciJ9.pqzk87Gny6mT8Gk7CVfkminm3u9CrNPhRt0oElwmfwZ7Jak1Ss4iOZ7MSZEgZFPxGiaz3DQyvos65dqbM_e4RaLYXb9fFYylaBl8kE8bhqMnXfPBNp9C4XTsSz4mR-eUvnkXXZ31dhMkoZvwIswWXR50wZ0rC6NF60Tye0sHJRdDcwL5778wDzLnualvtIiL-CbhWzXgRmjcrK3sbikLCHBjQiTEyBMPOVqS5NqJBgd7ZW1UASoxuxjCLsN8tBIaAFSACf8FZggAh9vEUJ_uc39kvOKQ0vs0pxvoYtsMPcndBYhws6IUhx_iF__qs_zz9mDNp8aMbXSlEdJG30w123"
-
-	/*
-		Configured with these fields:
-			{
-			  "iss": "https://dev.example.com",
-			  "exp": 4804324736,
-			  "iat": 1648651136,
-			  "org": "internal",
-			  "email": "dev1@solo.io",
-			  "group": "engineering",
-			  "scope": "is:developer"
-			}
-		Using https://jwt.io/ and the following instructions to generate a public/private key pair:
-		1. openssl genrsa 2048 > private-key.pem
-		2. openssl rsa -in private-key.pem -pubout
-		3. cat private-key.pem | pbcopy
-	*/
-	// this is also used for single jwt configs
-	jwtToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2Rldi5leGFtcGxlLmNvbSIsImV4cCI6NDgwNDMyNDczNiwiaWF0IjoxNjQ4NjUxMTM2LCJvcmciOiJpbnRlcm5hbCIsImVtYWlsIjoiZGV2MUBzb2xvLmlvIiwiZ3JvdXAiOiJlbmdpbmVlcmluZyIsInNjb3BlIjoiaXM6ZGV2ZWxvcGVyIn0.WtqyZagpEcLnam5v5VpPqTpF-Ow_IvnLKdJgoFoXX_BaHzIgBvx2vdczpjiZxlSw4sBP1x4z1u-nEvohcmjLWlQgW_saAKuOrQMhBWRJtsj7-Ql_cVNqIej4eS7QofYyCuJSzHC9H3KGoIUHd5oQdnTvaTFt07k8xiwgaBOmRvNKVgSbi5B4KxXi59RB4YaoPFut3Em4s9i26U6H5Eqy4OgA39b6vDvQ71DbZGzhncboRQ4KdCkwsk-lMsavooG5OKIuQj3xZH1qzM8g70UOmj-Dg7VTsNGw9QbdOVw-hddFlv6AQ-bqNNA_1jbmEoHaVLfvM4-LUzoPt7_4giSApw"
-)
-
 // TestJwtAuthentication tests the jwt is valid
 func (s *testingSuite) TestJwtAuthentication() {
-	// Check that the httpbin route is accepted
-	s.testInstallation.Assertions.EventuallyHTTPRouteCondition(s.ctx, httpbinRoute.Name, httpbinRoute.Namespace, gwv1.RouteConditionAccepted, metav1.ConditionTrue)
-
 	// Send request to route with no JWT config applied, should get 200 OK
 	s.T().Log("send request to route with no JWT config applied, should get 200 OK")
 	statusReqCurlOpts := []curl.Option{
@@ -202,7 +160,7 @@ func (s *testingSuite) TestJwtAuthentication() {
 
 	// correct JWT is used should result in 200 OK
 	s.T().Log("The /get route does have a JWT config applied, should succeed when correct JWT is provided")
-	getReqJwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+jwtToken))
+	getReqJwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+dev1JwtToken))
 	s.testInstallation.Assertions.AssertEventualCurlResponse(
 		s.ctx,
 		testdefaults.CurlPodExecOpt,

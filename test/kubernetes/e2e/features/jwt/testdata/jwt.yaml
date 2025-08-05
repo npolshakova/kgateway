@@ -67,11 +67,11 @@ spec:
           local:
             key: |
               -----BEGIN PUBLIC KEY-----
-              MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA10wLlnj/yIbd4FHCyyd8
-              t/a3jbZIND2p3ak01ytdk4r7KCMDEFctX1+UYbz3+pyB01qu0jZpLMnESrVQIyZY
-              s8X9T2RTquZ713LiBKPQiDlx0ClBH1aB9uWSk0XEryv85qh46peuu9QSA5NitWok
-              pYyaHdE+1ASGzEYLIEN4W86k0ZTw/fZGhCJ6NH6QS2vabIk7hLm4ntu7yx5PG9AD
-              g4bOT/powWnztB8aB61T1Fgib5xTapxJhWFVTr6KdZLyZdd+lHesECpDjEk/SlL9
-              mplzAHjXBfrbRY4geLEUOXKnPmy3Mk5WvHT4+N0XHZejG8E30nHVRbU+pKIrrjTo
-              zQIDAQAB
+              MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAruK9KacQjDePRyfG7oPI
+              aqAIyCeOCBIGB2nBbDLGp1Szdm7rsWcrzGf7Avpa/ijLV9huoNvpdflld4B+SaT7
+              m3EDDMDUyA4LayJC5JBI10Qfu3Qn8BEpcdN2uRiycXOzgsoIXneXp9hENlS5Vsr3
+              ur5BaBCc+BZZRRaXDTLy6KyD1Pyd6XRsxyZXt/SYOIww0NSt5u0CTyZUGJhQungJ
+              pI8Hhrzdf87mLZGZd16dOGObE5LqFwk2prN3D0+owLsA25WJOPZXizxpTB4tPvJu
+              YGATajDpzrHf+WXgOgvwyxaHJSN/fE+eFuRT3ooDaAuytsfYotsn4z/ajdEPSwXY
+              CwIDAQAB
               -----END PUBLIC KEY-----
