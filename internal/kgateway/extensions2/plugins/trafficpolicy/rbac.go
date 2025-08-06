@@ -2,19 +2,13 @@ package trafficpolicy
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	cncfcorev3 "github.com/cncf/xds/go/xds/core/v3"
 	cncfmatcherv3 "github.com/cncf/xds/go/xds/type/matcher/v3"
 	cncftypev3 "github.com/cncf/xds/go/xds/type/v3"
-	envoycorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoycfgauthz "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v3"
 	envoyauthz "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/rbac/v3"
-	envoy_matcher_v3 "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	"google.golang.org/protobuf/proto"
-	"istio.io/istio/pkg/kube/krt"
-	"k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
@@ -60,13 +54,13 @@ func (p *trafficPolicyPluginGwPass) handleRbac(fcn string, pCtxTypedFilterConfig
 }
 
 // constructRbac translates the RBAC spec into an envoy RBAC policy and stores it in the traffic policy IR
-func constructRbac(krtctx krt.HandlerContext, policy *v1alpha1.TrafficPolicy, out *trafficPolicySpecIr, fetchGatewayExtension FetchGatewayExtensionFunc) error {
+func constructRbac(policy *v1alpha1.TrafficPolicy, out *trafficPolicySpecIr) error {
 	spec := policy.Spec
 	if spec.RBAC == nil {
 		return nil
 	}
 
-	rbacConfig, err := translateRbac(krtctx, policy.Namespace, policy.Name, spec.RBAC, spec.JWT, fetchGatewayExtension)
+	rbacConfig, err := translateRbac(spec.RBAC)
 	if err != nil {
 		return err
 	}
@@ -77,296 +71,197 @@ func constructRbac(krtctx krt.HandlerContext, policy *v1alpha1.TrafficPolicy, ou
 	return nil
 }
 
-func translateRbac(krtctx krt.HandlerContext, tpNs, tpName string, rbac *v1alpha1.Rbac, jwtAuthn *v1alpha1.JWTValidation, fetchGatewayExtension FetchGatewayExtensionFunc) (*envoyauthz.RBACPerRoute, error) {
-	policies := make(map[string]*envoycfgauthz.Policy)
+func translateRbac(rbac *v1alpha1.Rbac) (*envoyauthz.RBACPerRoute, error) {
+	var errs []error
 
-	action := envoycfgauthz.RBAC_ALLOW
-	if rbac.Action == v1alpha1.AuthorizationPolicyActionDeny {
-		action = envoycfgauthz.RBAC_DENY
+	// Create matcher-based RBAC configuration
+	var matchers []*cncfmatcherv3.Matcher_MatcherList_FieldMatcher
+
+	for _, rule := range rbac.Policies {
+		if rule.CelMatchExpression != nil && len(rule.CelMatchExpression) > 0 {
+			matcher, err := createCELMatcher(rule.CelMatchExpression, rbac.Action)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			matchers = append(matchers, matcher)
+		}
+	}
+
+	if len(matchers) == 0 {
+		// If no CEL matchers, create a simple deny-all RBAC
+		return &envoyauthz.RBACPerRoute{
+			Rbac: &envoyauthz.RBAC{
+				Rules: &envoycfgauthz.RBAC{
+					Action:   envoycfgauthz.RBAC_DENY,
+					Policies: map[string]*envoycfgauthz.Policy{},
+				},
+			},
+		}, nil
+	}
+
+	celMatcher := &cncfmatcherv3.Matcher{
+		MatcherType: &cncfmatcherv3.Matcher_MatcherList_{
+			MatcherList: &cncfmatcherv3.Matcher_MatcherList{
+				Matchers: matchers,
+			},
+		},
+		OnNoMatch: createDefaultAction(envoycfgauthz.RBAC_DENY),
 	}
 
 	res := &envoyauthz.RBACPerRoute{
 		Rbac: &envoyauthz.RBAC{
-			Rules: &envoycfgauthz.RBAC{
-				Action:   action,
-				Policies: policies,
-			},
+			Matcher: celMatcher, // Use the Matcher field directly
 		},
 	}
-	for ruleIdx, rule := range rbac.Policies {
-		var err error
-		pName := policyName(tpNs, tpName, ruleIdx)
-		policies[pName], err = translatePolicy(krtctx, tpNs, rule, jwtAuthn, fetchGatewayExtension)
-		if err != nil {
-			return nil, err
-		}
+
+	if len(errs) > 0 {
+		return res, fmt.Errorf("CEL matcher errors: %v", errs)
 	}
 	return res, nil
 }
 
-func translatePolicy(krtctx krt.HandlerContext, namespace string, rule v1alpha1.RbacPolicy, jwtAuthn *v1alpha1.JWTValidation, fetchGatewayExtension FetchGatewayExtensionFunc) (*envoycfgauthz.Policy, error) {
-	outPolicy := &envoycfgauthz.Policy{}
-	var errs []error
-
-	if rule.Principals != nil {
-		for _, principal := range rule.Principals {
-			// TODO: support other principal types (e.g. OIDC, etc.)
-			if principal.JWTPrincipals == nil {
-				// any principal
-				outPolicy.Principals = append(outPolicy.GetPrincipals(), &envoycfgauthz.Principal{
-					Identifier: &envoycfgauthz.Principal_Any{
-						Any: true,
-					},
-				})
-			} else {
-				for jwtPrincipalName, jwtPrincipal := range principal.JWTPrincipals {
-					if jwtPrincipal == nil {
-						errs = append(errs, fmt.Errorf("jwt principal %s not found", jwtPrincipalName))
-						continue
-					}
-					provider, err := fetchGatewayExtension(krtctx, &jwtAuthn.ExtensionRef, namespace)
-					if err != nil {
-						return nil, fmt.Errorf("jwt: %w", err)
-					}
-					// check if providerName on rbac is in the list of providers
-					if _, ok := provider.JwtProviders[jwtPrincipalName]; !ok {
-						errs = append(errs, fmt.Errorf("jwt provider %s not found", jwtPrincipalName))
-						continue
-					}
-					outPrincipal, err := translateJwtPrincipal(provider.ResourceName(), jwtPrincipal)
-					if err != nil {
-						return nil, err
-					}
-					if outPrincipal != nil {
-						outPolicy.Principals = append(outPolicy.GetPrincipals(), outPrincipal)
-					}
-				}
-			}
-		}
+func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyAction) (*cncfmatcherv3.Matcher_MatcherList_FieldMatcher, error) {
+	if len(celExprs) == 0 {
+		return nil, fmt.Errorf("no CEL expressions provided")
 	}
 
-	var allPermissions []*envoycfgauthz.Permission
-	if rule.Conditions != nil {
-		if rule.Conditions.CelMatchExpression != nil {
-			celMatchInput, err := utils.MessageToAny(&cncfmatcherv3.HttpAttributesCelMatchInput{})
-			if err != nil {
-				errs = append(errs, err)
-			}
-			celMatchInputConfig := &cncfcorev3.TypedExtensionConfig{
-				Name:        "envoy.matching.inputs.cel_data_input",
-				TypedConfig: celMatchInput,
-			}
-			var matchers []*cncfmatcherv3.Matcher_MatcherList_FieldMatcher
-
-			// TODO: handle single vs. list case separately
-			for _, cel := range rule.Conditions.CelMatchExpression {
-				typedCelMatchAny, marshalErr := utils.MessageToAny(&cncfmatcherv3.CelMatcher{
-					ExprMatch: &cncftypev3.CelExpression{
-						CelExprString: cel,
-					},
-				})
-				if marshalErr != nil {
-					errs = append(errs, err)
-					continue
-				}
-				typedCelMatchConfig := &cncfcorev3.TypedExtensionConfig{
-					// TODO: use unique user-defined name?
-					Name:        "envoy.matching.matchers.cel_matcher",
-					TypedConfig: typedCelMatchAny,
-				}
-				predicate := &cncfmatcherv3.Matcher_MatcherList_Predicate{
-					MatchType: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate_{
-						SinglePredicate: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate{
-							Input: celMatchInputConfig,
-							Matcher: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate_CustomMatch{
-								CustomMatch: typedCelMatchConfig,
-							},
-						},
-					},
-				}
-				matcher := &cncfmatcherv3.Matcher_MatcherList_FieldMatcher{
-					Predicate: predicate,
-					// TODO: on match action?
-				}
-
-				matchers = append(matchers, matcher)
-			}
-
-			celMatcher := &cncfmatcherv3.Matcher{
-				MatcherType: &cncfmatcherv3.Matcher_MatcherList_{
-					MatcherList: &cncfmatcherv3.Matcher_MatcherList{
-						Matchers: matchers,
-					},
-				},
-			}
-			typedCelMatchAny, marshalErr := utils.MessageToAny(celMatcher)
-			if marshalErr != nil {
-				// failed to marshal cel matcher, return error (nothing to do)
-				return nil, marshalErr
-			}
-			typedCelMatcheConfig := &envoycorev3.TypedExtensionConfig{
-				Name:        "cel-matcher",
-				TypedConfig: typedCelMatchAny,
-			}
-			allPermissions = append(allPermissions, &envoycfgauthz.Permission{
-				Rule: &envoycfgauthz.Permission_Matcher{
-					Matcher: typedCelMatcheConfig,
-				},
-			})
-		}
+	// Create CEL match input
+	celMatchInput, err := utils.MessageToAny(&cncfmatcherv3.HttpAttributesCelMatchInput{})
+	if err != nil {
+		return nil, err
 	}
 
-	if len(allPermissions) == 0 {
-		outPolicy.Permissions = []*envoycfgauthz.Permission{{
-			Rule: &envoycfgauthz.Permission_Any{
-				Any: true,
+	celMatchInputConfig := &cncfcorev3.TypedExtensionConfig{
+		Name:        "envoy.matching.inputs.cel_data_input",
+		TypedConfig: celMatchInput,
+	}
+
+	var predicate *cncfmatcherv3.Matcher_MatcherList_Predicate
+
+	if len(celExprs) == 1 {
+		// Single expression - use SinglePredicate
+		typedCelMatchAny, err := utils.MessageToAny(&cncfmatcherv3.CelMatcher{
+			ExprMatch: &cncftypev3.CelExpression{
+				CelExprString: celExprs[0],
 			},
-		}}
-	} else if len(allPermissions) == 1 {
-		outPolicy.Permissions = []*envoycfgauthz.Permission{allPermissions[0]}
-	} else {
-		outPolicy.Permissions = []*envoycfgauthz.Permission{{
-			Rule: &envoycfgauthz.Permission_AndRules{
-				AndRules: &envoycfgauthz.Permission_Set{
-					Rules: allPermissions,
-				},
-			},
-		}}
-	}
-
-	return outPolicy, errors.NewAggregate(errs)
-}
-
-func translateJwtPrincipal(jwtProviderName string, jwtPrincipal *v1alpha1.JWTPrincipal) (*envoycfgauthz.Principal, error) {
-	var jwtPrincipals []*envoycfgauthz.Principal
-	claims := jwtPrincipal.Claims
-	// sort for idempotency
-	for _, claim := range claims {
-		valueMatcher, err := GetValueMatcher(claim.Value, claim.Matcher)
+		})
 		if err != nil {
 			return nil, err
 		}
-		claimPrincipal := &envoycfgauthz.Principal{
-			Identifier: &envoycfgauthz.Principal_SourcedMetadata{
-				SourcedMetadata: &envoycfgauthz.SourcedMetadata{
-					MetadataMatcher: &envoy_matcher_v3.MetadataMatcher{
-						Filter: jwtFilterName(jwtProviderName),
-						Path:   getPath(claim, jwtPrincipal),
-						Value:  valueMatcher,
+
+		typedCelMatchConfig := &cncfcorev3.TypedExtensionConfig{
+			Name:        "envoy.matching.matchers.cel_matcher",
+			TypedConfig: typedCelMatchAny,
+		}
+
+		predicate = &cncfmatcherv3.Matcher_MatcherList_Predicate{
+			MatchType: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate_{
+				SinglePredicate: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate{
+					Input: celMatchInputConfig,
+					Matcher: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate_CustomMatch{
+						CustomMatch: typedCelMatchConfig,
 					},
 				},
 			},
 		}
-		jwtPrincipals = append(jwtPrincipals, claimPrincipal)
-	}
+	} else {
+		// Multiple expressions - create a list of predicates
+		var predicates []*cncfmatcherv3.Matcher_MatcherList_Predicate
 
-	if len(jwtPrincipals) == 0 {
-		logger.Info("RBAC JWT Principal with zero claims - ignoring")
-		return nil, nil
-	} else if len(jwtPrincipals) == 1 {
-		return jwtPrincipals[0], nil
-	}
-	return &envoycfgauthz.Principal{
-		Identifier: &envoycfgauthz.Principal_AndIds{
-			AndIds: &envoycfgauthz.Principal_Set{
-				Ids: jwtPrincipals,
-			},
-		},
-	}, nil
-}
+		for _, celExpr := range celExprs {
+			typedCelMatchAny, err := utils.MessageToAny(&cncfmatcherv3.CelMatcher{
+				ExprMatch: &cncftypev3.CelExpression{
+					CelExprString: celExpr,
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
 
-// For rbac config the PayloadInMetadata must match the value set in the jwt filter.
-func getPath(claim v1alpha1.JWTClaimMatch, jwtPrincipal *v1alpha1.JWTPrincipal) []*envoy_matcher_v3.MetadataMatcher_PathSegment {
-	// If the claim name contains the nestedClaimsDelimiter then it's a nested claim, and the path
-	// should contain a segment for each layer of nesting, for example:
-	// {
-	//   "sub": "1234567890",
-	//   "name": "John Doe",
-	//   "iat": 1516239022,
-	//   "metadata": {
-	//     "role": [
-	//       "user",
-	//       "editor",
-	//       "admin"
-	//     ]
-	//   }
-	// }
-	// The nested claim name "role" would get a [metadata] segment and a [role] segment.
-	// The claim name "sub" would only have a single [sub] segment.
-	if strings.Contains(claim.Name, nestedClaimsDelimiter) {
-		substrings := strings.Split(claim.Name, nestedClaimsDelimiter)
-		var path []*envoy_matcher_v3.MetadataMatcher_PathSegment
-		path = make([]*envoy_matcher_v3.MetadataMatcher_PathSegment, len(substrings)+1)
-		path[0] = &envoy_matcher_v3.MetadataMatcher_PathSegment{
-			Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-				Key: PayloadInMetadata, // this needs to match jwt payload in metadata
-			},
-		}
-		for i, substring := range substrings {
-			path[i+1] = &envoy_matcher_v3.MetadataMatcher_PathSegment{
-				Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-					Key: substring,
+			typedCelMatchConfig := &cncfcorev3.TypedExtensionConfig{
+				Name:        "envoy.matching.matchers.cel_matcher",
+				TypedConfig: typedCelMatchAny,
+			}
+
+			singlePredicate := &cncfmatcherv3.Matcher_MatcherList_Predicate{
+				MatchType: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate_{
+					SinglePredicate: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate{
+						Input: celMatchInputConfig,
+						Matcher: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate_CustomMatch{
+							CustomMatch: typedCelMatchConfig,
+						},
+					},
 				},
 			}
+			predicates = append(predicates, singlePredicate)
 		}
-		return path
+
+		// Create an OR predicate that contains all the single predicates
+		predicate = &cncfmatcherv3.Matcher_MatcherList_Predicate{
+			MatchType: &cncfmatcherv3.Matcher_MatcherList_Predicate_OrMatcher{
+				OrMatcher: &cncfmatcherv3.Matcher_MatcherList_Predicate_PredicateList{
+					Predicate: predicates,
+				},
+			},
+		}
+	}
+
+	// Determine the action based on policy action
+	var onMatchAction *cncfmatcherv3.Matcher_OnMatch
+	if action == v1alpha1.AuthorizationPolicyActionDeny {
+		onMatchAction = createMatchAction(envoycfgauthz.RBAC_DENY)
 	} else {
-		return []*envoy_matcher_v3.MetadataMatcher_PathSegment{
-			{
-				Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-					Key: PayloadInMetadata, // this needs to match jwt payload in metadata
-				},
-			},
-			{
-				Segment: &envoy_matcher_v3.MetadataMatcher_PathSegment_Key{
-					Key: claim.Name,
-				},
-			},
-		}
+		onMatchAction = createMatchAction(envoycfgauthz.RBAC_ALLOW)
 	}
-}
 
-func GetValueMatcher(value string, claimMatcher v1alpha1.ClaimMatcher) (*envoy_matcher_v3.ValueMatcher, error) {
-	switch claimMatcher {
-	case v1alpha1.ClaimMatcherExactString:
-		return getExactStringValueMatcher(value), nil
-	case v1alpha1.ClaimMatcherBoolean:
-		boolValue, err := strconv.ParseBool(value)
-		if err != nil {
-			return nil, fmt.Errorf("value cannot be parsed to a bool to use ClaimMatcher.BOOLEAN: %v", value)
-		}
-		return &envoy_matcher_v3.ValueMatcher{
-			MatchPattern: &envoy_matcher_v3.ValueMatcher_BoolMatch{
-				BoolMatch: boolValue,
-			},
-		}, nil
-	case v1alpha1.ClaimMatcherContains:
-		return &envoy_matcher_v3.ValueMatcher{
-			MatchPattern: &envoy_matcher_v3.ValueMatcher_ListMatch{
-				ListMatch: &envoy_matcher_v3.ListMatcher{
-					MatchPattern: &envoy_matcher_v3.ListMatcher_OneOf{
-						OneOf: getExactStringValueMatcher(value),
-					},
-				},
-			},
-		}, nil
-	default:
-		return nil, fmt.Errorf("no implementation defined for ClaimMatcher: %v", claimMatcher)
+	return &cncfmatcherv3.Matcher_MatcherList_FieldMatcher{
+		Predicate: predicate,
+		OnMatch:   onMatchAction,
+	}, nil
+}
+func createMatchAction(action envoycfgauthz.RBAC_Action) *cncfmatcherv3.Matcher_OnMatch {
+	actionName := "allow-request"
+	if action == envoycfgauthz.RBAC_DENY {
+		actionName = "deny-request"
 	}
-}
 
-func getExactStringValueMatcher(value string) *envoy_matcher_v3.ValueMatcher {
-	return &envoy_matcher_v3.ValueMatcher{
-		MatchPattern: &envoy_matcher_v3.ValueMatcher_StringMatch{
-			StringMatch: &envoy_matcher_v3.StringMatcher{
-				MatchPattern: &envoy_matcher_v3.StringMatcher_Exact{
-					Exact: value,
-				},
+	rbacAction := &envoycfgauthz.Action{
+		Name:   actionName,
+		Action: action,
+	}
+
+	actionAny, _ := utils.MessageToAny(rbacAction)
+
+	return &cncfmatcherv3.Matcher_OnMatch{
+		OnMatch: &cncfmatcherv3.Matcher_OnMatch_Action{
+			Action: &cncfcorev3.TypedExtensionConfig{
+				Name:        "envoy.filters.rbac.action",
+				TypedConfig: actionAny,
 			},
 		},
 	}
 }
 
-func policyName(namespace, name string, rule int) string {
-	return fmt.Sprintf("ns[%s]-policy[%s]-rule[%d]", namespace, name, rule)
+func createDefaultAction(action envoycfgauthz.RBAC_Action) *cncfmatcherv3.Matcher_OnMatch {
+	actionName := "allow-request"
+	if action == envoycfgauthz.RBAC_DENY {
+		actionName = "deny-request"
+	}
+
+	rbacAction := &envoycfgauthz.Action{
+		Name:   actionName,
+		Action: action,
+	}
+
+	actionAny, _ := utils.MessageToAny(rbacAction)
+
+	return &cncfmatcherv3.Matcher_OnMatch{
+		OnMatch: &cncfmatcherv3.Matcher_OnMatch_Action{
+			Action: &cncfcorev3.TypedExtensionConfig{
+				Name:        "action",
+				TypedConfig: actionAny,
+			},
+		},
+	}
 }

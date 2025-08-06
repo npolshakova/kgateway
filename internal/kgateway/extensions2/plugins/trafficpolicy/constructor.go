@@ -98,7 +98,7 @@ func (c *TrafficPolicyConstructor) ConstructIR(
 	}
 
 	// Construct rbac specific IR
-	if err := constructRbac(krtctx, policyCR, &outSpec, c.FetchGatewayExtension); err != nil {
+	if err := constructRbac(policyCR, &outSpec); err != nil {
 		errors = append(errors, err)
 	}
 

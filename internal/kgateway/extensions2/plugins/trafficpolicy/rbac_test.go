@@ -107,7 +107,6 @@ func TestTranslateRbac(t *testing.T) {
 		ns               string
 		tpName           string
 		rbac             *v1alpha1.Rbac
-		jwt              *v1alpha1.JWTValidation
 		expected         *envoyauthz.RBACPerRoute
 		expectedCELRules map[string][]string // policy name -> expected CEL expressions
 		wantErr          bool
@@ -120,31 +119,8 @@ func TestTranslateRbac(t *testing.T) {
 				Action: v1alpha1.AuthorizationPolicyActionAllow,
 				Policies: []v1alpha1.RbacPolicy{
 					{
-						Name: "policy-0",
-						Principals: []v1alpha1.Principal{
-							{
-								JWTPrincipals: map[string]*v1alpha1.JWTPrincipal{
-									"test-provider": {
-										Claims: []v1alpha1.JWTClaimMatch{
-											{
-												Name:    "sub",
-												Value:   "test-user",
-												Matcher: v1alpha1.ClaimMatcherExactString,
-											},
-										},
-									},
-								},
-							},
-						},
-						Conditions: &v1alpha1.CELConditions{
-							CelMatchExpression: []string{"request.auth.claims.groups == 'group1'", "request.auth.claims.groups == 'group2'"},
-						},
+						CelMatchExpression: []string{"request.auth.claims.groups == 'group1'", "request.auth.claims.groups == 'group2'"},
 					},
-				},
-			},
-			jwt: &v1alpha1.JWTValidation{
-				ExtensionRef: corev1.LocalObjectReference{
-					Name: "test-provider",
 				},
 			},
 			expected: &envoyauthz.RBACPerRoute{
@@ -231,52 +207,11 @@ func TestTranslateRbac(t *testing.T) {
 				Action: v1alpha1.AuthorizationPolicyActionAllow,
 				Policies: []v1alpha1.RbacPolicy{
 					{
-						Name: "policy-0",
-						Principals: []v1alpha1.Principal{
-							{
-								JWTPrincipals: map[string]*v1alpha1.JWTPrincipal{
-									"test-provider": {
-										Claims: []v1alpha1.JWTClaimMatch{
-											{
-												Name:    "role",
-												Value:   "admin",
-												Matcher: v1alpha1.ClaimMatcherExactString,
-											},
-										},
-									},
-								},
-							},
-						},
-						Conditions: &v1alpha1.CELConditions{
-							CelMatchExpression: []string{"request.auth.claims.groups == 'group1'"},
-						},
+						CelMatchExpression: []string{"request.auth.claims.groups == 'group1'"},
 					},
 					{
-						Name: "policy-1",
-						Principals: []v1alpha1.Principal{
-							{
-								JWTPrincipals: map[string]*v1alpha1.JWTPrincipal{
-									"test-provider": {
-										Claims: []v1alpha1.JWTClaimMatch{
-											{
-												Name:    "role",
-												Value:   "user",
-												Matcher: v1alpha1.ClaimMatcherExactString,
-											},
-										},
-									},
-								},
-							},
-						},
-						Conditions: &v1alpha1.CELConditions{
-							CelMatchExpression: []string{"request.auth.claims.groups == 'group2'"},
-						},
+						CelMatchExpression: []string{"request.auth.claims.groups == 'group2'"},
 					},
-				},
-			},
-			jwt: &v1alpha1.JWTValidation{
-				ExtensionRef: corev1.LocalObjectReference{
-					Name: "test-provider",
 				},
 			},
 			expected: &envoyauthz.RBACPerRoute{
@@ -388,31 +323,8 @@ func TestTranslateRbac(t *testing.T) {
 				Action: v1alpha1.AuthorizationPolicyActionAllow,
 				Policies: []v1alpha1.RbacPolicy{
 					{
-						Name: "policy-0",
-						Principals: []v1alpha1.Principal{
-							{
-								JWTPrincipals: map[string]*v1alpha1.JWTPrincipal{
-									"test-provider": {
-										Claims: []v1alpha1.JWTClaimMatch{
-											{
-												Name:    "email",
-												Value:   "dev2@kgateway.io", // route requires dev2
-												Matcher: v1alpha1.ClaimMatcherContains,
-											},
-										},
-									},
-								},
-							},
-						},
-						Conditions: &v1alpha1.CELConditions{
-							CelMatchExpression: []string{"request.auth.claims.groups == 'group1'"},
-						},
+						CelMatchExpression: []string{"request.auth.claims.groups == 'group1'"},
 					},
-				},
-			},
-			jwt: &v1alpha1.JWTValidation{
-				ExtensionRef: corev1.LocalObjectReference{
-					Name: "test-provider",
 				},
 			},
 			expected: &envoyauthz.RBACPerRoute{
@@ -476,8 +388,7 @@ func TestTranslateRbac(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			krtctx := krt.TestingDummyContext{}
-			got, err := translateRbac(krtctx, tt.ns, tt.tpName, tt.rbac, tt.jwt, fetchGatewayExtension)
+			got, err := translateRbac(tt.rbac)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

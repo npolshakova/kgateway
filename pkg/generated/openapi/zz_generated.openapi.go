@@ -46,7 +46,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.BodyTransformation":                        schema_kgateway_v2_api_v1alpha1_BodyTransformation(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Buffer":                                    schema_kgateway_v2_api_v1alpha1_Buffer(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.BufferSettings":                            schema_kgateway_v2_api_v1alpha1_BufferSettings(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELConditions":                             schema_kgateway_v2_api_v1alpha1_CELConditions(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELFilter":                                 schema_kgateway_v2_api_v1alpha1_CELFilter(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CSRFPolicy":                                schema_kgateway_v2_api_v1alpha1_CSRFPolicy(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CommonAccessLogGrpcService":                schema_kgateway_v2_api_v1alpha1_CommonAccessLogGrpcService(ref),
@@ -110,9 +109,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.IstioContainer":                            schema_kgateway_v2_api_v1alpha1_IstioContainer(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.IstioIntegration":                          schema_kgateway_v2_api_v1alpha1_IstioIntegration(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWKS":                                      schema_kgateway_v2_api_v1alpha1_JWKS(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTClaimMatch":                             schema_kgateway_v2_api_v1alpha1_JWTClaimMatch(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTClaimToHeader":                          schema_kgateway_v2_api_v1alpha1_JWTClaimToHeader(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTPrincipal":                              schema_kgateway_v2_api_v1alpha1_JWTPrincipal(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTProvider":                               schema_kgateway_v2_api_v1alpha1_JWTProvider(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTTokenSource":                            schema_kgateway_v2_api_v1alpha1_JWTTokenSource(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTValidation":                             schema_kgateway_v2_api_v1alpha1_JWTValidation(ref),
@@ -150,7 +147,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.PolicyAncestorStatus":                      schema_kgateway_v2_api_v1alpha1_PolicyAncestorStatus(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.PolicyStatus":                              schema_kgateway_v2_api_v1alpha1_PolicyStatus(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Port":                                      schema_kgateway_v2_api_v1alpha1_Port(ref),
-		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Principal":                                 schema_kgateway_v2_api_v1alpha1_Principal(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Priority":                                  schema_kgateway_v2_api_v1alpha1_Priority(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.ProcessingMode":                            schema_kgateway_v2_api_v1alpha1_ProcessingMode(ref),
 		"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.PromptguardRequest":                        schema_kgateway_v2_api_v1alpha1_PromptguardRequest(ref),
@@ -1978,33 +1974,6 @@ func schema_kgateway_v2_api_v1alpha1_BufferSettings(ref common.ReferenceCallback
 					},
 				},
 				Required: []string{"maxRequestBytes"},
-			},
-		},
-	}
-}
-
-func schema_kgateway_v2_api_v1alpha1_CELConditions(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
-				Properties: map[string]spec.Schema{
-					"matchExpressions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "CelMatchExpression defines a set of conditions that must be satisfied for the rule to match.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-				},
 			},
 		},
 	}
@@ -4436,43 +4405,6 @@ func schema_kgateway_v2_api_v1alpha1_JWKS(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_kgateway_v2_api_v1alpha1_JWTClaimMatch(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JWTClaimMatch configures the claim to match",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of the claim to match (e.g., \"sub\", \"role\"). It can be a nested claim of type (eg. \"my.cool.key\") where the nested claim delimiter must use dot \".\" to separate the name path.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"value": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Value is the expected value of the claim.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"matcher": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Matcher specifies how the claim value should be matched.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"name", "value"},
-			},
-		},
-	}
-}
-
 func schema_kgateway_v2_api_v1alpha1_JWTClaimToHeader(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -4500,36 +4432,6 @@ func schema_kgateway_v2_api_v1alpha1_JWTClaimToHeader(ref common.ReferenceCallba
 				Required: []string{"name", "header"},
 			},
 		},
-	}
-}
-
-func schema_kgateway_v2_api_v1alpha1_JWTPrincipal(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "JWTPrincipal defines JWT-based authentication configuration",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"claims": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Claims defines a set of claims that make up the principal. All listed claims must be present and match the given value (AND semantics). Commonly, the 'iss' and 'sub' or 'email' claims are used.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTClaimMatch"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"claims"},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTClaimMatch"},
 	}
 }
 
@@ -5985,35 +5887,6 @@ func schema_kgateway_v2_api_v1alpha1_Port(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_kgateway_v2_api_v1alpha1_Principal(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Principal defines authentication requirements that can be satisfied by different types of principals",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"jwt": {
-						SchemaProps: spec.SchemaProps{
-							Description: "JWTPrincipals defines a map of provider name to JWT principals (e.g. \"my-provider\") used in RBAC These must match provider names defined in the GatewayExtension and configured in the JWT TrafficPolicy field.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTPrincipal"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.JWTPrincipal"},
-	}
-}
-
 func schema_kgateway_v2_api_v1alpha1_Priority(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -6431,31 +6304,24 @@ func schema_kgateway_v2_api_v1alpha1_RbacPolicy(ref common.ReferenceCallback) co
 				Description: "RbacPolicy defines a single RBAC rule.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"principals": {
+					"matchExpressions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Principals defines the list of authentication requirements for this rule.",
+							Description: "CelMatchExpression defines a set of conditions that must be satisfied for the rule to match.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Principal"),
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
 									},
 								},
 							},
 						},
 					},
-					"conditions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Condition defines a set of conditions that must be satisfied for the rule to match.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELConditions"),
-						},
-					},
 				},
 			},
 		},
-		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.CELConditions", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.Principal"},
 	}
 }
 

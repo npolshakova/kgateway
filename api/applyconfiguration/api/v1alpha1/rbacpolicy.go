@@ -5,8 +5,7 @@ package v1alpha1
 // RbacPolicyApplyConfiguration represents a declarative configuration of the RbacPolicy type for use
 // with apply.
 type RbacPolicyApplyConfiguration struct {
-	Principals []PrincipalApplyConfiguration    `json:"principals,omitempty"`
-	Conditions *CELConditionsApplyConfiguration `json:"conditions,omitempty"`
+	CelMatchExpression []string `json:"matchExpressions,omitempty"`
 }
 
 // RbacPolicyApplyConfiguration constructs a declarative configuration of the RbacPolicy type for use with
@@ -15,23 +14,12 @@ func RbacPolicy() *RbacPolicyApplyConfiguration {
 	return &RbacPolicyApplyConfiguration{}
 }
 
-// WithPrincipals adds the given value to the Principals field in the declarative configuration
+// WithCelMatchExpression adds the given value to the CelMatchExpression field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Principals field.
-func (b *RbacPolicyApplyConfiguration) WithPrincipals(values ...*PrincipalApplyConfiguration) *RbacPolicyApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the CelMatchExpression field.
+func (b *RbacPolicyApplyConfiguration) WithCelMatchExpression(values ...string) *RbacPolicyApplyConfiguration {
 	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithPrincipals")
-		}
-		b.Principals = append(b.Principals, *values[i])
+		b.CelMatchExpression = append(b.CelMatchExpression, values[i])
 	}
-	return b
-}
-
-// WithConditions sets the Conditions field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Conditions field is set to the value of the last call.
-func (b *RbacPolicyApplyConfiguration) WithConditions(value *CELConditionsApplyConfiguration) *RbacPolicyApplyConfiguration {
-	b.Conditions = value
 	return b
 }

@@ -47,12 +47,9 @@ metadata:
 spec:
   rbac:
     policies:
-      - principals:
-        - jwt:
-              my-example:
-                claims:
-                  - name: email
-                    value: dev2@kgateway.io # route requires dev2
+      - conditions:
+          matchExpressions:
+            - metadata.jwt.claims.email == 'dev2@kgateway.io'
   jwt:
     extensionRef:
       name: basic-jwt-provider

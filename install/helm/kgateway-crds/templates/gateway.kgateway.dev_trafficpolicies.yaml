@@ -646,50 +646,10 @@ spec:
                   policies:
                     items:
                       properties:
-                        conditions:
-                          properties:
-                            matchExpressions:
-                              items:
-                                type: string
-                              minItems: 1
-                              type: array
-                          type: object
-                        principals:
+                        matchExpressions:
                           items:
-                            properties:
-                              jwt:
-                                additionalProperties:
-                                  properties:
-                                    claims:
-                                      items:
-                                        properties:
-                                          matcher:
-                                            default: Exact
-                                            enum:
-                                            - Exact
-                                            - Boolean
-                                            - Contains
-                                            type: string
-                                          name:
-                                            maxLength: 2048
-                                            minLength: 1
-                                            type: string
-                                          value:
-                                            maxLength: 2048
-                                            minLength: 1
-                                            type: string
-                                        required:
-                                        - name
-                                        - value
-                                        type: object
-                                      maxItems: 16
-                                      minItems: 1
-                                      type: array
-                                  required:
-                                  - claims
-                                  type: object
-                                type: object
-                            type: object
+                            type: string
+                          minItems: 1
                           type: array
                       type: object
                     maxItems: 16

@@ -546,15 +546,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: packAsBytes
       type:
         scalar: boolean
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.CELConditions
-  map:
-    fields:
-    - name: matchExpressions
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.CELFilter
   map:
     fields:
@@ -1389,20 +1380,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: local
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
-  map:
-    fields:
-    - name: matcher
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: value
-      type:
-        scalar: string
-      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
   map:
     fields:
@@ -1414,15 +1391,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipal
-  map:
-    fields:
-    - name: claims
-      type:
-        list:
-          elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
-          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
   map:
     fields:
@@ -1924,14 +1892,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
-- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Principal
-  map:
-    fields:
-    - name: jwt
-      type:
-        map:
-          elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipal
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Priority
   map:
     fields:
@@ -2077,14 +2037,11 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RbacPolicy
   map:
     fields:
-    - name: conditions
-      type:
-        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.CELConditions
-    - name: principals
+    - name: matchExpressions
       type:
         list:
           elementType:
-            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Principal
+            scalar: string
           elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Regex
   map:
