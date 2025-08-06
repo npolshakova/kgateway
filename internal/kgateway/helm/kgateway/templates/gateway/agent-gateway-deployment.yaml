@@ -84,7 +84,11 @@ spec:
       volumes:
         - name: config-volume
           configMap:
+            {{- if $gateway.agentGateway.customConfigMapName }}
+            name: {{ $gateway.agentGateway.customConfigMapName }}
+            {{- else }}
             name: {{ include "kgateway.gateway.fullname" . }}
+            {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -118,6 +122,7 @@ spec:
   selector:
     {{- include "kgateway.gateway.selectorLabels" . | nindent 4 }}
 
+{{- if not $gateway.agentGateway.customConfigMapName }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -131,5 +136,6 @@ data:
     {
       "config": {}
     }
+{{- end }}
 
 {{- end }} {{/* if $gateway.agentGateway.enabled */}}
