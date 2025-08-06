@@ -71,6 +71,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BufferApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BufferSettings"):
 		return &apiv1alpha1.BufferSettingsApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("CELConditions"):
+		return &apiv1alpha1.CELConditionsApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CELFilter"):
 		return &apiv1alpha1.CELFilterApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CommonAccessLogGrpcService"):
@@ -181,8 +183,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.IstioIntegrationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JWKS"):
 		return &apiv1alpha1.JWKSApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTClaimMatch"):
+		return &apiv1alpha1.JWTClaimMatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JWTClaimToHeader"):
 		return &apiv1alpha1.JWTClaimToHeaderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JWTPrincipal"):
+		return &apiv1alpha1.JWTPrincipalApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JWTProvider"):
 		return &apiv1alpha1.JWTProviderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JWTTokenSource"):
@@ -251,6 +257,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.PodApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Port"):
 		return &apiv1alpha1.PortApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Principal"):
+		return &apiv1alpha1.PrincipalApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Priority"):
 		return &apiv1alpha1.PriorityApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ProcessingMode"):
@@ -273,6 +281,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.RateLimitPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RateLimitProvider"):
 		return &apiv1alpha1.RateLimitProviderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Rbac"):
+		return &apiv1alpha1.RbacApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RbacPolicy"):
+		return &apiv1alpha1.RbacPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Regex"):
 		return &apiv1alpha1.RegexApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RegexMatch"):

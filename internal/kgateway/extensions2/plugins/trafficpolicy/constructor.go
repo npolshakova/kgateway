@@ -97,6 +97,11 @@ func (c *TrafficPolicyConstructor) ConstructIR(
 		errors = append(errors, err)
 	}
 
+	// Construct rbac specific IR
+	if err := constructRbac(krtctx, policyCR, &outSpec, c.FetchGatewayExtension); err != nil {
+		errors = append(errors, err)
+	}
+
 	for _, err := range errors {
 		logger.Error("error translating gateway extension", "namespace", policyCR.GetNamespace(), "name", policyCR.GetName(), "error", err)
 	}

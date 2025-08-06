@@ -46,6 +46,7 @@ func (s *testingSuite) SetupSuite() {
 	// Initialize test manifest mappings
 	s.manifests = map[string][]string{
 		"TestJwtAuthentication": {jwtManifest},
+		"TestJWTAuthorization":  {jwtRbacManifest},
 	}
 
 	// Apply core infrastructure
@@ -165,6 +166,35 @@ func (s *testingSuite) TestJwtAuthentication() {
 		s.ctx,
 		testdefaults.CurlPodExecOpt,
 		getReqJwtCurlOpts,
+		expectStatus200Success,
+	)
+}
+
+// TestJwtAuthentication tests the jwt claims have permissions
+func (s *testingSuite) TestJwtAuthorization() {
+	getReqCurlOpts := []curl.Option{
+		curl.WithHost(kubeutils.ServiceFQDN(gatewayService.ObjectMeta)),
+		curl.WithHostHeader("httpbin"),
+		curl.WithPort(8080),
+		curl.WithPath("/get"),
+	}
+
+	// correct JWT, but incorrect claims should be denied
+	s.T().Log("The /get route has a JWT applies at the route level, should fail when correct JWT is provided but incorrect claims")
+	getReqDev1JwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+dev1JwtToken))
+	s.testInstallation.Assertions.AssertEventualCurlResponse(
+		s.ctx,
+		testdefaults.CurlPodExecOpt,
+		getReqDev1JwtCurlOpts,
+		expectRbacDeniedWithJwt,
+	)
+	// correct JWT is used should result in 200 OK
+	s.T().Log("The /get route has a JWT applies at the route level, should succeed when correct JWT is provided with correct claims")
+	getReqDev2JwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+dev2JwtToken))
+	s.testInstallation.Assertions.AssertEventualCurlResponse(
+		s.ctx,
+		testdefaults.CurlPodExecOpt,
+		getReqDev2JwtCurlOpts,
 		expectStatus200Success,
 	)
 }

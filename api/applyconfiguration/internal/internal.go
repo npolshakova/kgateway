@@ -546,6 +546,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: packAsBytes
       type:
         scalar: boolean
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.CELConditions
+  map:
+    fields:
+    - name: matchExpressions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.CELFilter
   map:
     fields:
@@ -1380,6 +1389,20 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: local
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.LocalJWKS
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
+  map:
+    fields:
+    - name: matcher
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: value
+      type:
+        scalar: string
+      default: ""
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimToHeader
   map:
     fields:
@@ -1391,6 +1414,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipal
+  map:
+    fields:
+    - name: claims
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTClaimMatch
+          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTProvider
   map:
     fields:
@@ -1892,6 +1924,14 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Principal
+  map:
+    fields:
+    - name: jwt
+      type:
+        map:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.JWTPrincipal
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Priority
   map:
     fields:
@@ -2022,6 +2062,30 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: timeout
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Rbac
+  map:
+    fields:
+    - name: action
+      type:
+        scalar: string
+    - name: policies
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RbacPolicy
+          elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RbacPolicy
+  map:
+    fields:
+    - name: conditions
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.CELConditions
+    - name: principals
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Principal
+          elementRelationship: atomic
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Regex
   map:
     fields:
@@ -2430,6 +2494,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: rateLimit
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.RateLimit
+    - name: rbac
+      type:
+        namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Rbac
     - name: targetRefs
       type:
         list:
