@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -109,6 +110,9 @@ func buildModelCluster(aiUs *v1alpha1.AIBackend, aiSecret *ir.Secret, multiSecre
 						secretForMultiPool = multiSecrets[GetMultiPoolSecretKey(idx, jdx, secretRef.Name)]
 					}
 					result, err = buildVertexAIEndpoint(ep.Provider.VertexAI, ep.HostOverride, secretForMultiPool)
+				} else if ep.Provider.Bedrock != nil {
+					// TODO: add bedrock support
+					return errors.New("bedrock on the AI backend are not supported yet, switch to agentgateway class")
 				}
 				if err != nil {
 					return err

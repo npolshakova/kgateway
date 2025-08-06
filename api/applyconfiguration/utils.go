@@ -65,6 +65,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BackendStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BackoffStrategy"):
 		return &apiv1alpha1.BackoffStrategyApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BedrockConfig"):
+		return &apiv1alpha1.BedrockConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BodyTransformation"):
 		return &apiv1alpha1.BodyTransformationApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Buffer"):

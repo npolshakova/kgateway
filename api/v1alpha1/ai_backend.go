@@ -63,6 +63,7 @@ type SupportedLLMProvider struct {
 	Anthropic   *AnthropicConfig   `json:"anthropic,omitempty"`
 	Gemini      *GeminiConfig      `json:"gemini,omitempty"`
 	VertexAI    *VertexAIConfig    `json:"vertexai,omitempty"`
+	Bedrock     *BedrockConfig     `json:"bedrock,omitempty"`
 }
 
 type SingleAuthTokenKind string
@@ -220,6 +221,35 @@ type AnthropicConfig struct {
 	// If unset, the model name is taken from the request.
 	// This setting can be useful when testing model failover scenarios.
 	Model *string `json:"model,omitempty"`
+}
+
+type BedrockConfig struct {
+	// Auth specifies an explicit AWS authentication method for the backend.
+	// When omitted, the following credential providers are tried in order, stopping when one
+	// of them returns an access key ID and a secret access key (the session token is optional):
+	// 1. Environment variables: when the environment variables AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN are set.
+	// 2. AssumeRoleWithWebIdentity API call: when the environment variables AWS_WEB_IDENTITY_TOKEN_FILE and AWS_ROLE_ARN are set.
+	// 3. EKS Pod Identity: when the environment variable AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE is set.
+	//
+	// See the Envoy docs for more info:
+	// https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/aws_request_signing_filter#credentials
+	//
+	// +optional
+	Auth *AwsAuth `json:"auth,omitempty"`
+
+	// The model field is the supported model id published by AWS. See <https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html>
+	Model string `json:"model"`
+
+	// Region is the AWS region to use for the backend.
+	// Defaults to us-east-1 if not specified.
+	// +optional
+	// +kubebuilder:default=us-east-1
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
+	Region *string `json:"region,omitempty"`
+
+	// TODO: add future support for match_excluded_headers for more control over what gets signed, signing_algorithm for multiple regions, etc.
 }
 
 // Priority configures the priority of the backend endpoints.

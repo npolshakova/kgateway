@@ -1,13 +1,18 @@
 package ai
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 )
@@ -99,8 +104,23 @@ func buildAIBackendFromLLM(
 			},
 		}
 		auth = buildAuthPolicy(ctx, &provider.VertexAI.AuthToken, secrets, namespace)
+	} else if provider.Bedrock != nil {
+		model := &wrappers.StringValue{
+			Value: provider.Bedrock.Model,
+		}
+		region := wellknown.DefaultAWSRegion
+		if provider.Bedrock.Region != nil {
+			region = *provider.Bedrock.Region
+		}
+		aiBackend.Provider = &api.AIBackend_Bedrock_{
+			Bedrock: &api.AIBackend_Bedrock{
+				Model:  model,
+				Region: region,
+			},
+		}
+		// TODO: handle errors on report
+		auth, _ = buildBedrockAuthPolicy(ctx, region, provider.Bedrock.Auth, secrets, namespace)
 	}
-	// TODO: add bedrock support
 
 	// Map common override configurations
 	if llm.HostOverride != nil {
@@ -124,6 +144,66 @@ func buildAIBackendFromLLM(
 				Auth: auth,
 			}},
 		}
+}
+
+func buildBedrockAuthPolicy(ctx krt.HandlerContext, region string, auth *v1alpha1.AwsAuth, secrets krt.Collection[*corev1.Secret], namespace string) (*api.BackendAuthPolicy, error) {
+	var errs []error
+	if auth == nil {
+		return nil, nil
+	}
+
+	switch auth.Type {
+	case v1alpha1.AwsAuthTypeSecret:
+		if auth.SecretRef == nil {
+			return nil, nil
+		}
+
+		secretRef := auth.SecretRef
+		secretKey := namespace + "/" + secretRef.Name
+		secret := krt.FetchOne(ctx, secrets, krt.FilterKey(secretKey))
+		if secret == nil {
+			// Return nil auth policy if secret not found - this will be handled upstream
+			return nil, nil
+		}
+		secretData := (*secret).Data
+
+		var accessKeyId, secretAccessKey string
+		var sessionToken *string
+
+		// validate that the secret has field in string format and has an access_key and secret_key
+		if secretData[wellknown.AccessKey] == nil || !utf8.Valid(secretData[wellknown.AccessKey]) {
+			// err is nil here but this is still safe
+			errs = append(errs, errors.New("access_key is not a valid string"))
+		} else {
+			accessKeyId = string(secretData[wellknown.AccessKey])
+		}
+
+		if secretData[wellknown.SecretKey] == nil || !utf8.Valid(secretData[wellknown.SecretKey]) {
+			errs = append(errs, errors.New("secret_key is not a valid string"))
+		} else {
+			secretAccessKey = string(secretData[wellknown.SecretKey])
+		}
+		// Session key is optional, but if it is present, it must be a valid string.
+		if secretData[wellknown.SessionToken] != nil && !utf8.Valid(secretData[wellknown.SessionToken]) {
+			errs = append(errs, errors.New("session_key is not a valid string"))
+		} else {
+			sessionToken = ptr.To(string(secretData[wellknown.SessionToken]))
+		}
+
+		return &api.BackendAuthPolicy{
+			Kind: &api.BackendAuthPolicy_Aws{
+				Aws: &api.Aws{
+					AccessKeyId:     accessKeyId,
+					SecretAccessKey: secretAccessKey,
+					SessionToken:    sessionToken,
+					Region:          region,
+				},
+			},
+		}, errors.Join(errs...)
+	default:
+		errs = append(errs, errors.New("unknown AWS auth type"))
+		return nil, errors.Join(errs...)
+	}
 }
 
 // buildAuthPolicy creates auth policy for the given auth token configuration
