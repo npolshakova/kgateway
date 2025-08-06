@@ -150,8 +150,9 @@ func translateProvider(krtctx krt.HandlerContext, provider v1alpha1.JWTProvider,
 		shouldForward = true
 	}
 	jwtProvider := &jwtauthnv3.JwtProvider{
-		Issuer:            provider.Issuer,
-		Audiences:         provider.Audiences,
+		Issuer:    provider.Issuer,
+		Audiences: provider.Audiences,
+		// TODO: multiple jwt filters? make this the provider?
 		PayloadInMetadata: PayloadInMetadata,
 		ClaimToHeaders:    claimToHeaders,
 		Forward:           shouldForward,

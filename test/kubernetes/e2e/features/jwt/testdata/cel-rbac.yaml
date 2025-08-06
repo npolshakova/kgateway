@@ -48,4 +48,4 @@ spec:
   rbac:
     policies:
       - matchExpressions:
-          - 'request.path == "/test-localhost-deny"'
+          - "request.headers['x-my-header'] == 'cool-beans'"

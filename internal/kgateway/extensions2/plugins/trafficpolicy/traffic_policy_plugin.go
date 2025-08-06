@@ -631,7 +631,7 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 		jwtName := jwtFilterName(providerName)
 		stagedJwtFilter := plugins.MustNewStagedFilter(jwtName,
 			jwtFilter,
-			plugins.DuringStage(plugins.AuthZStage))
+			plugins.DuringStage(plugins.AuthNStage))
 
 		filters = append(filters, stagedJwtFilter)
 		// TODO: add associated rbac after?
