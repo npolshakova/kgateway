@@ -82,7 +82,7 @@ func (s *testingSuite) SetupSuite() {
 			LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", gatewayObjectMeta.GetName()),
 		},
 	)
-	s.testInstallation.Assertions.EventuallyHTTPRouteCondition(s.ctx, "httpbin", "httpbin", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
+	s.testInstallation.Assertions.EventuallyHTTPRouteCondition(s.ctx, "httpbin-route", "default", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
 }
 
 // TearDownSuite cleans up any remaining resources
@@ -100,7 +100,7 @@ func (s *testingSuite) TearDownSuite() {
 		LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", gatewayObjectMeta.GetName()),
 	})
 	s.testInstallation.Assertions.EventuallyPodsNotExist(s.ctx, httpbinObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app=httpbin",
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", httpbinObjectMeta.GetName()),
 	})
 }
 

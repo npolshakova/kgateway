@@ -28,7 +28,7 @@ var (
 
 	httpbinObjectMeta = metav1.ObjectMeta{
 		Name:      "httpbin",
-		Namespace: "httpbin",
+		Namespace: "default",
 	}
 	httpbinDeployment = &appsv1.Deployment{ObjectMeta: httpbinObjectMeta}
 
