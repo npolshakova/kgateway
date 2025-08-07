@@ -335,7 +335,7 @@ var _ = DescribeTable("Basic",
 		},
 	),
 	Entry(
-		"TrafficPolicy edge cases",
+		"TrafficPolicy ExtAuth different attachment points",
 		translatorTestCase{
 			inputFile:  "traffic-policy/extauth.yaml",
 			outputFile: "traffic-policy/extauth.yaml",
@@ -352,6 +352,16 @@ var _ = DescribeTable("Basic",
 					{Group: "gateway.kgateway.dev", Kind: "TrafficPolicy", Namespace: "infra", Name: "extauth-for-route-section-name"},
 				}
 				assertAcceptedPolicyStatus(reportsMap, expectedPolicies)
+			},
+		}),
+	Entry(
+		"TrafficPolicy ExtProc different attachment points",
+		translatorTestCase{
+			inputFile:  "traffic-policy/extproc.yaml",
+			outputFile: "traffic-policy/extproc.yaml",
+			gwNN: types.NamespacedName{
+				Namespace: "default",
+				Name:      "test",
 			},
 		}),
 	Entry(
@@ -958,6 +968,14 @@ var _ = DescribeTable("Basic",
 			Name:      "example-gateway",
 		},
 	}),
+	Entry("Backend Config Policy with simple TLS", translatorTestCase{
+		inputFile:  "backendconfigpolicy/simple-tls.yaml",
+		outputFile: "backendconfigpolicy/simple-tls.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
 	Entry(
 		"TrafficPolicy with explicit generation",
 		translatorTestCase{
@@ -1254,7 +1272,7 @@ var _ = DescribeTable("Route Replacement",
 				Expect(acceptedCond.Status).To(Equal(metav1.ConditionFalse))
 				Expect(acceptedCond.Reason).To(Equal(reporter.RouteRuleDroppedReason))
 				Expect(acceptedCond.Message).To(ContainSubstring("Dropped Rule (0)"))
-				Expect(acceptedCond.Message).To(ContainSubstring("extauthz: extension not found"))
+				Expect(acceptedCond.Message).To(ContainSubstring("extauthz: gateway extension gwtest/non-existent-auth-extension not found"))
 				Expect(acceptedCond.ObservedGeneration).To(Equal(int64(0)))
 			},
 		},

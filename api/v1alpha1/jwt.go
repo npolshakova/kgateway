@@ -9,6 +9,8 @@ type JWTValidation struct {
 	ExtensionRef corev1.LocalObjectReference `json:"extensionRef"`
 
 	// TODO: add support for ValidationMode here (REQUIRE_VALID,ALLOW_MISSING,ALLOW_MISSING_OR_FAILED)
+
+	// TODO(npolshak): Add option to disable all jwt filters.
 }
 
 // JWTProvider configures the JWT Provider
