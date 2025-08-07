@@ -249,7 +249,20 @@ type BedrockConfig struct {
 	// +kubebuilder:validation:Pattern="^[a-z0-9-]+$"
 	Region *string `json:"region,omitempty"`
 
+	// Guardrail configures the Guardrail policy to use for the backend. See <https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html>
+	// If not specified, the AWS Guardrail policy will not be used.
+	// +optional
+	Guardrail *AWSGuardrailConfig `json:"guardrail,omitempty"`
+
 	// TODO: add future support for match_excluded_headers for more control over what gets signed, signing_algorithm for multiple regions, etc.
+}
+
+type AWSGuardrailConfig struct {
+	// GuardrailIdentifier is the identifier of the Guardrail policy to use for the backend.
+	GuardrailIdentifier string `json:"identifier"`
+
+	// GuardrailVersion is the version of the Guardrail policy to use for the backend.
+	GuardrailVersion string `json:"version"`
 }
 
 // Priority configures the priority of the backend endpoints.

@@ -112,10 +112,22 @@ func buildAIBackendFromLLM(
 		if provider.Bedrock.Region != nil {
 			region = *provider.Bedrock.Region
 		}
+		var guardrailIdentifier, guardrailVersion *wrappers.StringValue
+		if provider.Bedrock.Guardrail != nil {
+			guardrailIdentifier = &wrappers.StringValue{
+				Value: provider.Bedrock.Guardrail.GuardrailIdentifier,
+			}
+			guardrailVersion = &wrappers.StringValue{
+				Value: provider.Bedrock.Guardrail.GuardrailVersion,
+			}
+		}
+
 		aiBackend.Provider = &api.AIBackend_Bedrock_{
 			Bedrock: &api.AIBackend_Bedrock{
-				Model:  model,
-				Region: region,
+				Model:               model,
+				Region:              region,
+				GuardrailIdentifier: guardrailIdentifier,
+				GuardrailVersion:    guardrailVersion,
 			},
 		}
 		// TODO: handle errors on report
@@ -193,10 +205,14 @@ func buildBedrockAuthPolicy(ctx krt.HandlerContext, region string, auth *v1alpha
 		return &api.BackendAuthPolicy{
 			Kind: &api.BackendAuthPolicy_Aws{
 				Aws: &api.Aws{
-					AccessKeyId:     accessKeyId,
-					SecretAccessKey: secretAccessKey,
-					SessionToken:    sessionToken,
-					Region:          region,
+					Kind: &api.Aws_ExplicitConfig{
+						ExplicitConfig: &api.AwsExplicitConfig{
+							AccessKeyId:     accessKeyId,
+							SecretAccessKey: secretAccessKey,
+							SessionToken:    sessionToken,
+							Region:          region,
+						},
+					},
 				},
 			},
 		}, errors.Join(errs...)

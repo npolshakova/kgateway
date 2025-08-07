@@ -5,9 +5,10 @@ package v1alpha1
 // BedrockConfigApplyConfiguration represents a declarative configuration of the BedrockConfig type for use
 // with apply.
 type BedrockConfigApplyConfiguration struct {
-	Auth   *AwsAuthApplyConfiguration `json:"auth,omitempty"`
-	Model  *string                    `json:"model,omitempty"`
-	Region *string                    `json:"region,omitempty"`
+	Auth      *AwsAuthApplyConfiguration            `json:"auth,omitempty"`
+	Model     *string                               `json:"model,omitempty"`
+	Region    *string                               `json:"region,omitempty"`
+	Guardrail *AWSGuardrailConfigApplyConfiguration `json:"guardrail,omitempty"`
 }
 
 // BedrockConfigApplyConfiguration constructs a declarative configuration of the BedrockConfig type for use with
@@ -37,5 +38,13 @@ func (b *BedrockConfigApplyConfiguration) WithModel(value string) *BedrockConfig
 // If called multiple times, the Region field is set to the value of the last call.
 func (b *BedrockConfigApplyConfiguration) WithRegion(value string) *BedrockConfigApplyConfiguration {
 	b.Region = &value
+	return b
+}
+
+// WithGuardrail sets the Guardrail field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Guardrail field is set to the value of the last call.
+func (b *BedrockConfigApplyConfiguration) WithGuardrail(value *AWSGuardrailConfigApplyConfiguration) *BedrockConfigApplyConfiguration {
+	b.Guardrail = value
 	return b
 }

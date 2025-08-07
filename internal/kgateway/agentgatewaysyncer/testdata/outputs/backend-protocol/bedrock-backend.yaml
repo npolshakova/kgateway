@@ -23,6 +23,8 @@ Backends:
       bedrock:
         model: anthropic.claude-3-5-haiku-20241022-v1:0
         region: us-west-2
+        guardrail_identifier: guardrail-policy-id
+        guardrail_version: guardrail-policy-version
 Policies:
   - name: auth-default/bedrock
     target:

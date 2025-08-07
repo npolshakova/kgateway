@@ -180,6 +180,16 @@ spec:
                                 - message: secretRef must be specified when type is
                                     'Secret'
                                   rule: '!(!has(self.secretRef) && self.type == ''Secret'')'
+                              guardrail:
+                                properties:
+                                  identifier:
+                                    type: string
+                                  version:
+                                    type: string
+                                required:
+                                - identifier
+                                - version
+                                type: object
                               model:
                                 type: string
                               region:
@@ -460,6 +470,16 @@ spec:
                                                 when type is 'Secret'
                                               rule: '!(!has(self.secretRef) && self.type
                                                 == ''Secret'')'
+                                          guardrail:
+                                            properties:
+                                              identifier:
+                                                type: string
+                                              version:
+                                                type: string
+                                            required:
+                                            - identifier
+                                            - version
+                                            type: object
                                           model:
                                             type: string
                                           region:

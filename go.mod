@@ -634,7 +634,7 @@ require (
 replace sigs.k8s.io/controller-tools => github.com/shashankram/controller-tools v0.0.0-20250626172831-f7be064a9132
 
 replace (
-	github.com/agentgateway/agentgateway => github.com/npolshakova/agentgateway v0.0.0-20250806225259-63dd718412ac
+	github.com/agentgateway/agentgateway => github.com/npolshakova/agentgateway v0.0.0-20250807145145-c8210e3547c9
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
 )
 
