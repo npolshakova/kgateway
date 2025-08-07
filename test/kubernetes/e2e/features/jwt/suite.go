@@ -53,6 +53,10 @@ func (s *testingSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	// Apply curl pod for testing
+	err = s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, testdefaults.HttpbinManifest)
+	s.Require().NoError(err)
+
+	// Apply curl pod for testing
 	err = s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, testdefaults.CurlPodManifest)
 	s.Require().NoError(err)
 

@@ -93,7 +93,7 @@ type trafficPolicySpecIr struct {
 	csrf            *csrfIR
 	hashPolicies    *hashPolicyIR
 	autoHostRewrite *autoHostRewriteIR
-	jwt             *JwtIr
+	jwt             *jwtIr
 }
 
 func (d *TrafficPolicy) CreationTime() time.Time {

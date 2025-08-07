@@ -30,12 +30,12 @@ const (
 	PayloadInMetadata string = "payload"
 )
 
-type JwtIr struct {
+type jwtIr struct {
 	provider    *TrafficPolicyGatewayExtensionIR
 	jwtPerRoute *jwtauthnv3.PerRouteConfig
 }
 
-func (j *JwtIr) Equals(other *JwtIr) bool {
+func (j *jwtIr) Equals(other *jwtIr) bool {
 	if j == nil && other == nil {
 		return true
 	}
@@ -55,7 +55,7 @@ func (j *JwtIr) Equals(other *JwtIr) bool {
 }
 
 // handleJwt configures the filter JwtAuthentication and per-route JWT configuration for a specific route
-func (p *trafficPolicyPluginGwPass) handleJwt(fcn string, pCtxTypedFilterConfig *ir.TypedFilterConfigMap, jwtIr *JwtIr) {
+func (p *trafficPolicyPluginGwPass) handleJwt(fcn string, pCtxTypedFilterConfig *ir.TypedFilterConfigMap, jwtIr *jwtIr) {
 	if jwtIr == nil || jwtIr.jwtPerRoute == nil {
 		return
 	}
@@ -99,7 +99,7 @@ func constructJwt(krtctx krt.HandlerContext, policy *v1alpha1.TrafficPolicy, out
 		return err
 	}
 
-	out.jwt = &JwtIr{
+	out.jwt = &jwtIr{
 		provider:    provider,
 		jwtPerRoute: perRouteConfig,
 	}
@@ -107,11 +107,11 @@ func constructJwt(krtctx krt.HandlerContext, policy *v1alpha1.TrafficPolicy, out
 }
 
 // Validate performs validation on the jwt component.
-func (j *JwtIr) Validate() error {
+func (j *jwtIr) Validate() error {
 	return j.validate()
 }
 
-func (j *JwtIr) validate() error {
+func (j *jwtIr) validate() error {
 	if j == nil {
 		return nil
 	}
