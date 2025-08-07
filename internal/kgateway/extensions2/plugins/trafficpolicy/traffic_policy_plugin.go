@@ -14,6 +14,7 @@ import (
 	envoy_csrf_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/csrf/v3"
 	dynamicmodulesv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3"
 	localratelimitv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3"
+	envoyrbacv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/rbac/v3"
 	envoy_wellknown "github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -52,6 +53,7 @@ const (
 	localRateLimitStatPrefix       = "http_local_rate_limiter"
 	rateLimitFilterNamePrefix      = "ratelimit"
 	jwtFilterNamePrefix            = "jwt"
+	rbacFilterNamePrefix           = "envoy.filters.http.rbac"
 )
 
 var (
@@ -94,6 +96,7 @@ type trafficPolicySpecIr struct {
 	hashPolicies    *hashPolicyIR
 	autoHostRewrite *autoHostRewriteIR
 	jwt             *jwtIr
+	rbac            *rbacIr
 }
 
 func (d *TrafficPolicy) CreationTime() time.Time {
@@ -148,6 +151,9 @@ func (d *TrafficPolicy) Equals(in any) bool {
 	if !d.spec.jwt.Equals(d2.spec.jwt) {
 		return false
 	}
+	if !d.spec.rbac.Equals(d2.spec.rbac) {
+		return false
+	}
 	return true
 }
 
@@ -190,6 +196,7 @@ type trafficPolicyPluginGwPass struct {
 	extProcPerProvider    ProviderNeededMap
 	rateLimitPerProvider  ProviderNeededMap
 	jwtPerProvider        ProviderNeededMap
+	rbacInChain           map[string]*envoyrbacv3.RBAC
 	corsInChain           map[string]*corsv3.Cors
 	csrfInChain           map[string]*envoy_csrf_v3.CsrfPolicy
 	bufferInChain         map[string]*bufferv3.Buffer
@@ -626,6 +633,15 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 		filters = append(filters, stagedJwtFilter)
 	}
 
+	// Add the RBAC filter to enable RBAC for the listener.
+	// Requires the RBAC policy to be set as typed_per_filter_config.
+	if p.rbacInChain[fcc.FilterChainName] != nil {
+		filter := plugins.MustNewStagedFilter(rbacFilterNamePrefix,
+			p.rbacInChain[fcc.FilterChainName],
+			plugins.DuringStage(plugins.AuthZStage))
+		filters = append(filters, filter)
+	}
+
 	if len(filters) == 0 {
 		return nil, nil
 	}
@@ -650,6 +666,9 @@ func (p *trafficPolicyPluginGwPass) handlePolicies(fcn string, typedFilterConfig
 
 	// Apply jwt configuration if present
 	p.handleJwt(fcn, typedFilterConfig, spec.jwt)
+
+	// Apply the rbac configuration if present
+	p.handleRbac(fcn, typedFilterConfig, spec.rbac)
 }
 
 func (p *trafficPolicyPluginGwPass) SupportsPolicyMerge() bool {
@@ -683,6 +702,7 @@ func MergeTrafficPolicies(
 		mergeAutoHostRewrite,
 		mergeHashPolicies,
 		mergeJwt,
+		mergeRbac,
 	}
 
 	for _, mergeFunc := range mergeFuncs {

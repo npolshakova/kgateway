@@ -1016,6 +1016,30 @@ var _ = DescribeTable("Basic",
 			Name:      "example-gateway",
 		},
 	}),
+	Entry("RBAC Policy at route level", translatorTestCase{
+		inputFile:  "rbac/route-cel-rbac.yaml",
+		outputFile: "rbac/route-cel-rbac.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
+	Entry("RBAC Policy at httproute level", translatorTestCase{
+		inputFile:  "rbac/httproute-cel-rbac.yaml",
+		outputFile: "rbac/httproute-cel-rbac.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
+	Entry("RBAC Policy at gateway level", translatorTestCase{
+		inputFile:  "rbac/gateway-cel-rbac.yaml",
+		outputFile: "rbac/gateway-cel-rbac.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
 	// TODO: Add this once istio adds support for listener sets
 	// Entry(
 	//

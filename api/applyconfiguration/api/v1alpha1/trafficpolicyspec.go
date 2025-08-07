@@ -22,6 +22,7 @@ type TrafficPolicySpecApplyConfiguration struct {
 	AutoHostRewrite *bool                                                         `json:"autoHostRewrite,omitempty"`
 	Buffer          *BufferApplyConfiguration                                     `json:"buffer,omitempty"`
 	JWT             *JWTValidationApplyConfiguration                              `json:"jwt,omitempty"`
+	RBAC            *RbacApplyConfiguration                                       `json:"rbac,omitempty"`
 }
 
 // TrafficPolicySpecApplyConfiguration constructs a declarative configuration of the TrafficPolicySpec type for use with
@@ -146,5 +147,13 @@ func (b *TrafficPolicySpecApplyConfiguration) WithBuffer(value *BufferApplyConfi
 // If called multiple times, the JWT field is set to the value of the last call.
 func (b *TrafficPolicySpecApplyConfiguration) WithJWT(value *JWTValidationApplyConfiguration) *TrafficPolicySpecApplyConfiguration {
 	b.JWT = value
+	return b
+}
+
+// WithRBAC sets the RBAC field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RBAC field is set to the value of the last call.
+func (b *TrafficPolicySpecApplyConfiguration) WithRBAC(value *RbacApplyConfiguration) *TrafficPolicySpecApplyConfiguration {
+	b.RBAC = value
 	return b
 }
