@@ -137,34 +137,22 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 
 	// Create parsed expression
 	env, err := cel.NewEnv()
+	if err != nil {
+		logger.Error("failed to create CEL environment", "err", err.Error())
+		return nil, err
+	}
+
 	var predicate *cncfmatcherv3.Matcher_MatcherList_Predicate
 	if len(celExprs) == 1 {
 		// Single expression - use SinglePredicate
+		celDevParsed, err := parseCELExpression(env, celExprs[0])
 		if err != nil {
-			logger.Error("failed to create CEL environment", "err", err.Error())
-		}
-		ast, iss := env.Parse(celExprs[0])
-		if iss.Err() != nil {
-			logger.Error("parse error", "err", iss.Err())
-		}
-		parsedExpr, err := cel.AstToParsedExpr(ast)
-		if err != nil {
-			logger.Error("failed to convert AST to parsed expression", "err", err.Error())
-		}
-		// Marshal from google.golang.org/genproto
-		data, err := proto.Marshal(parsedExpr)
-		if err != nil {
-			logger.Error("marshal err", "err", err.Error())
-		}
-		// Unmarshal into cel.dev/expr/v1alpha1
-		var celDevParsed expr.ParsedExpr
-		if err := proto.Unmarshal(data, &celDevParsed); err != nil {
-			logger.Error("unmarshal err", "err", err.Error())
+			return nil, fmt.Errorf("failed to parse CEL expression: %w", err)
 		}
 
 		matcher := &cncfmatcherv3.CelMatcher{
 			ExprMatch: &cncftypev3.CelExpression{
-				CelExprParsed: &celDevParsed,
+				CelExprParsed: celDevParsed,
 			},
 		}
 		pb, err := utils.MessageToAny(matcher)
@@ -191,31 +179,14 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 		var predicates []*cncfmatcherv3.Matcher_MatcherList_Predicate
 
 		for _, celExpr := range celExprs {
+			celDevParsed, err := parseCELExpression(env, celExpr)
 			if err != nil {
-				logger.Error("failed to create CEL environment", "err", err.Error())
-			}
-			ast, iss := env.Parse(celExpr)
-			if iss.Err() != nil {
-				logger.Error("parse error", "err", iss.Err())
-			}
-			parsedExpr, err := cel.AstToParsedExpr(ast)
-			if err != nil {
-				logger.Error("failed to convert AST to parsed expression", "err", err.Error())
-			}
-			// Marshal from google.golang.org/genproto
-			data, err := proto.Marshal(parsedExpr)
-			if err != nil {
-				logger.Error("marshal err", "err", err.Error())
-			}
-			// Unmarshal into cel.dev/expr/v1alpha1
-			var celDevParsed expr.ParsedExpr
-			if err := proto.Unmarshal(data, &celDevParsed); err != nil {
-				logger.Error("unmarshal err", "err", err.Error())
+				return nil, fmt.Errorf("failed to parse CEL expression: %w", err)
 			}
 
 			matcher := &cncfmatcherv3.CelMatcher{
 				ExprMatch: &cncftypev3.CelExpression{
-					CelExprParsed: &celDevParsed,
+					CelExprParsed: celDevParsed,
 				},
 			}
 			pb, err := utils.MessageToAny(matcher)
@@ -308,4 +279,40 @@ func createDefaultAction(action envoycfgauthz.RBAC_Action) *cncfmatcherv3.Matche
 			},
 		},
 	}
+}
+
+// parseCELExpression takes a CEL expression string and converts it to a parsed expression
+// for use in Envoy matchers. It handles the conversion between different protobuf types.
+func parseCELExpression(env *cel.Env, celExpr string) (*expr.ParsedExpr, error) {
+	if env == nil {
+		return nil, fmt.Errorf("CEL environment is nil")
+	}
+
+	ast, iss := env.Parse(celExpr)
+	if iss.Err() != nil {
+		logger.Error("parse error", "err", iss.Err())
+		return nil, iss.Err()
+	}
+
+	parsedExpr, err := cel.AstToParsedExpr(ast)
+	if err != nil {
+		logger.Error("failed to convert AST to parsed expression", "err", err.Error())
+		return nil, err
+	}
+
+	// Marshal from google.golang.org/genproto
+	data, err := proto.Marshal(parsedExpr)
+	if err != nil {
+		logger.Error("marshal err", "err", err.Error())
+		return nil, err
+	}
+
+	// Unmarshal into cel.dev/expr/v1alpha1
+	var celDevParsed expr.ParsedExpr
+	if err := proto.Unmarshal(data, &celDevParsed); err != nil {
+		logger.Error("unmarshal err", "err", err.Error())
+		return nil, err
+	}
+
+	return &celDevParsed, nil
 }

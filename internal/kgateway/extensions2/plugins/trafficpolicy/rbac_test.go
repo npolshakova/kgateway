@@ -8,6 +8,7 @@ import (
 	cncfmatcherv3 "github.com/cncf/xds/go/xds/type/matcher/v3"
 	envoycfgauthz "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v3"
 	envoyauthz "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/rbac/v3"
+	"github.com/google/cel-go/cel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	proto "google.golang.org/protobuf/proto"
@@ -264,10 +265,20 @@ func TestTranslateRbac(t *testing.T) {
 				// When CEL expressions are present, expect Matcher field
 				require.NotNil(t, got.Rbac.Matcher, "Expected Matcher field in actual result")
 
+				// Create CEL environment for validation
+				env, err := cel.NewEnv()
+				require.NoError(t, err, "Failed to create CEL environment")
+
 				// Validate CEL expressions for all expected rules
 				for _, expectedCELs := range tt.expectedCELRules {
 					assert.Greater(t, len(expectedCELs), 0, "Expected CEL expressions should not be empty")
-					// TODO: add CEL expression validation
+
+					// Validate each CEL expression can be parsed
+					for _, celExpr := range expectedCELs {
+						parsedExpr, err := parseCELExpression(env, celExpr)
+						assert.NoError(t, err, "CEL expression should be valid: %s", celExpr)
+						assert.NotNil(t, parsedExpr, "Parsed CEL expression should not be nil: %s", celExpr)
+					}
 				}
 			}
 		})
