@@ -52,6 +52,10 @@ func (s *testingSuite) SetupSuite() {
 	err := s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, setupManifest)
 	s.Require().NoError(err)
 
+	// Apply httpbin for testing
+	err = s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, testdefaults.HttpbinManifest)
+	s.Require().NoError(err)
+
 	// Apply curl pod for testing
 	err = s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, testdefaults.CurlPodManifest)
 	s.Require().NoError(err)
@@ -69,7 +73,7 @@ func (s *testingSuite) SetupSuite() {
 		LabelSelector: testdefaults.CurlPodLabelSelector,
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, httpbinDeployment.ObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app=httpbin",
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", httpbinDeployment.GetName()),
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(
 		s.ctx,
@@ -78,7 +82,7 @@ func (s *testingSuite) SetupSuite() {
 			LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", gatewayObjectMeta.GetName()),
 		},
 	)
-	s.testInstallation.Assertions.EventuallyHTTPRouteCondition(s.ctx, "httpbin", "httpbin", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
+	s.testInstallation.Assertions.EventuallyHTTPRouteCondition(s.ctx, "httpbin-route", "default", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
 }
 
 // TearDownSuite cleans up any remaining resources
@@ -96,7 +100,7 @@ func (s *testingSuite) TearDownSuite() {
 		LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", gatewayObjectMeta.GetName()),
 	})
 	s.testInstallation.Assertions.EventuallyPodsNotExist(s.ctx, httpbinObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app=httpbin",
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", httpbinDeployment.GetName()),
 	})
 }
 
