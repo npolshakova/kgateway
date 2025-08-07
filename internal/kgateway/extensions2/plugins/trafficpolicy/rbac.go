@@ -7,7 +7,7 @@ import (
 	cncfcorev3 "github.com/cncf/xds/go/xds/core/v3"
 	cncfmatcherv3 "github.com/cncf/xds/go/xds/type/matcher/v3"
 	cncftypev3 "github.com/cncf/xds/go/xds/type/v3"
-	envoyrbac3 "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v3"
+	envoyrbacv3 "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v3"
 	envoyauthz "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/rbac/v3"
 	"github.com/google/cel-go/cel"
 	"google.golang.org/protobuf/proto"
@@ -90,9 +90,9 @@ func translateRbac(rbac *v1alpha1.Rbac) (*envoyauthz.RBACPerRoute, error) {
 		// If no CEL matchers, create a simple deny-all RBAC
 		return &envoyauthz.RBACPerRoute{
 			Rbac: &envoyauthz.RBAC{
-				Rules: &envoyrbac3.RBAC{
-					Action:   envoyrbac3.RBAC_DENY,
-					Policies: map[string]*envoyrbac3.Policy{},
+				Rules: &envoyrbacv3.RBAC{
+					Action:   envoyrbacv3.RBAC_DENY,
+					Policies: map[string]*envoyrbacv3.Policy{},
 				},
 			},
 		}, nil
@@ -104,7 +104,7 @@ func translateRbac(rbac *v1alpha1.Rbac) (*envoyauthz.RBACPerRoute, error) {
 				Matchers: matchers,
 			},
 		},
-		OnNoMatch: createDefaultAction(envoyrbac3.RBAC_DENY),
+		OnNoMatch: createDefaultAction(envoyrbacv3.RBAC_DENY),
 	}
 
 	res := &envoyauthz.RBACPerRoute{
@@ -225,9 +225,9 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 	// Determine the action based on policy action
 	var onMatchAction *cncfmatcherv3.Matcher_OnMatch
 	if action == v1alpha1.AuthorizationPolicyActionDeny {
-		onMatchAction = createMatchAction(envoyrbac3.RBAC_DENY)
+		onMatchAction = createMatchAction(envoyrbacv3.RBAC_DENY)
 	} else {
-		onMatchAction = createMatchAction(envoyrbac3.RBAC_ALLOW)
+		onMatchAction = createMatchAction(envoyrbacv3.RBAC_ALLOW)
 	}
 
 	return &cncfmatcherv3.Matcher_MatcherList_FieldMatcher{
@@ -235,13 +235,13 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 		OnMatch:   onMatchAction,
 	}, nil
 }
-func createMatchAction(action envoyrbac3.RBAC_Action) *cncfmatcherv3.Matcher_OnMatch {
+func createMatchAction(action envoyrbacv3.RBAC_Action) *cncfmatcherv3.Matcher_OnMatch {
 	actionName := "allow-request"
-	if action == envoyrbac3.RBAC_DENY {
+	if action == envoyrbacv3.RBAC_DENY {
 		actionName = "deny-request"
 	}
 
-	rbacAction := &envoyrbac3.Action{
+	rbacAction := &envoyrbacv3.Action{
 		Name:   actionName,
 		Action: action,
 	}
@@ -258,13 +258,13 @@ func createMatchAction(action envoyrbac3.RBAC_Action) *cncfmatcherv3.Matcher_OnM
 	}
 }
 
-func createDefaultAction(action envoyrbac3.RBAC_Action) *cncfmatcherv3.Matcher_OnMatch {
+func createDefaultAction(action envoyrbacv3.RBAC_Action) *cncfmatcherv3.Matcher_OnMatch {
 	actionName := "allow-request"
-	if action == envoyrbac3.RBAC_DENY {
+	if action == envoyrbacv3.RBAC_DENY {
 		actionName = "deny-request"
 	}
 
-	rbacAction := &envoyrbac3.Action{
+	rbacAction := &envoyrbacv3.Action{
 		Name:   actionName,
 		Action: action,
 	}

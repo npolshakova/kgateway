@@ -8,49 +8,10 @@ import (
 	envoycfgauthz "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v3"
 	envoyauthz "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/rbac/v3"
 	"github.com/google/cel-go/cel"
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	proto "google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 )
-
-// extractCELExpressions extracts CEL expressions from a Permission_Matcher
-func extractCELExpressions(t *testing.T, perm *envoycfgauthz.Permission) []string {
-	matcherPerm, ok := perm.Rule.(*envoycfgauthz.Permission_Matcher)
-	require.True(t, ok, "Expected Permission_Matcher")
-
-	// Unmarshal the TypedConfig to get the Matcher
-	var matcher cncfmatcherv3.Matcher
-	err := anypb.UnmarshalTo(matcherPerm.Matcher.TypedConfig, &matcher, proto.UnmarshalOptions{})
-	require.NoError(t, err)
-
-	// Extract CEL expressions from the matcher list
-	matcherList := matcher.GetMatcherList()
-	require.NotNil(t, matcherList)
-
-	var celExpressions []string
-	for _, fieldMatcher := range matcherList.Matchers {
-		predicate := fieldMatcher.Predicate
-		singlePred := predicate.GetSinglePredicate()
-		require.NotNil(t, singlePred)
-
-		customMatch := singlePred.GetCustomMatch()
-		require.NotNil(t, customMatch)
-
-		var celMatcher cncfmatcherv3.CelMatcher
-		err := anypb.UnmarshalTo(customMatch.TypedConfig, &celMatcher, proto.UnmarshalOptions{})
-		require.NoError(t, err)
-
-		exprMatch := celMatcher.GetExprMatch()
-		require.NotNil(t, exprMatch)
-
-		celExpressions = append(celExpressions, exprMatch.CelExprString)
-	}
-
-	return celExpressions
-}
 
 // createExpectedMatcher creates an expected matcher structure for testing
 func createExpectedMatcher(action v1alpha1.AuthorizationPolicyAction, numRules int) *cncfmatcherv3.Matcher {
