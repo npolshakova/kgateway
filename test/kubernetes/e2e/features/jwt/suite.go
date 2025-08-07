@@ -73,7 +73,7 @@ func (s *testingSuite) SetupSuite() {
 		LabelSelector: testdefaults.CurlPodLabelSelector,
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, httpbinDeployment.ObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app=httpbin",
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/name=%s", httpbinDeployment.GetName()),
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(
 		s.ctx,
