@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"sort"
 
-	envoycore "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoycorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	jwtauthnv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/jwt_authn/v3"
 	"github.com/go-jose/go-jose/v3"
 	"google.golang.org/protobuf/proto"
@@ -129,7 +129,6 @@ func (j *jwtIr) validate() error {
 	}
 
 	return errors.Join(errs...)
-
 }
 
 // ProviderName returns a unique name for a provider in the context of a route
@@ -222,8 +221,8 @@ func translateJwksSecret(ref *corev1.LocalObjectReference, secret *ir.Secret) (*
 
 func translateJwksFile(filename string) (*jwtauthnv3.JwtProvider_LocalJwks, error) {
 	return &jwtauthnv3.JwtProvider_LocalJwks{
-		LocalJwks: &envoycore.DataSource{
-			Specifier: &envoycore.DataSource_Filename{
+		LocalJwks: &envoycorev3.DataSource{
+			Specifier: &envoycorev3.DataSource_Filename{
 				Filename: filename,
 			},
 		},
@@ -242,8 +241,8 @@ func translateJwksInline(inlineKey string) (*jwtauthnv3.JwtProvider_LocalJwks, e
 	}
 
 	return &jwtauthnv3.JwtProvider_LocalJwks{
-		LocalJwks: &envoycore.DataSource{
-			Specifier: &envoycore.DataSource_InlineString{
+		LocalJwks: &envoycorev3.DataSource{
+			Specifier: &envoycorev3.DataSource_InlineString{
 				InlineString: string(keysetJson),
 			},
 		},
