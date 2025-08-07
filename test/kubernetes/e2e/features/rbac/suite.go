@@ -1,4 +1,4 @@
-package jwt
+package rbac
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 
 var _ e2e.NewSuiteFunc = NewTestingSuite
 
-// testingSuite is a suite of tests for jwt functionality
+// testingSuite is a suite of tests for rbac functionality
 type testingSuite struct {
 	suite.Suite
 
@@ -45,8 +45,7 @@ func NewTestingSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.
 func (s *testingSuite) SetupSuite() {
 	// Initialize test manifest mappings
 	s.manifests = map[string][]string{
-		"TestJwtAuthentication": {jwtManifest},
-		"TestJWTAuthorization":  {jwtRbacManifest},
+		"TestRbacHeaderAuthorization": {rbacManifest},
 	}
 
 	// Apply core infrastructure
@@ -119,86 +118,6 @@ func (s *testingSuite) AfterTest(suiteName, testName string) {
 	}
 }
 
-// TestJwtAuthentication tests the jwt is valid
-func (s *testingSuite) TestJwtAuthentication() {
-	// Send request to route with no JWT config applied, should get 200 OK
-	s.T().Log("send request to route with no JWT config applied, should get 200 OK")
-	statusReqCurlOpts := []curl.Option{
-		curl.WithHost(kubeutils.ServiceFQDN(gatewayService.ObjectMeta)),
-		curl.WithHostHeader("httpbin"),
-		curl.WithPort(8080),
-		curl.WithPath("/status/200"),
-	}
-	s.testInstallation.Assertions.AssertEventualCurlResponse(
-		s.ctx,
-		testdefaults.CurlPodExecOpt,
-		statusReqCurlOpts,
-		expectStatus200Success)
-
-	// The /get route does have a JWT config applied, should get 401 Unauthorized
-	s.T().Log("The /get route does have a JWT config applied, should fail when no JWT is provided")
-	getReqCurlOpts := []curl.Option{
-		curl.WithHost(kubeutils.ServiceFQDN(gatewayService.ObjectMeta)),
-		curl.WithHostHeader("httpbin"),
-		curl.WithPort(8080),
-		curl.WithPath("/get"),
-	}
-	s.testInstallation.Assertions.AssertEventualCurlResponse(
-		s.ctx,
-		testdefaults.CurlPodExecOpt,
-		getReqCurlOpts,
-		expectedJwtMissingFailedResponse)
-
-	// correct JWT is used should result in 200 OK
-	s.T().Log("The /get route does have a JWT config applied, should fail when incorrect JWT is provided")
-	getReqBadJwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+badJwtToken))
-	s.testInstallation.Assertions.AssertEventualCurlResponse(
-		s.ctx,
-		testdefaults.CurlPodExecOpt,
-		getReqBadJwtCurlOpts,
-		expectedJwtVerificationFailedResponse,
-	)
-
-	// correct JWT is used should result in 200 OK
-	s.T().Log("The /get route does have a JWT config applied, should succeed when correct JWT is provided")
-	getReqJwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+dev1JwtToken))
-	s.testInstallation.Assertions.AssertEventualCurlResponse(
-		s.ctx,
-		testdefaults.CurlPodExecOpt,
-		getReqJwtCurlOpts,
-		expectStatus200Success,
-	)
-}
-
-// TestJwtAuthorization tests the jwt claims have permissions
-func (s *testingSuite) TestJwtAuthorization() {
-	getReqCurlOpts := []curl.Option{
-		curl.WithHost(kubeutils.ServiceFQDN(gatewayService.ObjectMeta)),
-		curl.WithHostHeader("httpbin"),
-		curl.WithPort(8080),
-		curl.WithPath("/get"),
-	}
-
-	// correct JWT, but incorrect claims should be denied
-	s.T().Log("The /get route has a JWT applies at the route level, should fail when correct JWT is provided but incorrect claims")
-	getReqDev1JwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+dev1JwtToken))
-	s.testInstallation.Assertions.AssertEventualCurlResponse(
-		s.ctx,
-		testdefaults.CurlPodExecOpt,
-		getReqDev1JwtCurlOpts,
-		expectRbacDeniedWithJwt,
-	)
-	// correct JWT is used should result in 200 OK
-	s.T().Log("The /get route has a JWT applies at the route level, should succeed when correct JWT is provided with correct claims")
-	getReqDev2JwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("Authorization", "Bearer "+dev2JwtToken))
-	s.testInstallation.Assertions.AssertEventualCurlResponse(
-		s.ctx,
-		testdefaults.CurlPodExecOpt,
-		getReqDev2JwtCurlOpts,
-		expectStatus200Success,
-	)
-}
-
 // TestRbacHeaderAuthorization tests header based rbac
 func (s *testingSuite) TestRbacHeaderAuthorization() {
 	statusReqCurlOpts := []curl.Option{
@@ -213,7 +132,7 @@ func (s *testingSuite) TestRbacHeaderAuthorization() {
 		s.ctx,
 		testdefaults.CurlPodExecOpt,
 		statusReqCurlOpts,
-		expectRbacDeniedWithJwt,
+		expectStatus200Success,
 	)
 
 	getReqCurlOpts := []curl.Option{
@@ -228,15 +147,15 @@ func (s *testingSuite) TestRbacHeaderAuthorization() {
 		s.ctx,
 		testdefaults.CurlPodExecOpt,
 		getReqCurlOpts,
-		expectRbacDeniedWithJwt,
+		expectRbacDenied,
 	)
 	// has header, should succeed
 	s.T().Log("The /get route has an rbac policy applied at the route level, should suceed when the header is present")
-	getReqDev2JwtCurlOpts := append(getReqCurlOpts, curl.WithHeader("x-my-header", "cool-beans"))
+	getWithHeaderCurlOpts := append(getReqCurlOpts, curl.WithHeader("x-my-header", "cool-beans"))
 	s.testInstallation.Assertions.AssertEventualCurlResponse(
 		s.ctx,
 		testdefaults.CurlPodExecOpt,
-		getReqDev2JwtCurlOpts,
+		getWithHeaderCurlOpts,
 		expectStatus200Success,
 	)
 }

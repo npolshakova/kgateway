@@ -1,136 +1,252 @@
 clusters:
-  - connectTimeout: 5s
-    edsClusterConfig:
-      edsConfig:
-        ads: {}
-        resourceApiVersion: V3
-    ignoreHealthOnHostRemoval: true
-    metadata: {}
-    name: kube_default_kubernetes_443
-    type: EDS
-  - connectTimeout: 5s
-    edsClusterConfig:
-      edsConfig:
-        ads: {}
-        resourceApiVersion: V3
-    ignoreHealthOnHostRemoval: true
-    metadata: {}
-    name: kube_gwtest_extproc_9091
-    type: EDS
-    typedExtensionProtocolOptions:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicitHttpConfig:
-          http2ProtocolOptions: {}
-  - connectTimeout: 5s
-    edsClusterConfig:
-      edsConfig:
-        ads: {}
-        resourceApiVersion: V3
-    ignoreHealthOnHostRemoval: true
-    metadata: {}
-    name: kube_gwtest_reviews_8080
-    type: EDS
+- connectTimeout: 5s
+  edsClusterConfig:
+    edsConfig:
+      ads: {}
+      resourceApiVersion: V3
+  ignoreHealthOnHostRemoval: true
+  metadata: {}
+  name: kube_default_kubernetes_443
+  type: EDS
+- connectTimeout: 5s
+  edsClusterConfig:
+    edsConfig:
+      ads: {}
+      resourceApiVersion: V3
+  ignoreHealthOnHostRemoval: true
+  metadata: {}
+  name: kube_gwtest_extproc_9091
+  type: EDS
+  typedExtensionProtocolOptions:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      '@type': type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicitHttpConfig:
+        http2ProtocolOptions: {}
+- connectTimeout: 5s
+  edsClusterConfig:
+    edsConfig:
+      ads: {}
+      resourceApiVersion: V3
+  ignoreHealthOnHostRemoval: true
+  metadata: {}
+  name: kube_gwtest_reviews_8080
+  type: EDS
 endpoints:
-  - clusterName: kube_gwtest_reviews_8080
-    endpoints:
-      - lbEndpoints:
-          - endpoint:
-              address:
-                socketAddress:
-                  address: 10.244.1.11
-                  portValue: 8080
-            loadBalancingWeight: 1
-        loadBalancingWeight: 1
-        locality:
-          region: r1
-          subZone: r1z2s3
-          zone: r1z2
-      - lbEndpoints:
-          - endpoint:
-              address:
-                socketAddress:
-                  address: 10.244.2.14
-                  portValue: 8080
-            loadBalancingWeight: 1
-        loadBalancingWeight: 1
+- clusterName: kube_gwtest_reviews_8080
+  endpoints:
+  - lbEndpoints:
+    - endpoint:
+        address:
+          socketAddress:
+            address: 10.244.1.11
+            portValue: 8080
+      loadBalancingWeight: 1
+    loadBalancingWeight: 1
+    locality:
+      region: r1
+      subZone: r1z2s3
+      zone: r1z2
+  - lbEndpoints:
+    - endpoint:
+        address:
+          socketAddress:
+            address: 10.244.2.14
+            portValue: 8080
+      loadBalancingWeight: 1
+    loadBalancingWeight: 1
 listeners:
-  - address:
-      socketAddress:
-        address: '::'
-        ipv4Compat: true
-        portValue: 8080
-    filterChains:
-      - filters:
-          - name: envoy.filters.network.http_connection_manager
-            typedConfig:
-              '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-              httpFilters:
-                - name: envoy.filters.http.rbac
-                  typedConfig:
-                    '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-                - name: envoy.filters.http.router
-                  typedConfig:
-                    '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-              mergeSlashes: true
-              normalizePath: true
-              rds:
-                configSource:
-                  ads: {}
-                  resourceApiVersion: V3
-                routeConfigName: listener~8080
-              statPrefix: http
-              useRemoteAddress: true
-        name: listener~8080
+- address:
+    socketAddress:
+      address: '::'
+      ipv4Compat: true
+      portValue: 8080
+  filterChains:
+  - filters:
+    - name: envoy.filters.network.http_connection_manager
+      typedConfig:
+        '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        httpFilters:
+        - name: envoy.filters.http.rbac
+          typedConfig:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+        - name: envoy.filters.http.router
+          typedConfig:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        mergeSlashes: true
+        normalizePath: true
+        rds:
+          configSource:
+            ads: {}
+            resourceApiVersion: V3
+          routeConfigName: listener~8080
+        statPrefix: http
+        useRemoteAddress: true
     name: listener~8080
+  name: listener~8080
 routes:
-  - ignorePortInHostMatching: true
-    name: listener~8080
-    virtualHosts:
-      - domains:
-          - example.com
-        name: listener~8080~example_com
-        routes:
-          - match:
-              prefix: /
-            name: listener~8080~example_com-route-0-httproute-route-gwtest-0-0-matcher-0
-            route:
-              cluster: kube_gwtest_reviews_8080
-              clusterNotFoundResponseCode: INTERNAL_SERVER_ERROR
-            typedPerFilterConfig:
-              envoy.filters.http.rbac:
-                '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
-                rbac:
-                  rules:
-                    policies:
-                      ns[gwtest]-policy[route-test]-rule[0]:
-                        permissions:
-                          - any: true
-                        principals:
-                          - sourcedMetadata:
-                              metadataMatcher:
-                                filter: envoy.filters.http.jwt_authn
-                                path:
-                                  - key: payload
-                                  - key: test
-                                value:
-                                  stringMatch:
-                                    exact: foo
-                      ns[gwtest]-policy[route-test]-rule[1]:
-                        permissions:
-                          - any: true
-                        principals:
-                          - sourcedMetadata:
-                              metadataMatcher:
-                                filter: envoy.filters.http.jwt_authn
-                                path:
-                                  - key: payload
-                                  - key: request
-                                  - key: auth
-                                  - key: claims
-                                  - key: groups
-                                value:
-                                  listMatch:
-                                    oneOf:
-                                      stringMatch:
-                                        exact: group1
+- ignorePortInHostMatching: true
+  name: listener~8080
+  virtualHosts:
+  - domains:
+    - example.com
+    name: listener~8080~example_com
+    routes:
+    - match:
+        prefix: /
+      metadata:
+        filterMetadata:
+          merge.TrafficPolicy.gateway.kgateway.dev:
+            rbac:
+            - gateway.kgateway.dev/TrafficPolicy/gwtest/route-test
+      name: listener~8080~example_com-route-0-httproute-route-gwtest-0-0-matcher-0
+      route:
+        cluster: kube_gwtest_reviews_8080
+        clusterNotFoundResponseCode: INTERNAL_SERVER_ERROR
+      typedPerFilterConfig:
+        envoy.filters.http.rbac:
+          '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+          rbac:
+            matcher:
+              matcherList:
+                matchers:
+                - onMatch:
+                    action:
+                      name: envoy.filters.rbac.action
+                      typedConfig:
+                        '@type': type.googleapis.com/envoy.config.rbac.v3.Action
+                        name: allow-request
+                  predicate:
+                    orMatcher:
+                      predicate:
+                      - singlePredicate:
+                          customMatch:
+                            name: envoy.matching.matchers.cel_matcher
+                            typedConfig:
+                              '@type': type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                              exprMatch:
+                                celExprParsed:
+                                  expr:
+                                    callExpr:
+                                      args:
+                                      - callExpr:
+                                          args:
+                                          - callExpr:
+                                              args:
+                                              - callExpr:
+                                                  args:
+                                                  - id: "2"
+                                                    selectExpr:
+                                                      field: filter_metadata
+                                                      operand:
+                                                        id: "1"
+                                                        identExpr:
+                                                          name: metadata
+                                                  - constExpr:
+                                                      stringValue: envoy.filters.http.jwt_authn
+                                                    id: "4"
+                                                  function: _[_]
+                                                id: "3"
+                                              - constExpr:
+                                                  stringValue: payload
+                                                id: "6"
+                                              function: _[_]
+                                            id: "5"
+                                          - constExpr:
+                                              stringValue: test
+                                            id: "8"
+                                          function: _[_]
+                                        id: "7"
+                                      - constExpr:
+                                          stringValue: foo
+                                        id: "10"
+                                      function: _==_
+                                    id: "9"
+                                  sourceInfo:
+                                    lineOffsets:
+                                    - 85
+                                    location: <input>
+                                    positions:
+                                      "1": 0
+                                      "2": 8
+                                      "3": 24
+                                      "4": 25
+                                      "5": 56
+                                      "6": 57
+                                      "7": 67
+                                      "8": 68
+                                      "9": 76
+                                      "10": 79
+                          input:
+                            name: envoy.matching.inputs.cel_data_input
+                            typedConfig:
+                              '@type': type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+                      - singlePredicate:
+                          customMatch:
+                            name: envoy.matching.matchers.cel_matcher
+                            typedConfig:
+                              '@type': type.googleapis.com/xds.type.matcher.v3.CelMatcher
+                              exprMatch:
+                                celExprParsed:
+                                  expr:
+                                    callExpr:
+                                      args:
+                                      - constExpr:
+                                          stringValue: group1
+                                        id: "10"
+                                      function: contains
+                                      target:
+                                        callExpr:
+                                          args:
+                                          - callExpr:
+                                              args:
+                                              - callExpr:
+                                                  args:
+                                                  - id: "2"
+                                                    selectExpr:
+                                                      field: filter_metadata
+                                                      operand:
+                                                        id: "1"
+                                                        identExpr:
+                                                          name: metadata
+                                                  - constExpr:
+                                                      stringValue: envoy.filters.http.jwt_authn
+                                                    id: "4"
+                                                  function: _[_]
+                                                id: "3"
+                                              - constExpr:
+                                                  stringValue: payload
+                                                id: "6"
+                                              function: _[_]
+                                            id: "5"
+                                          - constExpr:
+                                              stringValue: groups
+                                            id: "8"
+                                          function: _[_]
+                                        id: "7"
+                                    id: "9"
+                                  sourceInfo:
+                                    lineOffsets:
+                                    - 97
+                                    location: <input>
+                                    positions:
+                                      "1": 0
+                                      "2": 8
+                                      "3": 24
+                                      "4": 25
+                                      "5": 56
+                                      "6": 57
+                                      "7": 67
+                                      "8": 68
+                                      "9": 86
+                                      "10": 87
+                          input:
+                            name: envoy.matching.inputs.cel_data_input
+                            typedConfig:
+                              '@type': type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
+              onNoMatch:
+                action:
+                  name: action
+                  typedConfig:
+                    '@type': type.googleapis.com/envoy.config.rbac.v3.Action
+                    action: DENY
+                    name: deny-request

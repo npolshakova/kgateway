@@ -17,10 +17,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 )
 
-const (
-	nestedClaimsDelimiter = "."
-)
-
 // rbacIr is the internal representation of an RBAC policy.
 type rbacIr struct {
 	rbacConfig *envoyauthz.RBACPerRoute
@@ -139,150 +135,39 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 		TypedConfig: celMatchInput,
 	}
 
-	var predicate *cncfmatcherv3.Matcher_MatcherList_Predicate
-
-	// works
-	//matcher := &cncfmatcherv3.CelMatcher{
-	//	ExprMatch: &cncftypev3.CelExpression{
-	//		ExprSpecifier: &cncftypev3.CelExpression_ParsedExpr{
-	//			ParsedExpr: &celv1alpha1.ParsedExpr{
-	//				Expr: &celv1alpha1.Expr{
-	//					Id: 9,
-	//					ExprKind: &celv1alpha1.Expr_CallExpr{
-	//						CallExpr: &celv1alpha1.Expr_Call{
-	//							Function: "_&&_",
-	//							Args: []*celv1alpha1.Expr{
-	//								{
-	//									Id: 3,
-	//									ExprKind: &celv1alpha1.Expr_CallExpr{
-	//										CallExpr: &celv1alpha1.Expr_Call{
-	//											Function: "_>=_",
-	//											Args: []*celv1alpha1.Expr{
-	//												{
-	//													Id: 2,
-	//													ExprKind: &celv1alpha1.Expr_SelectExpr{
-	//														SelectExpr: &celv1alpha1.Expr_Select{
-	//															Operand: &celv1alpha1.Expr{
-	//																Id: 1,
-	//																ExprKind: &celv1alpha1.Expr_IdentExpr{
-	//																	IdentExpr: &celv1alpha1.Expr_Ident{
-	//																		Name: "response",
-	//																	},
-	//																},
-	//															},
-	//															Field: "code",
-	//														},
-	//													},
-	//												},
-	//												{
-	//													Id: 4,
-	//													ExprKind: &celv1alpha1.Expr_ConstExpr{
-	//														ConstExpr: &celv1alpha1.Constant{
-	//															ConstantKind: &celv1alpha1.Constant_Int64Value{
-	//																Int64Value: int64(200),
-	//															},
-	//														},
-	//													},
-	//												},
-	//											},
-	//										},
-	//									},
-	//								},
-	//								{
-	//									Id: 7,
-	//									ExprKind: &celv1alpha1.Expr_CallExpr{
-	//										CallExpr: &celv1alpha1.Expr_Call{
-	//											Function: "_<=_",
-	//											Args: []*celv1alpha1.Expr{
-	//												{
-	//													Id: 6,
-	//													ExprKind: &celv1alpha1.Expr_SelectExpr{
-	//														SelectExpr: &celv1alpha1.Expr_Select{
-	//															Operand: &celv1alpha1.Expr{
-	//																Id: 5,
-	//																ExprKind: &celv1alpha1.Expr_IdentExpr{
-	//																	IdentExpr: &celv1alpha1.Expr_Ident{
-	//																		Name: "response",
-	//																	},
-	//																},
-	//															},
-	//															Field: "code",
-	//														},
-	//													},
-	//												},
-	//												{
-	//													Id: 8,
-	//													ExprKind: &celv1alpha1.Expr_ConstExpr{
-	//														ConstExpr: &celv1alpha1.Constant{
-	//															ConstantKind: &celv1alpha1.Constant_Int64Value{
-	//																Int64Value: int64(500),
-	//															},
-	//														},
-	//													},
-	//												},
-	//											},
-	//										},
-	//									},
-	//								},
-	//							},
-	//						},
-	//					},
-	//				},
-	//			},
-	//		},
-	//	},
-	//}
-
+	// Create parsed expression
 	env, err := cel.NewEnv()
-	if err != nil {
-		logger.Error("failed to create CEL environment: %v", err)
-	}
-	//metadata.filter_metadata['jwt/default/basic-jwt-provider'].fields['email'].string_value == 'dev2@kgateway.io'
-	//metadata['jwt/default/basic-jwt-provider']['email'] == 'dev2@kgateway.io'
-
-	//ast, iss := env.Parse("metadata.filter_metadata['jwt/default/basic-jwt-provider'].fields['payload'].fields['email'].string_value == 'dev2@kgateway.io'")
-
-	// working
-	ast, iss := env.Parse("metadata.filter_metadata['envoy.filters.http.jwt_authn']['payload']['email'] == 'dev2@kgateway.io'")
-
-	//ast, iss := env.Parse("request.headers['x-my-header'] == 'cool-beans'")
-	if iss.Err() != nil {
-		logger.Error("parse error: %v", iss.Err())
-	}
-	parsedExpr, err := cel.AstToParsedExpr(ast)
-	if err != nil {
-		logger.Error("failed to convert AST to parsed expression: %v", err)
-	}
-
-	// Marshal from google.golang.org/genproto
-	data, err := proto.Marshal(parsedExpr)
-	if err != nil {
-		logger.Error("marshal err: %v", err)
-	}
-	// Unmarshal into cel.dev/expr/v1alpha1
-	var celDevParsed expr.ParsedExpr
-	if err := proto.Unmarshal(data, &celDevParsed); err != nil {
-		logger.Error("unmarshal err: %v", err)
-	}
-
-	matcher := &cncfmatcherv3.CelMatcher{
-		ExprMatch: &cncftypev3.CelExpression{
-			CelExprParsed: &celDevParsed,
-		},
-	}
-
-	pb, err := utils.MessageToAny(matcher)
-	if err != nil {
-		return nil, err
-	}
-
+	var predicate *cncfmatcherv3.Matcher_MatcherList_Predicate
 	if len(celExprs) == 1 {
 		// Single expression - use SinglePredicate
-		typedCelMatchAny, err := utils.MessageToAny(&cncfmatcherv3.CelMatcher{
+		if err != nil {
+			logger.Error("failed to create CEL environment", "err", err.Error())
+		}
+		ast, iss := env.Parse(celExprs[0])
+		if iss.Err() != nil {
+			logger.Error("parse error", "err", iss.Err())
+		}
+		parsedExpr, err := cel.AstToParsedExpr(ast)
+		if err != nil {
+			logger.Error("failed to convert AST to parsed expression", "err", err.Error())
+		}
+		// Marshal from google.golang.org/genproto
+		data, err := proto.Marshal(parsedExpr)
+		if err != nil {
+			logger.Error("marshal err", "err", err.Error())
+		}
+		// Unmarshal into cel.dev/expr/v1alpha1
+		var celDevParsed expr.ParsedExpr
+		if err := proto.Unmarshal(data, &celDevParsed); err != nil {
+			logger.Error("unmarshal err", "err", err.Error())
+		}
+
+		matcher := &cncfmatcherv3.CelMatcher{
 			ExprMatch: &cncftypev3.CelExpression{
-				CelExprString: celExprs[0],
+				CelExprParsed: &celDevParsed,
 			},
-		})
+		}
+		pb, err := utils.MessageToAny(matcher)
 		if err != nil {
 			return nil, err
 		}
@@ -290,10 +175,7 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 		typedCelMatchConfig := &cncfcorev3.TypedExtensionConfig{
 			Name:        "envoy.matching.matchers.cel_matcher",
 			TypedConfig: pb,
-			//TypedConfig: typedCelMatchAny,
 		}
-		print(typedCelMatchAny)
-
 		predicate = &cncfmatcherv3.Matcher_MatcherList_Predicate{
 			MatchType: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate_{
 				SinglePredicate: &cncfmatcherv3.Matcher_MatcherList_Predicate_SinglePredicate{
@@ -309,12 +191,34 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 		var predicates []*cncfmatcherv3.Matcher_MatcherList_Predicate
 
 		for _, celExpr := range celExprs {
-			typedCelMatchAny, err := utils.MessageToAny(&cncfmatcherv3.CelMatcher{
+			if err != nil {
+				logger.Error("failed to create CEL environment", "err", err.Error())
+			}
+			ast, iss := env.Parse(celExpr)
+			if iss.Err() != nil {
+				logger.Error("parse error", "err", iss.Err())
+			}
+			parsedExpr, err := cel.AstToParsedExpr(ast)
+			if err != nil {
+				logger.Error("failed to convert AST to parsed expression", "err", err.Error())
+			}
+			// Marshal from google.golang.org/genproto
+			data, err := proto.Marshal(parsedExpr)
+			if err != nil {
+				logger.Error("marshal err", "err", err.Error())
+			}
+			// Unmarshal into cel.dev/expr/v1alpha1
+			var celDevParsed expr.ParsedExpr
+			if err := proto.Unmarshal(data, &celDevParsed); err != nil {
+				logger.Error("unmarshal err", "err", err.Error())
+			}
+
+			matcher := &cncfmatcherv3.CelMatcher{
 				ExprMatch: &cncftypev3.CelExpression{
-					CelExprString: celExpr,
+					CelExprParsed: &celDevParsed,
 				},
-			})
-			print(typedCelMatchAny)
+			}
+			pb, err := utils.MessageToAny(matcher)
 			if err != nil {
 				return nil, err
 			}
@@ -322,7 +226,6 @@ func createCELMatcher(celExprs []string, action v1alpha1.AuthorizationPolicyActi
 			typedCelMatchConfig := &cncfcorev3.TypedExtensionConfig{
 				Name:        "envoy.matching.matchers.cel_matcher",
 				TypedConfig: pb,
-				//TypedConfig: typedCelMatchAny,
 			}
 
 			singlePredicate := &cncfmatcherv3.Matcher_MatcherList_Predicate{

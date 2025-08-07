@@ -103,19 +103,10 @@ spec:
       name: route
   rbac:
     action: Allow
-    rules:
-      - principal:
-          jwt:
-            - claims:
-                - name: test
-                  value: foo
-                  matcher: Exact
-      - principal:
-          jwt:
-            - claims:
-                - name: request.auth.claims.groups
-                  value: group1
-                  matcher: Contains
+    policies:
+      - matchExpressions:
+          - "metadata.filter_metadata['envoy.filters.http.jwt_authn']['payload']['test'] == 'foo'"
+          - "metadata.filter_metadata['envoy.filters.http.jwt_authn']['payload']['groups'].contains('group1')"
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

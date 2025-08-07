@@ -48,7 +48,7 @@ spec:
   rbac:
     policies:
       - matchExpressions:
-          - 'request.path == "/test-localhost-deny"'
+          - "metadata.filter_metadata['envoy.filters.http.jwt_authn']['payload']['email'] == 'dev2@kgateway.io'"
   jwt:
     extensionRef:
       name: basic-jwt-provider
@@ -79,21 +79,3 @@ spec:
             YGATajDpzrHf+WXgOgvwyxaHJSN/fE+eFuRT3ooDaAuytsfYotsn4z/ajdEPSwXY
             CwIDAQAB
             -----END PUBLIC KEY-----
----
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: HTTPListenerPolicy
-metadata:
-  name: accesslog
-spec:
-  targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: gw
-  accessLog:
-    - fileSink:
-        path: /dev/stdout
-        jsonFormat:
-          jwt_fiter-0: "%DYNAMIC_METADATA(jwt/default/basic-jwt-provider)%"
-          jwt_payload: "%DYNAMIC_METADATA(jwt/default/basic-jwt-provider:payload)%"
-          jwt_email: "%DYNAMIC_METADATA(jwt/default/basic-jwt-provider:payload.email)%"
-
