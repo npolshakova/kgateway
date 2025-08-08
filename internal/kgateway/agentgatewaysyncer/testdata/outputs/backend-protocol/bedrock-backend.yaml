@@ -32,7 +32,8 @@ Policies:
     spec:
       auth:
         aws:
+          explicitConfig:
             region: us-west-2
-            session_token: ""
-            access_key_id: "fakeAccessKeyId"
-            secret_access_key: "fakeSecretKeyString"
+            sessionToken: ""
+            accessKeyId: "fakeAccessKeyId"
+            secretAccessKey: "fakeSecretKeyString"
