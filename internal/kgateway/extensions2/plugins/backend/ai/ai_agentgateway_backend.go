@@ -12,9 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 )
 
 func ProcessAIBackendForAgentGateway(ctx krt.HandlerContext, be *v1alpha1.Backend, secrets krt.Collection[*corev1.Secret]) ([]*api.Backend, []*api.Policy, error) {
@@ -158,6 +157,26 @@ func buildAIBackendFromLLM(
 		}
 }
 
+// getSecretValue extracts a value from a Kubernetes secret, handling both Data and StringData fields.
+// It prioritizes StringData over Data if both are present (consistent with Kubernetes behavior).
+func getSecretValue(secret *corev1.Secret, key string) (string, bool) {
+	// First check StringData (if it exists, it takes precedence)
+	if secret.StringData != nil {
+		if value, exists := secret.StringData[key]; exists {
+			return value, true
+		}
+	}
+
+	// Then check Data (base64-encoded)
+	if secret.Data != nil {
+		if value, exists := secret.Data[key]; exists && utf8.Valid(value) {
+			return string(value), true
+		}
+	}
+
+	return "", false
+}
+
 func buildBedrockAuthPolicy(ctx krt.HandlerContext, region string, auth *v1alpha1.AwsAuth, secrets krt.Collection[*corev1.Secret], namespace string) (*api.BackendAuthPolicy, error) {
 	var errs []error
 	if auth == nil {
@@ -177,29 +196,27 @@ func buildBedrockAuthPolicy(ctx krt.HandlerContext, region string, auth *v1alpha
 			// Return nil auth policy if secret not found - this will be handled upstream
 			return nil, nil
 		}
-		secretData := (*secret).Data
 
 		var accessKeyId, secretAccessKey string
 		var sessionToken *string
 
-		// validate that the secret has field in string format and has an access_key and secret_key
-		if secretData[wellknown.AccessKey] == nil || !utf8.Valid(secretData[wellknown.AccessKey]) {
-			// err is nil here but this is still safe
-			errs = append(errs, errors.New("access_key is not a valid string"))
+		// Extract access key
+		if value, exists := getSecretValue(*secret, wellknown.AccessKey); !exists {
+			errs = append(errs, errors.New("access_key is missing or not a valid string"))
 		} else {
-			accessKeyId = string(secretData[wellknown.AccessKey])
+			accessKeyId = value
 		}
 
-		if secretData[wellknown.SecretKey] == nil || !utf8.Valid(secretData[wellknown.SecretKey]) {
-			errs = append(errs, errors.New("secret_key is not a valid string"))
+		// Extract secret key
+		if value, exists := getSecretValue(*secret, wellknown.SecretKey); !exists {
+			errs = append(errs, errors.New("secret_key is missing or not a valid string"))
 		} else {
-			secretAccessKey = string(secretData[wellknown.SecretKey])
+			secretAccessKey = value
 		}
-		// Session key is optional, but if it is present, it must be a valid string.
-		if secretData[wellknown.SessionToken] != nil && !utf8.Valid(secretData[wellknown.SessionToken]) {
-			errs = append(errs, errors.New("session_key is not a valid string"))
-		} else {
-			sessionToken = ptr.To(string(secretData[wellknown.SessionToken]))
+
+		// Extract session token (optional)
+		if value, exists := getSecretValue(*secret, wellknown.SessionToken); exists {
+			sessionToken = ptr.To(value)
 		}
 
 		return &api.BackendAuthPolicy{
@@ -244,12 +261,10 @@ func buildAuthPolicy(ctx krt.HandlerContext, authToken *v1alpha1.SingleAuthToken
 
 		// Extract the authorization key from the secret data
 		authKey := ""
-		if (*secret).Data != nil {
-			if val, ok := (*secret).Data["Authorization"]; ok {
-				// Strip the "Bearer " prefix if present, as it will be added by the provider
-				authValue := strings.TrimSpace(string(val))
-				authKey = strings.TrimSpace(strings.TrimPrefix(authValue, "Bearer "))
-			}
+		if authValue, exists := getSecretValue(*secret, "Authorization"); exists {
+			// Strip the "Bearer " prefix if present, as it will be added by the provider
+			authValue = strings.TrimSpace(authValue)
+			authKey = strings.TrimSpace(strings.TrimPrefix(authValue, "Bearer "))
 		}
 
 		if authKey == "" {
