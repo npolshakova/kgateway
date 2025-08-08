@@ -14,13 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
-
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
-
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
@@ -237,7 +235,9 @@ func buildTranslatedAuthPolicy(krtctx krt.HandlerContext, authToken *v1alpha1.Si
 		}
 	case v1alpha1.Passthrough:
 		return &api.BackendAuthPolicy{
-			Kind: &api.BackendAuthPolicy_Passthrough{},
+			Kind: &api.BackendAuthPolicy_Passthrough{
+				Passthrough: &api.Passthrough{},
+			},
 		}
 	default:
 		return nil
@@ -443,14 +443,14 @@ func buildBedrockAuthPolicy(krtctx krt.HandlerContext, region string, auth *v1al
 
 		// Extract access key
 		if value, exists := getSecretValue(secret, wellknown.AccessKey); !exists {
-			errs = append(errs, errors.New("access_key is missing or not a valid string"))
+			errs = append(errs, errors.New("accessKey is missing or not a valid string"))
 		} else {
 			accessKeyId = value
 		}
 
 		// Extract secret key
 		if value, exists := getSecretValue(secret, wellknown.SecretKey); !exists {
-			errs = append(errs, errors.New("secret_key is missing or not a valid string"))
+			errs = append(errs, errors.New("secretKey is missing or not a valid string"))
 		} else {
 			secretAccessKey = value
 		}
