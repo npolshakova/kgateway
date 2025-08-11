@@ -5,6 +5,8 @@ import (
 
 	"istio.io/istio/pkg/kube/krt"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/trafficpolicy/agentgateway"
+
 	envoycorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
@@ -44,6 +46,18 @@ func NewTrafficPolicyConstructor(
 
 func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 	return trafficpolicy.NewGatewayTranslationPass(ctx, tctx, reporter)
+}
+
+// Create a traffic policy constructor. This converts a traffic policy into its IR form.
+func NewAgentGatewayTrafficPolicyConstructor(
+	ctx context.Context,
+	commoncol *common.CommonCollections,
+) *trafficpolicy.TrafficPolicyConstructor {
+	return trafficpolicy.NewTrafficPolicyConstructor(ctx, commoncol)
+}
+
+func NewAgentGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.AgentGatewayTranslationPass {
+	return agentgateway.NewAgentGatewayPass(reporter)
 }
 
 // ResolveExtGrpcService resolves a gateway extension gRPC service by looking up the backend reference

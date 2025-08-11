@@ -26,6 +26,7 @@ func NewAgentGatewayTranslator(
 // Init initializes the translator components
 func (s *AgentGatewayTranslator) Init() {
 	s.backendTranslator = NewAgentGatewayBackendTranslator(s.extensions)
+
 }
 
 // BackendTranslator returns the initialized backend translator on the AgentGatewayTranslator receiver

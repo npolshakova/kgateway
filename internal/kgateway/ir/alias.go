@@ -1,6 +1,8 @@
 package ir
 
-import "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
+import (
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
+)
 
 // This file exists to avoid changing all the code import paths in one mega PR.
 // this file will be removed over time, new code should not use this file.
@@ -22,26 +24,29 @@ type (
 	PodLocality           = ir.PodLocality
 	UniqlyConnectedClient = ir.UniqlyConnectedClient
 
-	BackendObjectIR                   = ir.BackendObjectIR
-	GwTranslationCtx                  = ir.GwTranslationCtx
-	ListenerContext                   = ir.ListenerContext
-	ObjectSource                      = ir.ObjectSource
-	PolicyIR                          = ir.PolicyIR
-	PolicyWrapper                     = ir.PolicyWrapper
-	ProxyTranslationPass              = ir.ProxyTranslationPass
-	UnimplementedProxyTranslationPass = ir.UnimplementedProxyTranslationPass
+	BackendObjectIR                          = ir.BackendObjectIR
+	GwTranslationCtx                         = ir.GwTranslationCtx
+	ListenerContext                          = ir.ListenerContext
+	ObjectSource                             = ir.ObjectSource
+	PolicyIR                                 = ir.PolicyIR
+	PolicyWrapper                            = ir.PolicyWrapper
+	ProxyTranslationPass                     = ir.ProxyTranslationPass
+	UnimplementedProxyTranslationPass        = ir.UnimplementedProxyTranslationPass
+	AgentGatewayTranslationPass              = ir.AgentGatewayTranslationPass
+	UnimplementedAgentGatewayTranslationPass = ir.UnimplementedAgentGatewayTranslationPass
 
-	Gateway                  = ir.Gateway
-	ListenerSet              = ir.ListenerSet
-	HcmContext               = ir.HcmContext
-	HttpBackend              = ir.HttpBackend
-	HttpRouteIR              = ir.HttpRouteIR
-	Route                    = ir.Route
-	RouteBackendContext      = ir.RouteBackendContext
-	RouteContext             = ir.RouteContext
-	AgentGatewayRouteContext = ir.AgentGatewayRouteContext
-	Secret                   = ir.Secret
-	VirtualHostContext       = ir.VirtualHostContext
+	Gateway                               = ir.Gateway
+	ListenerSet                           = ir.ListenerSet
+	HcmContext                            = ir.HcmContext
+	HttpBackend                           = ir.HttpBackend
+	HttpRouteIR                           = ir.HttpRouteIR
+	Route                                 = ir.Route
+	RouteBackendContext                   = ir.RouteBackendContext
+	RouteContext                          = ir.RouteContext
+	AgentGatewayRouteContext              = ir.AgentGatewayRouteContext
+	AgentGatewayTranslationBackendContext = ir.AgentGatewayTranslationBackendContext
+	Secret                                = ir.Secret
+	VirtualHostContext                    = ir.VirtualHostContext
 
 	EndpointMetadata  = ir.EndpointMetadata
 	FilterChainCommon = ir.FilterChainCommon

@@ -1,0 +1,44 @@
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
+  name: super-gateway
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+    - protocol: HTTP
+      port: 8080
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: test-route
+spec:
+  parentRefs:
+    - name: super-gateway
+  hostnames:
+    - "example.com"
+  rules:
+    - backendRefs:
+        - name: simple-svc
+          port: 8080
+          filters:
+            - type: ExtensionRef
+              extensionRef:
+                group: gateway.kgateway.dev
+                kind: TrafficPolicy
+                name: secure-route-policy
+---
+## On a route that is not part of the gw gateway opt in
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: secure-route-policy
+spec:
+  extAuth:
+    extensionRef:
+      name: basic-extauth2
+

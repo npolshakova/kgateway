@@ -31,6 +31,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/trafficpolicy/agentgateway"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/plugins"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
@@ -72,6 +73,67 @@ type PolicySubIR interface {
 	Validate() error
 
 	// TODO: Merge. Just awkward as we won't be using the actual method type.
+}
+
+// CompositeTrafficPolicy holds both envoy and agentgateway traffic policies
+type CompositeTrafficPolicy struct {
+	ct                 time.Time
+	EnvoyPolicy        *TrafficPolicy
+	AgentGatewayPolicy *agentgateway.TrafficPolicy
+}
+
+func (c *CompositeTrafficPolicy) CreationTime() time.Time {
+	return c.ct
+}
+
+func (c *CompositeTrafficPolicy) Equals(in any) bool {
+	c2, ok := in.(*CompositeTrafficPolicy)
+	if !ok {
+		return false
+	}
+	if c.ct != c2.ct {
+		return false
+	}
+
+	if c.EnvoyPolicy == nil && c2.EnvoyPolicy != nil {
+		return false
+	}
+	if c.EnvoyPolicy != nil && c2.EnvoyPolicy == nil {
+		return false
+	}
+	if c.EnvoyPolicy != nil && !c.EnvoyPolicy.Equals(c2.EnvoyPolicy) {
+		return false
+	}
+
+	if c.AgentGatewayPolicy == nil && c2.AgentGatewayPolicy != nil {
+		return false
+	}
+	if c.AgentGatewayPolicy != nil && c2.AgentGatewayPolicy == nil {
+		return false
+	}
+	if c.AgentGatewayPolicy != nil && !c.AgentGatewayPolicy.Equals(c2.AgentGatewayPolicy) {
+		return false
+	}
+
+	return true
+}
+
+func (c *CompositeTrafficPolicy) Validate() error {
+	if c.EnvoyPolicy != nil {
+		if err := c.EnvoyPolicy.Validate(); err != nil {
+			return err
+		}
+	}
+	if c.AgentGatewayPolicy != nil {
+		if err := c.AgentGatewayPolicy.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *CompositeTrafficPolicy) Name() string {
+	return "composite-trafficpolicies"
 }
 
 type TrafficPolicy struct {
@@ -216,10 +278,18 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 	), commoncol.KrtOpts.ToOptions("TrafficPolicy")...)
 	gk := wellknown.TrafficPolicyGVK.GroupKind()
 
+	var agentgatewayTranslator *agentgateway.TrafficPolicyConstructor
+	if commoncol.Settings.EnableAgentGateway {
+		agentgatewayTranslator = agentgateway.NewTrafficPolicyConstructor(ctx, commoncol)
+	}
+
 	translator := NewTrafficPolicyConstructor(ctx, commoncol)
 	v := validator.New()
 
 	// TrafficPolicy IR will have TypedConfig -> implement backendroute method to add prompt guard, etc.
+	// Create a cache to store PolicyWrapper objects for lookup during merge
+	policyWrapperCache := make(map[string]*ir.PolicyWrapper)
+
 	policyCol := krt.NewCollection(col, func(krtctx krt.HandlerContext, policyCR *v1alpha1.TrafficPolicy) *ir.PolicyWrapper {
 		objSrc := ir.ObjectSource{
 			Group:     gk.Group,
@@ -233,13 +303,29 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 			logger.Error("validation failed", "policy", policyCR.Name, "error", err)
 			errors = append(errors, err)
 		}
+
+		var agwPolicyIr *agentgateway.TrafficPolicy
+		var agwErrors []error
+		if commoncol.Settings.EnableAgentGateway {
+			agwPolicyIr, agwErrors = agentgatewayTranslator.ConstructIR(krtctx, policyCR)
+			if len(agwErrors) != 0 {
+				errors = append(errors, agwErrors...)
+			}
+		}
+
 		pol := &ir.PolicyWrapper{
 			ObjectSource: objSrc,
 			Policy:       policyCR,
 			PolicyIR:     policyIR,
+			AGWPolicyIR:  agwPolicyIr,
 			TargetRefs:   pluginsdkutils.TargetRefsToPolicyRefsWithSectionName(policyCR.Spec.TargetRefs, policyCR.Spec.TargetSelectors),
 			Errors:       errors,
 		}
+
+		// Store in cache for later lookup during merge operations
+		cacheKey := objSrc.ResourceName()
+		policyWrapperCache[cacheKey] = pol
+
 		return pol
 	})
 
@@ -248,15 +334,62 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 			wellknown.TrafficPolicyGVK.GroupKind(): {
 				// AttachmentPoints: []ir.AttachmentPoints{ir.HttpAttachmentPoint},
 				NewGatewayTranslationPass: NewGatewayTranslationPass,
+				NewAgentGatewayPass:       agentgateway.NewAgentGatewayPass,
 				Policies:                  policyCol,
 				MergePolicies: func(pols []ir.PolicyAtt) ir.PolicyAtt {
-					return policy.MergePolicies(pols, MergeTrafficPolicies)
+					// Create composite policies by extracting both envoy and agentgateway policies from the original PolicyWrappers
+					// Since PolicyAtt only contains envoy policies, we need to access the original PolicyWrapper collection
+					compositePolicies := make([]ir.PolicyAtt, 0, len(pols))
+
+					for _, pol := range pols {
+						compositePol := &CompositeTrafficPolicy{
+							ct: pol.PolicyIr.CreationTime(),
+						}
+
+						// The PolicyAtt contains the envoy policy in PolicyIr
+						if envoyPol, ok := pol.PolicyIr.(*TrafficPolicy); ok {
+							compositePol.EnvoyPolicy = envoyPol
+						}
+
+						// Look up the agentgateway policy from the cache
+						if pol.PolicyRef != nil {
+							cacheKey := ir.ObjectSource{
+								Group:     pol.PolicyRef.Group,
+								Kind:      pol.PolicyRef.Kind,
+								Namespace: pol.PolicyRef.Namespace,
+								Name:      pol.PolicyRef.Name,
+							}.ResourceName()
+
+							if cachedWrapper, exists := policyWrapperCache[cacheKey]; exists && cachedWrapper.AGWPolicyIR != nil {
+								if agwPol, ok := cachedWrapper.AGWPolicyIR.(*agentgateway.TrafficPolicy); ok {
+									compositePol.AgentGatewayPolicy = agwPol
+								}
+							}
+						}
+
+						compositePolicyAtt := ir.PolicyAtt{
+							GroupKind:               pol.GroupKind,
+							Generation:              pol.Generation,
+							PolicyIr:                compositePol,
+							PolicyRef:               pol.PolicyRef,
+							InheritedPolicyPriority: pol.InheritedPolicyPriority,
+							Errors:                  pol.Errors,
+							HierarchicalPriority:    pol.HierarchicalPriority,
+							MergeOrigins:            pol.MergeOrigins,
+						}
+						compositePolicies = append(compositePolicies, compositePolicyAtt)
+					}
+
+					// Merge the composite policies
+					return policy.MergePolicies(compositePolicies, MergeCompositeTrafficPolicies)
 				},
 				GetPolicyStatus:   getPolicyStatusFn(commoncol.CrudClient),
 				PatchPolicyStatus: patchPolicyStatusFn(commoncol.CrudClient),
 			},
 		},
-		ExtraHasSynced: translator.HasSynced,
+		ExtraHasSynced: func() bool {
+			return translator.HasSynced() && agentgatewayTranslator.HasSynced()
+		},
 	}
 }
 
@@ -659,5 +792,32 @@ func MergeTrafficPolicies(
 
 	for _, mergeFunc := range mergeFuncs {
 		mergeFunc(p1, p2, p2Ref, p2MergeOrigins, mergeOpts, mergeOrigins)
+	}
+}
+
+// MergeCompositeTrafficPolicies merges two CompositeTrafficPolicy IRs
+func MergeCompositeTrafficPolicies(
+	p1, p2 *CompositeTrafficPolicy,
+	p2Ref *ir.AttachedPolicyRef,
+	p2MergeOrigins pluginsdkir.MergeOrigins,
+	mergeOpts policy.MergeOptions,
+	mergeOrigins pluginsdkir.MergeOrigins,
+) {
+	if p1 == nil || p2 == nil {
+		return
+	}
+
+	// Merge envoy policies if both exist
+	if p1.EnvoyPolicy != nil && p2.EnvoyPolicy != nil {
+		MergeTrafficPolicies(p1.EnvoyPolicy, p2.EnvoyPolicy, p2Ref, p2MergeOrigins, mergeOpts, mergeOrigins)
+	} else if p2.EnvoyPolicy != nil {
+		p1.EnvoyPolicy = p2.EnvoyPolicy
+	}
+
+	// Merge agentgateway policies if both exist
+	if p1.AgentGatewayPolicy != nil && p2.AgentGatewayPolicy != nil {
+		agentgateway.MergeTrafficPolicies(p1.AgentGatewayPolicy, p2.AgentGatewayPolicy, p2Ref, p2MergeOrigins, mergeOpts, mergeOrigins)
+	} else if p2.AgentGatewayPolicy != nil {
+		p1.AgentGatewayPolicy = p2.AgentGatewayPolicy
 	}
 }

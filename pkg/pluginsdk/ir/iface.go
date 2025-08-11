@@ -200,6 +200,9 @@ type AgentGatewayTranslationPass interface {
 	// ApplyForRoute processes route-level configuration
 	ApplyForRoute(pCtx *AgentGatewayRouteContext, out *api.Route) error
 
+	// ApplyForRoutePolicy processes policies attached at the route-level
+	ApplyForRoutePolicy(pCtx *AgentGatewayRouteContext, outPolicy *api.Policy) error
+
 	// ApplyForBackend processes backend-level configuration for each backend referenced in routes
 	ApplyForBackend(pCtx *AgentGatewayTranslationBackendContext, out *api.Backend) error
 
@@ -216,6 +219,10 @@ type UnimplementedAgentGatewayTranslationPass struct{}
 var _ AgentGatewayTranslationPass = UnimplementedAgentGatewayTranslationPass{}
 
 func (s UnimplementedAgentGatewayTranslationPass) ApplyForRoute(pCtx *AgentGatewayRouteContext, out *api.Route) error {
+	return nil
+}
+
+func (s UnimplementedAgentGatewayTranslationPass) ApplyForRoutePolicy(pCtx *AgentGatewayRouteContext, out *api.Policy) error {
 	return nil
 }
 
@@ -291,6 +298,10 @@ type PolicyWrapper struct {
 	// The IR of the policy objects. ideally with structural errors removed.
 	// Opaque to us other than metadata.
 	PolicyIR PolicyIR
+
+	// The IR of the agentgateway policy objects. ideally with structural errors removed.
+	// Opaque to us other than metadata.
+	AGWPolicyIR PolicyIR
 
 	// Where to attach the policy. This usually comes from the policy CRD.
 	TargetRefs []PolicyRef
