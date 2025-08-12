@@ -27,18 +27,32 @@ func toResourcep(gw types.NamespacedName, resources []*api.Resource, rm reports.
 	return &res
 }
 
-func toADPResource(t any) *api.Resource {
+func toADPResources(t any) []*api.Resource {
 	switch tt := t.(type) {
 	case ADPBind:
-		return &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}
+		return []*api.Resource{
+			{Kind: &api.Resource_Bind{Bind: tt.Bind}},
+		}
 	case ADPListener:
-		return &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}
+		return []*api.Resource{
+			{Kind: &api.Resource_Listener{Listener: tt.Listener}},
+		}
 	case ADPRoute:
-		return &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}
+		adpRoute := t.(ADPRoute)
+		var policies []*api.Resource
+		for _, policy := range adpRoute.AttachedPolicies {
+			policies = append(policies, &api.Resource{Kind: &api.Resource_Policy{Policy: policy}})
+		}
+
+		return append(policies, &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}})
 	case ADPTCPRoute:
-		return &api.Resource{Kind: &api.Resource_TcpRoute{TcpRoute: tt.TCPRoute}}
+		return []*api.Resource{
+			{Kind: &api.Resource_TcpRoute{TcpRoute: tt.TCPRoute}},
+		}
 	case ADPPolicy:
-		return &api.Resource{Kind: &api.Resource_Policy{Policy: tt.Policy}}
+		return []*api.Resource{
+			{Kind: &api.Resource_Policy{Policy: tt.Policy}},
+		}
 	}
 	panic("unknown resource kind")
 }
@@ -109,15 +123,20 @@ func (g ADPBackend) Equals(other ADPBackend) bool {
 }
 
 type ADPRoute struct {
-	*api.Route
+	Route            *api.Route
+	AttachedPolicies []*api.Policy
 }
 
 func (g ADPRoute) ResourceName() string {
-	return g.Key
+	return g.Route.Key
 }
 
 func (g ADPRoute) Equals(other ADPRoute) bool {
-	return protoconv.Equals(g, other)
+	if !protoconv.Equals(g.Route, other.Route) {
+		return false
+	}
+
+	return slices.Equal(g.AttachedPolicies, other.AttachedPolicies)
 }
 
 type ADPTCPRoute struct {

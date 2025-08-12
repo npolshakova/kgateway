@@ -9,7 +9,7 @@ import (
 // AgentGatewayTranslationPass defines the interface for agent gateway translation passes
 type AgentGatewayTranslationPass interface {
 	// ApplyForRoute processes route-level configuration
-	ApplyForRoute(pCtx *AgentGatewayRouteContext, out *api.Route) error
+	ApplyForRoute(pCtx *AgentGatewayRouteContext, out *api.Route, policies *[]*api.Policy) error
 
 	// ApplyForBackend processes backend-level configuration for each backend referenced in routes
 	ApplyForBackend(pCtx *AgentGatewayTranslationBackendContext, out *api.Backend) error
@@ -23,7 +23,7 @@ type UnimplementedAgentGatewayTranslationPass struct{}
 
 var _ AgentGatewayTranslationPass = UnimplementedAgentGatewayTranslationPass{}
 
-func (s UnimplementedAgentGatewayTranslationPass) ApplyForRoute(pCtx *AgentGatewayRouteContext, out *api.Route) error {
+func (s UnimplementedAgentGatewayTranslationPass) ApplyForRoute(pCtx *AgentGatewayRouteContext, out *api.Route, policies *[]*api.Policy) error {
 	return nil
 }
 

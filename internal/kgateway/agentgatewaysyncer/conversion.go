@@ -51,7 +51,9 @@ const (
 
 func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	obj *gwv1.HTTPRoute, pos int, matchPos int,
-) (*api.Route, *reporter.RouteCondition) {
+) (*api.Route, []*api.Policy, *reporter.RouteCondition) {
+	// policies attached to the route
+	var policies []*api.Policy
 	res := &api.Route{
 		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) + "." + strconv.Itoa(matchPos),
 		RouteName:   obj.Namespace + "/" + obj.Name,
@@ -62,19 +64,19 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	for _, match := range r.Matches {
 		path, err := createADPPathMatch(match)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		headers, err := createADPHeadersMatch(match)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		method, err := createADPMethodMatch(match)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		query, err := createADPQueryMatch(match)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		res.Matches = append(res.GetMatches(), &api.RouteMatch{
 			Path:        path,
@@ -87,12 +89,13 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	res.Filters = filters
 
 	agentGatewayRouteContext := agwir.AgentGatewayRouteContext{
-		Rule: &r,
+		Rule:             &r,
+		AttachedPolicies: ctx.AttachedPolicies,
 	}
 
 	for _, pass := range ctx.pluginPasses {
-		if err := pass.ApplyForRoute(&agentGatewayRouteContext, res); err != nil {
-			return nil, &reporter.RouteCondition{
+		if err := pass.ApplyForRoute(&agentGatewayRouteContext, res, &policies); err != nil {
+			return nil, nil, &reporter.RouteCondition{
 				Type:    gwv1.RouteConditionAccepted,
 				Status:  metav1.ConditionFalse,
 				Reason:  "PluginError",
@@ -104,12 +107,13 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	// Retry: todo
 	route, backendErr, err := buildADPHTTPDestination(ctx, r.BackendRefs, obj.Namespace)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	res.Backends = route
 	res.Hostnames = slices.Map(obj.Spec.Hostnames, func(e gwv1.Hostname) string {
 		return string(e)
 	})
+
 	// Return filter error if present, otherwise return backend error
 	var errs []error
 	var errorReason gwv1.RouteConditionReason = gwv1.RouteReasonBackendNotFound
@@ -124,14 +128,14 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 		}
 	}
 	if len(errs) > 0 {
-		return res, &reporter.RouteCondition{
+		return res, nil, &reporter.RouteCondition{
 			Type:    gwv1.RouteConditionAccepted,
 			Status:  metav1.ConditionFalse,
 			Reason:  errorReason,
 			Message: errors.Join(errs...).Error(),
 		}
 	}
-	return res, nil
+	return res, policies, backendErr
 }
 
 func convertTCPRouteToADP(ctx RouteContext, r gwv1alpha2.TCPRouteRule,

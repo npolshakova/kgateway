@@ -297,4 +297,12 @@ var _ = DescribeTable("Basic agentgateway Tests",
 			Expect(resolvedRefs.Status).To(Equal(metav1.ConditionTrue))
 		},
 	}),
+	Entry("TrafficPolicy with extauth", translatorTestCase{
+		inputFile:  "trafficpolicy/extauth.yaml",
+		outputFile: "trafficpolicy/extauth.yaml",
+		gwNN: types.NamespacedName{
+			Namespace: "default",
+			Name:      "example-gateway",
+		},
+	}),
 )

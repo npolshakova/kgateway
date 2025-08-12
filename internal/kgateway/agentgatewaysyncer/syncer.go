@@ -485,7 +485,7 @@ func (s *AgentGwSyncer) buildADPResources(
 			if binds[nsName] == nil {
 				binds[nsName] = make([]*api.Resource, 0)
 			}
-			binds[nsName] = append(binds[nsName], toADPResource(bind))
+			binds[nsName] = append(binds[nsName], toADPResources(bind)...)
 		}
 		for gw, res := range binds {
 			repForGw := gwReports[gw]
@@ -513,7 +513,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	}
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, s.plugins)
 
-	adpPolicies := ADPPolicyCollection(inputs, binds, krtopts)
+	adpPolicies := ADPPolicyCollection(inputs, binds, krtopts, s.plugins)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResourcesForGateway]{binds, listeners, adpRoutes, adpPolicies}, krtopts.ToOptions("ADPResources")...)
@@ -540,7 +540,7 @@ func (s *AgentGwSyncer) buildListenerFromGateway(obj GatewayListener) *ADPResour
 	l.Protocol = protocol
 	l.Tls = tlsConfig
 
-	resources := []*api.Resource{toADPResource(ADPListener{l})}
+	resources := toADPResources(ADPListener{l})
 	return toResourcep(types.NamespacedName{
 		Namespace: obj.parent.Namespace,
 		Name:      obj.parent.Name,

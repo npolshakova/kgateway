@@ -343,6 +343,9 @@ func buildADPGRPCFilters(
 			} else {
 				filters = append(filters, h)
 			}
+		case gwv1.GRPCRouteFilterExtensionRef:
+			// extension refs are handled in the plugins
+			continue
 		default:
 			return nil, &reporter.RouteCondition{
 				Type:    gwv1.RouteConditionAccepted,

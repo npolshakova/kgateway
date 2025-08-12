@@ -233,6 +233,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 			logger.Error("validation failed", "policy", policyCR.Name, "error", err)
 			errors = append(errors, err)
 		}
+
 		pol := &ir.PolicyWrapper{
 			ObjectSource: objSrc,
 			Policy:       policyCR,

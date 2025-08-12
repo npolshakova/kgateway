@@ -11,16 +11,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 const (
 	a2aProtocol = "kgateway.dev/a2a"
 )
 
-func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGateway], krtopts krtutil.KrtOptions) krt.Collection[ADPResourcesForGateway] {
+func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGateway], krtopts krtutil.KrtOptions, plugins pluginsdk.Plugin) krt.Collection[ADPResourcesForGateway] {
 	domainSuffix := kubeutils.GetClusterDomainName()
 
 	inference := krt.NewManyCollection(inputs.InferencePools, func(ctx krt.HandlerContext, i *inf.InferencePool) []ADPPolicy {
@@ -101,14 +101,24 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 
 	// For now, we apply all policies to all gateways. In the future, we can more precisely bind them to only relevant ones
 	policiesByGateway := krt.NewCollection(binds, func(ctx krt.HandlerContext, i ADPResourcesForGateway) *ADPResourcesForGateway {
+		var allResources []*api.Resource
+
+		// Add inference policies
 		inferences := slices.Map(krt.Fetch(ctx, inference), func(e ADPPolicy) *api.Resource {
-			return toADPResource(e)
+			return toADPResources(e)[0]
 		})
+		allResources = append(allResources, inferences...)
+
+		// Add A2A policies
 		a2aPolicies := slices.Map(krt.Fetch(ctx, a2a), func(e ADPPolicy) *api.Resource {
-			return toADPResource(e)
+			return toADPResources(e)[0]
 		})
+		allResources = append(allResources, a2aPolicies...)
+
+		// TODO: add backend policies
+
 		return &ADPResourcesForGateway{
-			Resources: append(inferences, a2aPolicies...),
+			Resources: allResources,
 			Gateway:   i.Gateway,
 		}
 	})
