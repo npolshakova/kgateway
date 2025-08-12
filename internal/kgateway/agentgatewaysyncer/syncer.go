@@ -302,7 +302,8 @@ type Inputs struct {
 	InferencePools krt.Collection[*inf.InferencePool]
 
 	// kgateway resources
-	Backends *krtcollections.BackendIndex
+	Backends   *krtcollections.BackendIndex
+	RouteIndex *krtcollections.RoutesIndex
 }
 
 func (s *AgentGwSyncer) Init(krtopts krtutil.KrtOptions) {
@@ -384,7 +385,8 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtutil.KrtOptions) Inputs
 		InferencePools: krt.NewStaticCollection[*inf.InferencePool](nil, nil, krtopts.ToOptions("disable/inferencepools")...),
 
 		// kgateway resources
-		Backends: s.commonCols.BackendIndex,
+		Backends:   s.commonCols.BackendIndex,
+		RouteIndex: s.commonCols.Routes,
 	}
 
 	if s.EnableInferExt {

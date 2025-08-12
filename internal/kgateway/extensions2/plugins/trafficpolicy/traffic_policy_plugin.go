@@ -79,7 +79,7 @@ type PolicySubIR interface {
 type CompositeTrafficPolicy struct {
 	ct                 time.Time
 	EnvoyPolicy        *TrafficPolicy
-	AgentGatewayPolicy *agentgateway.TrafficPolicy
+	AgentGatewayPolicy *agentgateway.AgwTrafficPolicyIr
 }
 
 func (c *CompositeTrafficPolicy) CreationTime() time.Time {
@@ -278,9 +278,9 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 	), commoncol.KrtOpts.ToOptions("TrafficPolicy")...)
 	gk := wellknown.TrafficPolicyGVK.GroupKind()
 
-	var agentgatewayTranslator *agentgateway.TrafficPolicyConstructor
+	var agentgatewayTranslator *agentgateway.AgwTrafficPolicyConstructor
 	if commoncol.Settings.EnableAgentGateway {
-		agentgatewayTranslator = agentgateway.NewTrafficPolicyConstructor(ctx, commoncol)
+		agentgatewayTranslator = agentgateway.NewAgwTrafficPolicyConstructor(ctx, commoncol)
 	}
 
 	translator := NewTrafficPolicyConstructor(ctx, commoncol)
@@ -304,7 +304,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 			errors = append(errors, err)
 		}
 
-		var agwPolicyIr *agentgateway.TrafficPolicy
+		var agwPolicyIr *agentgateway.AgwTrafficPolicyIr
 		var agwErrors []error
 		if commoncol.Settings.EnableAgentGateway {
 			agwPolicyIr, agwErrors = agentgatewayTranslator.ConstructIR(krtctx, policyCR)
@@ -361,7 +361,7 @@ func NewPlugin(ctx context.Context, commoncol *common.CommonCollections) extensi
 							}.ResourceName()
 
 							if cachedWrapper, exists := policyWrapperCache[cacheKey]; exists && cachedWrapper.AGWPolicyIR != nil {
-								if agwPol, ok := cachedWrapper.AGWPolicyIR.(*agentgateway.TrafficPolicy); ok {
+								if agwPol, ok := cachedWrapper.AGWPolicyIR.(*agentgateway.AgwTrafficPolicyIr); ok {
 									compositePol.AgentGatewayPolicy = agwPol
 								}
 							}

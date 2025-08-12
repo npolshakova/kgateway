@@ -27,21 +27,21 @@ type PolicySubIR interface {
 	// TODO: Merge. Just awkward as we won't be using the actual method type.
 }
 
-type TrafficPolicy struct {
+type AgwTrafficPolicyIr struct {
 	ct   time.Time
-	Spec trafficPolicySpecIr
+	Spec agwTrafficPolicySpecIr
 }
 
-type trafficPolicySpecIr struct {
+type agwTrafficPolicySpecIr struct {
 	ExtAuth *extAuthIR
 }
 
-func (d *TrafficPolicy) CreationTime() time.Time {
+func (d *AgwTrafficPolicyIr) CreationTime() time.Time {
 	return d.ct
 }
 
-func (d *TrafficPolicy) Equals(in any) bool {
-	d2, ok := in.(*TrafficPolicy)
+func (d *AgwTrafficPolicyIr) Equals(in any) bool {
+	d2, ok := in.(*AgwTrafficPolicyIr)
 	if !ok {
 		return false
 	}
@@ -58,7 +58,7 @@ func (d *TrafficPolicy) Equals(in any) bool {
 // Validate performs PGV (protobuf-generated validation) validation by delegating
 // to each policy sub-IR's Validate() method. This follows the exact same pattern as the Equals() method.
 // PGV validation is always performed regardless of route replacement mode.
-func (p *TrafficPolicy) Validate() error {
+func (p *AgwTrafficPolicyIr) Validate() error {
 	var validators []func() error
 	validators = append(validators, p.Spec.ExtAuth.Validate)
 	for _, validator := range validators {
@@ -84,7 +84,7 @@ func NewAgentGatewayPass(reporter reports.Reporter) agwir.AgentGatewayTranslatio
 	}
 }
 
-func (p *TrafficPolicy) Name() string {
+func (p *AgwTrafficPolicyIr) Name() string {
 	return "trafficpolicies"
 }
 
@@ -106,7 +106,7 @@ func (p *trafficPolicyPluginGwPass) ApplyForRouteBackend(policy ir.PolicyIR, pCt
 	return nil
 }
 
-func (p *trafficPolicyPluginGwPass) handlePolicies(fcn string, spec trafficPolicySpecIr) {
+func (p *trafficPolicyPluginGwPass) handlePolicies(fcn string, spec agwTrafficPolicySpecIr) {
 	p.handleExtAuth(fcn, spec.ExtAuth)
 }
 
@@ -117,7 +117,7 @@ func (p *trafficPolicyPluginGwPass) SupportsPolicyMerge() bool {
 // MergeTrafficPolicies merges two TrafficPolicy IRs, returning a map that contains information
 // about the origin policy reference for each merged field.
 func MergeTrafficPolicies(
-	p1, p2 *TrafficPolicy,
+	p1, p2 *AgwTrafficPolicyIr,
 	p2Ref *ir.AttachedPolicyRef,
 	p2MergeOrigins ir.MergeOrigins,
 	mergeOpts policy.MergeOptions,
@@ -127,7 +127,7 @@ func MergeTrafficPolicies(
 		return
 	}
 
-	mergeFuncs := []func(*TrafficPolicy, *TrafficPolicy, *ir.AttachedPolicyRef, ir.MergeOrigins, policy.MergeOptions, ir.MergeOrigins){
+	mergeFuncs := []func(*AgwTrafficPolicyIr, *AgwTrafficPolicyIr, *ir.AttachedPolicyRef, ir.MergeOrigins, policy.MergeOptions, ir.MergeOrigins){
 		mergeExtAuth,
 		mergeExtProc,
 	}
@@ -139,7 +139,7 @@ func MergeTrafficPolicies(
 
 // mergeExtAuth merges ExtAuth policies
 func mergeExtAuth(
-	p1, p2 *TrafficPolicy,
+	p1, p2 *AgwTrafficPolicyIr,
 	p2Ref *ir.AttachedPolicyRef,
 	p2MergeOrigins ir.MergeOrigins,
 	mergeOpts policy.MergeOptions,
@@ -150,7 +150,7 @@ func mergeExtAuth(
 
 // mergeExtProc merges ExtProc policies
 func mergeExtProc(
-	p1, p2 *TrafficPolicy,
+	p1, p2 *AgwTrafficPolicyIr,
 	p2Ref *ir.AttachedPolicyRef,
 	p2MergeOrigins ir.MergeOrigins,
 	mergeOpts policy.MergeOptions,

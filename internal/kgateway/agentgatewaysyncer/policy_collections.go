@@ -113,6 +113,7 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 
 		// Look up backend targeting policies and convert them to ADP Policy resources
 		var backendPolicyResources []*api.Resource
+		var routePolicyResources []*api.Resource
 
 		// Get all backends with policies from the backend index
 		for _, backendCol := range inputs.Backends.BackendsWithPolicy() {
@@ -151,9 +152,33 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 			}
 		}
 
+		// Get all policies attached to routes
+		for _, routeIr := range inputs.RouteIndex.RoutesForGateway(ctx, i.Gateway) {
+			// get attached policies from route
+			routePolicies := inputs.Backends.PolicyIndex().LookupTargetingPolicies(ctx,
+				pluginsdk.RouteAttachmentPoint,
+				pluginsdkir.ObjectSource{
+					Group:     routeIr.GetGroupKind().Group,
+					Kind:      routeIr.GetGroupKind().Kind,
+					Namespace: routeIr.GetNamespace(),
+					Name:      routeIr.GetName(),
+				},
+				"", // no section name for routes
+				routeIr.GetSourceObject().GetLabels())
+
+			for _, policyAtt := range routePolicies {
+				if policyAtt.PolicyIr != nil {
+					if adpPolicy := convertPolicyAttToADPPolicyForRoute(policyAtt, routeIr); adpPolicy != nil {
+						routePolicyResources = append(routePolicyResources, toADPResource(ADPPolicy{adpPolicy}))
+					}
+				}
+			}
+		}
+
 		// Combine all policy resources
 		allResources := append(inferences, a2aPolicies...)
 		allResources = append(allResources, backendPolicyResources...)
+		allResources = append(allResources, routePolicyResources...)
 
 		return &ADPResourcesForGateway{
 			Resources: allResources,
@@ -171,7 +196,7 @@ func convertPolicyAttToADPPolicy(policyAtt pluginsdkir.PolicyAtt, backend *plugi
 	}
 
 	// Only process agent gateway traffic policies
-	agwPolicyIr, ok := policyAtt.PolicyIr.(*agentgateway.TrafficPolicy)
+	agwPolicyIr, ok := policyAtt.PolicyIr.(*agentgateway.AgwTrafficPolicyIr)
 	if !ok {
 		// This PolicyIR is not an agent gateway traffic policy
 		// Return nil to skip processing
@@ -205,6 +230,55 @@ func convertPolicyAttToADPPolicy(policyAtt pluginsdkir.PolicyAtt, backend *plugi
 	adpPolicy := &api.Policy{
 		Name:   policyName,
 		Target: &api.PolicyTarget{Kind: &api.PolicyTarget_Backend{Backend: backendTarget}},
+		// Note: The actual policy spec conversion would depend on the policy type
+		// This is a placeholder that could be extended based on specific policy types
+		Spec: translatedSpec,
+	}
+
+	return adpPolicy
+}
+
+// convertPolicyAttToADPPolicyForRoute converts a PolicyAtt to an ADP Policy for routes
+func convertPolicyAttToADPPolicyForRoute(policyAtt pluginsdkir.PolicyAtt, route pluginsdkir.Route) *api.Policy {
+	if policyAtt.PolicyIr == nil {
+		return nil
+	}
+
+	// Only process agent gateway traffic policies
+	agwPolicyIr, ok := policyAtt.PolicyIr.(*agentgateway.AgwTrafficPolicyIr)
+	if !ok {
+		// This PolicyIR is not an agent gateway traffic policy
+		// Return nil to skip processing
+		return nil
+	}
+
+	// PolicyRef can be nil if the attachment was done via extension ref or if PolicyAtt is the result of MergePolicies
+	if policyAtt.PolicyRef == nil {
+		// Cannot create a meaningful policy name without PolicyRef, skip processing
+		return nil
+	}
+
+	// Create a unique policy name using the policy reference and route
+	policyName := fmt.Sprintf("%s/%s->%s/%s",
+		policyAtt.PolicyRef.Namespace, policyAtt.PolicyRef.Name,
+		route.GetNamespace(), route.GetName())
+
+	// Create the route target reference
+	routeTarget := fmt.Sprintf("%s/%s", route.GetNamespace(), route.GetName())
+
+	var translatedSpec *api.PolicySpec
+	if agwPolicyIr.Spec.ExtAuth != nil {
+		translatedSpec = &api.PolicySpec{
+			Kind: agwPolicyIr.Spec.ExtAuth.Extauth,
+		}
+	}
+
+	// For now, we create a generic ADP policy that references the route
+	// In the future, this could be extended to convert specific policy types
+	// to their corresponding ADP policy specifications
+	adpPolicy := &api.Policy{
+		Name:   policyName,
+		Target: &api.PolicyTarget{Kind: &api.PolicyTarget_Route{Route: routeTarget}},
 		// Note: The actual policy spec conversion would depend on the policy type
 		// This is a placeholder that could be extended based on specific policy types
 		Spec: translatedSpec,

@@ -16,36 +16,36 @@ import (
 // FetchGatewayExtensionFunc defines the signature for fetching gateway extensions
 type FetchGatewayExtensionFunc func(krtctx krt.HandlerContext, extensionRef *corev1.LocalObjectReference, ns string) (*TrafficPolicyAgentGatewayExtensionIR, error)
 
-type TrafficPolicyConstructor struct {
+type AgwTrafficPolicyConstructor struct {
 	commoncol         *common.CommonCollections
 	gatewayExtensions krt.Collection[TrafficPolicyAgentGatewayExtensionIR]
 	extBuilder        func(krtctx krt.HandlerContext, gExt ir.GatewayExtension) *TrafficPolicyAgentGatewayExtensionIR
 }
 
-func NewTrafficPolicyConstructor(
+func NewAgwTrafficPolicyConstructor(
 	ctx context.Context,
 	commoncol *common.CommonCollections,
-) *TrafficPolicyConstructor {
+) *AgwTrafficPolicyConstructor {
 	extBuilder := TranslateGatewayExtensionBuilder(commoncol)
 	defaultExtBuilder := func(krtctx krt.HandlerContext, gExt ir.GatewayExtension) *TrafficPolicyAgentGatewayExtensionIR {
 		return extBuilder(krtctx, gExt)
 	}
 	gatewayExtensions := krt.NewCollection(commoncol.GatewayExtensions, defaultExtBuilder)
-	return &TrafficPolicyConstructor{
+	return &AgwTrafficPolicyConstructor{
 		commoncol:         commoncol,
 		gatewayExtensions: gatewayExtensions,
 		extBuilder:        extBuilder,
 	}
 }
 
-func (c *TrafficPolicyConstructor) ConstructIR(
+func (c *AgwTrafficPolicyConstructor) ConstructIR(
 	krtctx krt.HandlerContext,
 	policyCR *v1alpha1.TrafficPolicy,
-) (*TrafficPolicy, []error) {
-	policyIr := TrafficPolicy{
+) (*AgwTrafficPolicyIr, []error) {
+	policyIr := AgwTrafficPolicyIr{
 		ct: policyCR.CreationTimestamp.Time,
 	}
-	outSpec := trafficPolicySpecIr{}
+	outSpec := agwTrafficPolicySpecIr{}
 
 	var errors []error
 	// Construct extproc specific IR
@@ -61,7 +61,7 @@ func (c *TrafficPolicyConstructor) ConstructIR(
 	return &policyIr, errors
 }
 
-func (c *TrafficPolicyConstructor) FetchGatewayExtension(krtctx krt.HandlerContext, extensionRef *corev1.LocalObjectReference, ns string) (*TrafficPolicyAgentGatewayExtensionIR, error) {
+func (c *AgwTrafficPolicyConstructor) FetchGatewayExtension(krtctx krt.HandlerContext, extensionRef *corev1.LocalObjectReference, ns string) (*TrafficPolicyAgentGatewayExtensionIR, error) {
 	if extensionRef == nil {
 		return nil, fmt.Errorf("gateway extension ref is nil")
 	}
@@ -77,6 +77,6 @@ func (c *TrafficPolicyConstructor) FetchGatewayExtension(krtctx krt.HandlerConte
 	return gatewayExtension, nil
 }
 
-func (c *TrafficPolicyConstructor) HasSynced() bool {
+func (c *AgwTrafficPolicyConstructor) HasSynced() bool {
 	return c.gatewayExtensions.HasSynced()
 }

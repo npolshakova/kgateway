@@ -77,9 +77,7 @@ func TranslateGatewayExtensionBuilder(commoncol *common.CommonCollections) func(
 					Target: &api.BackendReference{
 						Kind: grpcService,
 					},
-					Context: map[string]string{
-						"": "",
-					},
+					// Context is configured in the plugin translation
 				},
 			}
 		default:

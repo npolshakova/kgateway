@@ -357,7 +357,6 @@ type RouteContextInputs struct {
 	Namespaces     krt.Collection[*corev1.Namespace]
 	ServiceEntries krt.Collection[*networkingclient.ServiceEntry]
 	Backends       *krtcollections.BackendIndex
-	Policies       *krtcollections.PolicyIndex
 	Plugins        pluginsdk.Plugin
 }
 

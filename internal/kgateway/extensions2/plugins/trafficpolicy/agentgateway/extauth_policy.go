@@ -10,7 +10,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
 )
 
-// extprocIR represents external processing policy configuration
+// extAuthIR represents external processing policy configuration for agw extauth
 type extAuthIR struct {
 	provider            *TrafficPolicyAgentGatewayExtensionIR
 	Extauth             *api.PolicySpec_ExtAuthz
@@ -21,21 +21,21 @@ var _ PolicySubIR = &extAuthIR{}
 
 // Equals compares two extAuthIR instances for equality
 func (e *extAuthIR) Equals(other PolicySubIR) bool {
-	otherExtProc, ok := other.(*extAuthIR)
+	otherExtAuth, ok := other.(*extAuthIR)
 	if !ok {
 		return false
 	}
-	if e == nil || otherExtProc == nil {
-		return e == nil && otherExtProc == nil
+	if e == nil || otherExtAuth == nil {
+		return e == nil && otherExtAuth == nil
 	}
-	if e.disableAllProviders != otherExtProc.disableAllProviders {
+	if e.disableAllProviders != otherExtAuth.disableAllProviders {
 		return false
 	}
 	// TODO: Add proper comparison for provider and perRoute
 	return true
 }
 
-// Validate performs validation on the extprocIR
+// Validate performs validation on the extAuthIR
 func (e *extAuthIR) Validate() error {
 	if e == nil {
 		return nil
@@ -49,7 +49,7 @@ func constructExtAuth(
 	krtctx krt.HandlerContext,
 	in *v1alpha1.TrafficPolicy,
 	fetchGatewayExtension FetchGatewayExtensionFunc,
-	out *trafficPolicySpecIr,
+	out *agwTrafficPolicySpecIr,
 ) error {
 	spec := in.Spec.ExtAuth
 	if spec == nil {
@@ -73,13 +73,18 @@ func constructExtAuth(
 		return pluginutils.ErrInvalidExtensionType(v1alpha1.GatewayExtensionTypeExtAuth, provider.ExtType)
 	}
 
+	// TODO: clean this up (set target from provider)
+	if perRouteCfg != nil && perRouteCfg.ExtAuthz != nil {
+		provider.ExtAuth.ExtAuthz.Context = perRouteCfg.ExtAuthz.Context
+	}
+
 	out.ExtAuth = &extAuthIR{
-		provider: provider,
-		Extauth:  perRouteCfg,
+		Extauth: provider.ExtAuth,
 	}
 	return nil
 }
 
+// Translate context and other per route settings
 func buildExtAuthPerRouteFilterConfig(
 	spec *v1alpha1.ExtAuthPolicy,
 ) *api.PolicySpec_ExtAuthz {
