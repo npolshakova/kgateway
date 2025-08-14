@@ -63,7 +63,7 @@ func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, re
 	return trafficpolicy.NewGatewayTranslationPass(ctx, tctx, reporter)
 }
 
-func NewAgentGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) agwir.AgentGatewayTranslationPass {
+func NewAgentGatewayTranslationPass(reporter reports.Reporter) agwir.AgentGatewayTranslationPass {
 	return agentgateway.NewAgentGatewayTranslationPass(reporter)
 }
 
