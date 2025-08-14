@@ -34,7 +34,7 @@ func (s *testingSuite) checkPodsRunning() {
 	s.TestInstallation.Assertions.EventuallyPodsRunning(s.Ctx, e2edefaults.CurlPod.ObjectMeta.GetNamespace(), metav1.ListOptions{
 		LabelSelector: e2edefaults.CurlPodLabelSelector,
 	})
-	s.TestInstallation.Assertions.EventuallyPodsRunning(s.Ctx, e2edefaults.NginxPod.ObjectMeta.GetNamespace(), metav1.ListOptions{
+	s.TestInstallation.Assertions.EventuallyPodsRunning(s.Ctx, exampleSvc.ObjectMeta.GetNamespace(), metav1.ListOptions{
 		LabelSelector: e2edefaults.NgnixPodLabelSelector,
 	})
 	s.TestInstallation.Assertions.EventuallyPodsRunning(s.Ctx, proxyObjectMeta.GetNamespace(), metav1.ListOptions{
