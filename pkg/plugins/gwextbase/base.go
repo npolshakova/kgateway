@@ -39,6 +39,8 @@ var (
 	EnableFilterPerRoute           = trafficpolicy.EnableFilterPerRoute
 	MergeTrafficPolicies           = trafficpolicy.MergeTrafficPolicies
 	AddDisableFilterIfNeeded       = trafficpolicy.AddDisableFilterIfNeeded
+
+	MergeAgwTrafficPolicies = agentgateway.MergeTrafficPolicies
 )
 
 // NewTrafficPolicyConstructor creates a traffic policy constructor. This converts a traffic policy into its IR form.
