@@ -39,10 +39,20 @@ func NewTestingSuite(
 }
 
 func (s *testingSuite) SetupSuite() {
-	// Check that the common setup manifest is applied
-	err := s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, setupManifest)
-	s.NoError(err, "can apply "+setupManifest)
-	s.testInstallation.Assertions.EventuallyObjectsExist(s.ctx, exampleSvc, nginxPod)
+	// Apply curl pod for testing
+	err := s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, testdefaults.CurlPodManifest)
+	s.NoError(err, "can apply curl pod manifest")
+
+	// Apply well-known nginx manifest
+	err = s.testInstallation.Actions.Kubectl().ApplyFile(s.ctx, testdefaults.NginxPodManifest)
+	s.NoError(err, "can apply nginx pod manifest")
+
+	// Wait for both curl and nginx pods to be ready
+	s.testInstallation.Assertions.EventuallyObjectsExist(s.ctx, testdefaults.CurlPod, nginxSvc, nginxPod)
+	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, testdefaults.CurlPod.GetNamespace(), metav1.ListOptions{
+		LabelSelector: testdefaults.CurlPodLabelSelector,
+	})
+
 	// Check that test app is running
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, nginxPod.ObjectMeta.GetNamespace(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/name=nginx",
@@ -57,9 +67,13 @@ func (s *testingSuite) SetupSuite() {
 }
 
 func (s *testingSuite) TearDownSuite() {
-	// Check that the common setup manifest is deleted
-	err := s.testInstallation.Actions.Kubectl().DeleteFileSafe(s.ctx, setupManifest)
-	s.NoError(err, "can delete "+setupManifest)
+	// Clean up nginx manifest
+	err := s.testInstallation.Actions.Kubectl().DeleteFileSafe(s.ctx, testdefaults.NginxPodManifest)
+	s.NoError(err, "can delete nginx pod manifest")
+
+	// Clean up curl pod
+	err = s.testInstallation.Actions.Kubectl().DeleteFileSafe(s.ctx, testdefaults.CurlPodManifest)
+	s.NoError(err, "can delete curl pod manifest")
 }
 
 func (s *testingSuite) BeforeTest(suiteName, testName string) {

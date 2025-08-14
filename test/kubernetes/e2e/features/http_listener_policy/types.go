@@ -8,17 +8,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
+	testdefaults "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
 )
 
 var (
-	setupManifest                   = filepath.Join(fsutils.MustGetThisDir(), "testdata", "setup.yaml")
 	gatewayManifest                 = filepath.Join(fsutils.MustGetThisDir(), "testdata", "gateway.yaml")
 	httpRouteManifest               = filepath.Join(fsutils.MustGetThisDir(), "testdata", "httproute.yaml")
 	allFieldsManifest               = filepath.Join(fsutils.MustGetThisDir(), "testdata", "http-listener-policy-all-fields.yaml")
 	serverHeaderManifest            = filepath.Join(fsutils.MustGetThisDir(), "testdata", "http-listener-policy-server-header.yaml")
 	preserveHttp1HeaderCaseManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "preserve-http1-header-case.yaml")
 
-	// When we apply the setup file, we expect resources to be created with this metadata
+	// Gateway proxy resources created dynamically per test
 	proxyObjectMeta = metav1.ObjectMeta{
 		Name:      "gw",
 		Namespace: "default",
@@ -30,18 +30,9 @@ var (
 			Namespace: "default",
 		},
 	}
-	nginxPod = &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "nginx",
-			Namespace: "default",
-		},
-	}
-	exampleSvc = &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "example-svc",
-			Namespace: "default",
-		},
-	}
+	// Use well-known nginx resources instead of custom ones
+	nginxPod    = testdefaults.NginxPod
+	nginxSvc    = testdefaults.NginxSvc
 	echoService = &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "raw-header-echo",
