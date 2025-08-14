@@ -38,14 +38,6 @@ func (s *testingSuite) TestHeaderSessionPersistence() {
 
 // assertSessionPersistence makes multiple requests and verifies they go to the same backend pod
 func (s *testingSuite) assertSessionPersistence(persistenceType string) {
-	// Make sure the curl and echo pods are running.
-	s.TestInstallation.Assertions.EventuallyPodsRunning(s.Ctx, echoDeployment.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=echo",
-	})
-	s.TestInstallation.Assertions.EventuallyPodsRunning(s.Ctx, echoDeployment.GetNamespace(), metav1.ListOptions{
-		LabelSelector: testdefaults.CurlPodLabelSelector,
-	})
-
 	var (
 		gatewayService metav1.ObjectMeta
 		sessionHeader  string
