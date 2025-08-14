@@ -44,13 +44,6 @@ var (
 		},
 	}
 
-	nginxPod = &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "nginx",
-			Namespace: "default",
-		},
-	}
-
 	gw1 = &apiv1.Gateway{
 		ObjectMeta: proxyObjectMeta,
 	}
