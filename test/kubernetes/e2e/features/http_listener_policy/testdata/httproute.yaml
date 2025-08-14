@@ -16,5 +16,6 @@ spec:
         type: PathPrefix
         value: /
     backendRefs:
-    - name: example-svc
+    - name: nginx
+      namespace: nginx
       port: 8080 
