@@ -70,7 +70,7 @@ func (s *testingSuite) TestBackendConfigPolicy() {
 		LabelSelector: testdefaults.CurlPodLabelSelector,
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, nginxPod.ObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=nginx",
+		LabelSelector: testdefaults.NgnixPodLabelSelector,
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, proxyObjectMeta.GetNamespace(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/name=gw",
@@ -192,7 +192,7 @@ func (s *testingSuite) TestBackendConfigPolicyTLSInsecureSkipVerify() {
 		LabelSelector: testdefaults.CurlPodLabelSelector,
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, nginxPod.ObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=nginx",
+		LabelSelector: testdefaults.NgnixPodLabelSelector,
 	})
 
 	s.testInstallation.Assertions.AssertEventualCurlResponse(
@@ -240,7 +240,7 @@ func (s *testingSuite) TestBackendConfigPolicySimpleTLS() {
 		LabelSelector: testdefaults.CurlPodLabelSelector,
 	})
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, nginxPod.ObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=nginx",
+		LabelSelector: testdefaults.NgnixPodLabelSelector,
 	})
 
 	s.testInstallation.Assertions.AssertEventualCurlResponse(
