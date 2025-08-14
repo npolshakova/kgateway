@@ -16,4 +16,4 @@ spec:
       name: other
       allowedRoutes:
         namespaces:
-          from: Same
+          from: ALL

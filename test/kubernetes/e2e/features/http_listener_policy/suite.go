@@ -103,10 +103,6 @@ func (s *testingSuite) TestPreserveHttp1HeaderCase() {
 	// Assert that the HTTPRoute is accepted
 	s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(s.Ctx, "echo-route", "default", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
 
-	s.TestInstallation.Assertions.EventuallyObjectsExist(s.Ctx, echoService, echoDeployment)
-	s.TestInstallation.Assertions.EventuallyPodsRunning(s.Ctx, echoDeployment.ObjectMeta.GetNamespace(), metav1.ListOptions{
-		LabelSelector: "app=raw-header-echo",
-	})
 	s.TestInstallation.Assertions.AssertEventualCurlResponse(
 		s.Ctx,
 		testdefaults.CurlPodExecOpt,

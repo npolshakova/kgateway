@@ -48,22 +48,22 @@ var (
 
 	setup = base.TestCase{
 		Manifests: []string{testdefaults.CurlPodManifest, testdefaults.NginxPodManifest},
-		Resources: []client.Object{testdefaults.CurlPod, testdefaults.NginxPod, proxyService, proxyDeployment},
+		Resources: []client.Object{testdefaults.CurlPod, testdefaults.NginxPod},
 	}
 
 	// test cases
 	testCases = map[string]base.TestCase{
 		"TestHttpListenerPolicyAllFields": base.TestCase{
 			Manifests: []string{gatewayManifest, httpRouteManifest, allFieldsManifest},
-			Resources: []client.Object{},
+			Resources: []client.Object{proxyService, proxyDeployment},
 		},
 		"TestHttpListenerPolicyServerHeader": base.TestCase{
 			Manifests: []string{gatewayManifest, httpRouteManifest, serverHeaderManifest},
-			Resources: []client.Object{},
+			Resources: []client.Object{proxyService, proxyDeployment},
 		},
 		"TestPreserveHttp1HeaderCase": base.TestCase{
 			Manifests: []string{gatewayManifest, preserveHttp1HeaderCaseManifest},
-			Resources: []client.Object{echoService, echoDeployment},
+			Resources: []client.Object{proxyService, proxyDeployment, echoService, echoDeployment},
 		},
 	}
 )
