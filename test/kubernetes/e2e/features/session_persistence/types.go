@@ -6,9 +6,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
+	e2edefaults "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
+	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/tests/base"
 )
 
 var (
@@ -88,6 +91,34 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "echo-header",
 			Namespace: "default",
+		},
+	}
+
+	// Setup test case for the base suite
+	setup = base.TestCase{
+		Manifests: []string{echoServiceManifest, e2edefaults.CurlPodManifest},
+		Resources: []client.Object{
+			echoService,
+			echoDeployment,
+			e2edefaults.CurlPod,
+		},
+	}
+
+	// Test cases for the base suite
+	testCases = map[string]base.TestCase{
+		"TestCookieSessionPersistence": {
+			Manifests: []string{cookieSessionPersistenceManifest},
+			Resources: []client.Object{
+				cookieGateway,
+				cookieHTTPRoute,
+			},
+		},
+		"TestHeaderSessionPersistence": {
+			Manifests: []string{headerSessionPersistenceManifest},
+			Resources: []client.Object{
+				headerGateway,
+				headerHTTPRoute,
+			},
 		},
 	}
 )
