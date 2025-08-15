@@ -35,13 +35,13 @@ var (
 		Namespace: "default",
 	}
 
-	setup = base.TestCase{
+	setup = base.SetupTestCase{
 		Manifests: []string{e2edefaults.CurlPodManifest, e2edefaults.HttpbinManifest},
 		Resources: []client.Object{e2edefaults.CurlPod, e2edefaults.HttpbinDeployment, e2edefaults.HttpbinService},
 	}
 
 	// test cases
-	testCases = map[string]base.TestCase{
+	testCases = map[string]base.SetupTestCase{
 		"TestLeaderAndFollowerAction": {
 			Manifests: []string{gatewayManifest},
 		},

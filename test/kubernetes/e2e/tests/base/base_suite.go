@@ -66,7 +66,7 @@ func NewBaseTestingSuiteWithoutUpgrades(ctx context.Context, testInst *e2e.TestI
 }
 
 func (s *BaseTestingSuite) SetupSuite() {
-	s.ApplyManifests(s.Setup)
+	s.ApplyManifestsAndAssertAccepted(s.Setup)
 
 	// TODO handle upgrades https://github.com/kgateway-dev/kgateway/issues/10609
 	// if s.Setup.UpgradeValues != "" {
@@ -112,7 +112,7 @@ func (s *BaseTestingSuite) BeforeTest(suiteName, testName string) {
 	// 	s.TestInstallation.Assertions.Require.NoError(err)
 	// }
 
-	s.ApplyManifests(testCase)
+	s.ApplyManifestsAndAssertAccepted(testCase)
 }
 
 func (s *BaseTestingSuite) AfterTest(suiteName, testName string) {
