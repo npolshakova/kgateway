@@ -304,7 +304,7 @@ type Inputs struct {
 
 	// kgateway resources
 	Backends        *krtcollections.BackendIndex
-	BackendsTemp    krt.Collection[*v1alpha1.Backend]
+	GatewayIndex    *krtcollections.GatewayIndex
 	DirectResponses krt.Collection[*v1alpha1.DirectResponse]
 }
 
@@ -398,8 +398,8 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtinternal.KrtOptions) In
 
 		// kgateway resources
 		Backends:        s.commonCols.BackendIndex,
-		BackendsTemp:    krt.NewInformer[*v1alpha1.Backend](s.client),
 		DirectResponses: krt.NewInformer[*v1alpha1.DirectResponse](s.client),
+		GatewayIndex:    s.commonCols.GatewayIndex,
 	}
 
 	if s.EnableInferExt {
@@ -513,7 +513,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	}
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, s.plugins)
 
-	adpPolicies := ADPPolicyCollection(inputs, binds, krtopts, s.plugins)
+	adpPolicies := ADPPolicyCollection(inputs, krtopts, s.plugins)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResourcesForGateway]{binds, listeners, adpRoutes, adpPolicies}, krtopts.ToOptions("ADPResources")...)

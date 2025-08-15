@@ -4,11 +4,15 @@ import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/trafficpolicy/agentgateway"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
 	"istio.io/istio/pkg/slices"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
@@ -20,7 +24,7 @@ const (
 	a2aProtocol = "kgateway.dev/a2a"
 )
 
-func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGateway], krtopts krtutil.KrtOptions, plugins pluginsdk.Plugin) krt.Collection[ADPResourcesForGateway] {
+func ADPPolicyCollection(inputs Inputs, krtopts krtutil.KrtOptions, plugins pluginsdk.Plugin) krt.Collection[ADPResourcesForGateway] {
 	domainSuffix := kubeutils.GetClusterDomainName()
 
 	inference := krt.NewManyCollection(inputs.InferencePools, func(ctx krt.HandlerContext, i *inf.InferencePool) []ADPPolicy {
@@ -100,7 +104,7 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 	}, krtopts.ToOptions("A2APolicies")...)
 
 	// For now, we apply all policies to all gateways. In the future, we can more precisely bind them to only relevant ones
-	policiesByGateway := krt.NewCollection(binds, func(ctx krt.HandlerContext, i ADPResourcesForGateway) *ADPResourcesForGateway {
+	policiesByGateway := krt.NewCollection(inputs.GatewayIndex.Gateways, func(ctx krt.HandlerContext, i ir.Gateway) *ADPResourcesForGateway {
 		var allResources []*api.Resource
 
 		// Add inference policies
@@ -115,13 +119,90 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 		})
 		allResources = append(allResources, a2aPolicies...)
 
-		// TODO: add backend policies
+		// Add all policies attached to the Gateway
+		var attachedGatewayPolicyResources []*api.Resource
+		gwPolicyTarget := &api.PolicyTarget{
+			Kind: &api.PolicyTarget_Gateway{
+				Gateway: i.Namespace + "/" + i.Name,
+			},
+		}
+		for gvk, policyAttList := range i.AttachedHttpPolicies.Policies {
+			if gvk.Group == wellknown.TrafficPolicyGVK.Group && gvk.Kind == wellknown.TrafficPolicyGVK.Kind {
+				for _, policy := range policyAttList {
+					// Convert TrafficPolicy IR to ADP Policy resources
+					adpPolicies := convertTrafficPolicyIRToADPPolicies(policy, gwPolicyTarget)
+					attachedGatewayPolicyResources = append(attachedGatewayPolicyResources, adpPolicies...)
+				}
+			}
+		}
+		for gvk, policyAttList := range i.AttachedListenerPolicies.Policies {
+			if gvk.Group == wellknown.TrafficPolicyGVK.Group && gvk.Kind == wellknown.TrafficPolicyGVK.Kind {
+				for _, policy := range policyAttList {
+					adpPolicies := convertTrafficPolicyIRToADPPolicies(policy, gwPolicyTarget)
+					attachedGatewayPolicyResources = append(attachedGatewayPolicyResources, adpPolicies...)
+				}
+			}
+		}
+		allResources = append(allResources, attachedGatewayPolicyResources...)
+
+		attachedListenerPolicyResources := make([]*api.Resource, 0)
+		for _, listener := range i.Listeners {
+			listenerPolicyTarget := &api.PolicyTarget{
+				Kind: &api.PolicyTarget_Listener{
+					// TODO: check this
+					Listener: string(listener.Name),
+				},
+			}
+			for gvk, policyAttList := range listener.AttachedPolicies.Policies {
+				if gvk.Group == wellknown.TrafficPolicyGVK.Group && gvk.Kind == wellknown.TrafficPolicyGVK.Kind {
+					for _, policy := range policyAttList {
+						adpPolicies := convertTrafficPolicyIRToADPPolicies(policy, listenerPolicyTarget)
+						attachedListenerPolicyResources = append(attachedListenerPolicyResources, adpPolicies...)
+					}
+				}
+			}
+		}
+		allResources = append(allResources, attachedListenerPolicyResources...)
 
 		return &ADPResourcesForGateway{
 			Resources: allResources,
-			Gateway:   i.Gateway,
+			Gateway:   types.NamespacedName{Namespace: i.Namespace, Name: i.Name},
 		}
 	})
 
 	return policiesByGateway
+}
+
+// convertTrafficPolicyIRToADPPolicies converts a policy attachment to ADP Policy resources
+func convertTrafficPolicyIRToADPPolicies(policyAtt ir.PolicyAtt, policyTarget *api.PolicyTarget) []*api.Resource {
+	var resources []*api.Resource
+
+	policy, ok := policyAtt.PolicyIr.(agentgateway.AgentGatewayTrafficPolicyIr)
+	if !ok {
+		return resources
+	}
+
+	// Generate policy name - use the original policy reference
+	var policyName string
+	if policyAtt.PolicyRef != nil {
+		policyName = fmt.Sprintf("trafficpolicy/%s/%s", policyAtt.PolicyRef.Namespace, policyAtt.PolicyRef.Name)
+	} else {
+		policyName = "trafficpolicy/unknown"
+	}
+
+	// Convert ExtAuth policy if present
+	if policy.Extauth != nil && policy.Extauth.ExtAuthz != nil {
+		extAuthPolicy := &api.Policy{
+			Name:   policyName + ":extauth",
+			Target: policyTarget,
+			Spec: &api.PolicySpec{
+				Kind: policy.Extauth.ExtAuthz,
+			},
+		}
+		resources = append(resources, &api.Resource{
+			Kind: &api.Resource_Policy{Policy: extAuthPolicy},
+		})
+	}
+
+	return resources
 }
