@@ -13,10 +13,9 @@ import (
 const (
 	a2aProtocol   = "kgateway.dev/a2a"
 	a2aPluginName = "a2a-policy-plugin"
-	a2aPriority   = 100 // Lower priority than core policies
 )
 
-// A2APlugin implements the A2APolicyPlugin interface
+// A2APlugin converts an a2a annotated service to an agentgateway a2a policy
 type A2APlugin struct{}
 
 // NewA2APlugin creates a new A2A policy plugin
@@ -32,11 +31,6 @@ func (p *A2APlugin) PolicyType() PolicyType {
 // Name returns the name of this plugin
 func (p *A2APlugin) Name() string {
 	return a2aPluginName
-}
-
-// Priority returns the priority of this plugin
-func (p *A2APlugin) Priority() int {
-	return a2aPriority
 }
 
 // GeneratePolicies generates ADP policies for services with a2a protocol
@@ -96,6 +90,4 @@ func (p *A2APlugin) generatePoliciesForService(svc *corev1.Service) []ADPPolicy 
 }
 
 // Verify that A2APlugin implements the required interfaces
-var _ A2APolicyPlugin = (*A2APlugin)(nil)
-var _ ADPPolicyPlugin = (*A2APlugin)(nil)
 var _ PolicyPlugin = (*A2APlugin)(nil)

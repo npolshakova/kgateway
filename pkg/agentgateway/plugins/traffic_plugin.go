@@ -15,13 +15,12 @@ import (
 
 const (
 	trafficPluginName = "traffic-policy-plugin"
-	trafficPriority   = 10 // Highest priority
 )
 
-// TrafficPlugin implements the TrafficPolicyPlugin interface
+// TrafficPlugin converts a TrafficPolicy to an agentgateway policy
 type TrafficPlugin struct{}
 
-// NewTrafficPlugin creates a new Traffic policy plugin
+// NewTrafficPlugin creates a new TrafficPolicy plugin
 func NewTrafficPlugin() *TrafficPlugin {
 	return &TrafficPlugin{}
 }
@@ -36,17 +35,12 @@ func (p *TrafficPlugin) Name() string {
 	return trafficPluginName
 }
 
-// Priority returns the priority of this plugin
-func (p *TrafficPlugin) Priority() int {
-	return trafficPriority
-}
-
-// GeneratePolicies generates ADP policies for traffic policies
+// GeneratePolicies generates agentgateway policies from TrafficPolicy resources
 func (p *TrafficPlugin) GeneratePolicies(ctx krt.HandlerContext, inputs *PolicyInputs) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/traffic")
 
 	if inputs.TrafficPolicies == nil {
-		logger.Warn("traffic policies collection is nil, skipping traffic policy generation")
+		logger.Debug("traffic policies collection is nil, skipping traffic policy generation")
 		return nil, nil
 	}
 
@@ -68,7 +62,7 @@ func (p *TrafficPlugin) GenerateTrafficPolicies(ctx krt.HandlerContext, trafficP
 		trafficPoliciesResult = append(trafficPoliciesResult, policies...)
 	}
 
-	logger.Info("generated traffic policies", "count", len(trafficPoliciesResult))
+	logger.Debug("generated traffic policies", "count", len(trafficPoliciesResult))
 	return trafficPoliciesResult, nil
 }
 
@@ -184,7 +178,7 @@ func (p *TrafficPlugin) processExtAuthPolicy(ctx krt.HandlerContext, gatewayExte
 	}
 
 	if extauthSvcTarget == nil {
-		logger.Warn("failed to translate traffic policy", "policy", trafficPolicy.Name, "target", policyTarget, "error", "missing service target")
+		logger.Warn("failed to translate traffic policy", "policy", trafficPolicy.Name, "target", policyTarget, "error", "missing extauthservice target")
 		return nil
 	}
 
@@ -203,13 +197,11 @@ func (p *TrafficPlugin) processExtAuthPolicy(ctx krt.HandlerContext, gatewayExte
 
 	logger.Debug("generated ExtAuth policy",
 		"policy", trafficPolicy.Name,
-		"adp_policy", extauthPolicy.Name,
+		"agentgateway_policy", extauthPolicy.Name,
 		"target", extauthSvcTarget)
 
 	return []ADPPolicy{{Policy: extauthPolicy}}
 }
 
 // Verify that TrafficPlugin implements the required interfaces
-var _ TrafficPolicyPlugin = (*TrafficPlugin)(nil)
-var _ ADPPolicyPlugin = (*TrafficPlugin)(nil)
 var _ PolicyPlugin = (*TrafficPlugin)(nil)

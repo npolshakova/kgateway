@@ -2,7 +2,6 @@ package plugins
 
 import (
 	"fmt"
-	"sort"
 
 	"istio.io/istio/pkg/kube/krt"
 
@@ -11,19 +10,15 @@ import (
 
 // DefaultPolicyManager implements the PolicyManager interface
 type DefaultPolicyManager struct {
-	plugins             []PolicyPlugin
-	adpPlugins          []ADPPolicyPlugin
-	agentGatewayPlugins []AgentGatewayPolicyPlugin
-	pluginsByType       map[PolicyType][]PolicyPlugin
+	plugins       []PolicyPlugin
+	pluginsByType map[PolicyType][]PolicyPlugin
 }
 
 // NewPolicyManager creates a new DefaultPolicyManager
 func NewPolicyManager() *DefaultPolicyManager {
 	return &DefaultPolicyManager{
-		plugins:             make([]PolicyPlugin, 0),
-		adpPlugins:          make([]ADPPolicyPlugin, 0),
-		agentGatewayPlugins: make([]AgentGatewayPolicyPlugin, 0),
-		pluginsByType:       make(map[PolicyType][]PolicyPlugin),
+		plugins:       make([]PolicyPlugin, 0),
+		pluginsByType: make(map[PolicyType][]PolicyPlugin),
 	}
 }
 
@@ -46,28 +41,6 @@ func (m *DefaultPolicyManager) RegisterPlugin(plugin PolicyPlugin) error {
 	}
 	m.pluginsByType[policyType] = append(m.pluginsByType[policyType], plugin)
 
-	// Sort by priority (lower numbers have higher priority)
-	sort.Slice(m.pluginsByType[policyType], func(i, j int) bool {
-		return m.pluginsByType[policyType][i].Priority() < m.pluginsByType[policyType][j].Priority()
-	})
-
-	// Add to specialized plugin lists if applicable
-	if adpPlugin, ok := plugin.(ADPPolicyPlugin); ok {
-		m.adpPlugins = append(m.adpPlugins, adpPlugin)
-		// Sort ADP plugins by priority
-		sort.Slice(m.adpPlugins, func(i, j int) bool {
-			return m.adpPlugins[i].Priority() < m.adpPlugins[j].Priority()
-		})
-	}
-
-	if agwPlugin, ok := plugin.(AgentGatewayPolicyPlugin); ok {
-		m.agentGatewayPlugins = append(m.agentGatewayPlugins, agwPlugin)
-		// Sort agent gateway plugins by priority
-		sort.Slice(m.agentGatewayPlugins, func(i, j int) bool {
-			return m.agentGatewayPlugins[i].Priority() < m.agentGatewayPlugins[j].Priority()
-		})
-	}
-
 	return nil
 }
 
@@ -83,28 +56,12 @@ func (m *DefaultPolicyManager) GetPluginsByType(policyType PolicyType) []PolicyP
 	return result
 }
 
-// GetADPPlugins returns all ADP policy plugins
-func (m *DefaultPolicyManager) GetADPPlugins() []ADPPolicyPlugin {
-	// Return a copy to prevent external modification
-	result := make([]ADPPolicyPlugin, len(m.adpPlugins))
-	copy(result, m.adpPlugins)
-	return result
-}
-
-// GetAgentGatewayPlugins returns all agent gateway policy plugins
-func (m *DefaultPolicyManager) GetAgentGatewayPlugins() []AgentGatewayPolicyPlugin {
-	// Return a copy to prevent external modification
-	result := make([]AgentGatewayPolicyPlugin, len(m.agentGatewayPlugins))
-	copy(result, m.agentGatewayPlugins)
-	return result
-}
-
 // GenerateAllPolicies generates policies from all registered ADP plugins
 func (m *DefaultPolicyManager) GenerateAllPolicies(ctx krt.HandlerContext, inputs *PolicyInputs) ([]ADPPolicy, error) {
 	var allPolicies []ADPPolicy
 	var allErrors []error
 
-	for _, plugin := range m.adpPlugins {
+	for _, plugin := range m.plugins {
 		managerLogger := logging.New("agentgateway/plugins/manager")
 		managerLogger.Debug("generating policies", "plugin", plugin.Name(), "type", plugin.PolicyType())
 

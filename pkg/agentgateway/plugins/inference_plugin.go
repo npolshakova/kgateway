@@ -14,10 +14,9 @@ import (
 
 const (
 	inferencePluginName = "inference-pool-policy-plugin"
-	inferencePriority   = 50 // Higher priority than A2A but lower than traffic policies
 )
 
-// InferencePlugin implements the InferencePoolPolicyPlugin interface
+// InferencePlugin converts an inference pool to an agentgateway inference policy
 type InferencePlugin struct{}
 
 // NewInferencePlugin creates a new InferencePool policy plugin
@@ -33,11 +32,6 @@ func (p *InferencePlugin) PolicyType() PolicyType {
 // Name returns the name of this plugin
 func (p *InferencePlugin) Name() string {
 	return inferencePluginName
-}
-
-// Priority returns the priority of this plugin
-func (p *InferencePlugin) Priority() int {
-	return inferencePriority
 }
 
 // GeneratePolicies generates ADP policies for inference pools
@@ -153,6 +147,4 @@ func (p *InferencePlugin) generatePoliciesForInferencePool(pool *inf.InferencePo
 }
 
 // Verify that InferencePlugin implements the required interfaces
-var _ InferencePoolPolicyPlugin = (*InferencePlugin)(nil)
-var _ ADPPolicyPlugin = (*InferencePlugin)(nil)
 var _ PolicyPlugin = (*InferencePlugin)(nil)

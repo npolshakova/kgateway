@@ -74,9 +74,10 @@ type StartConfig struct {
 	RestConfig *rest.Config
 	// ExtensionsFactory is the factory function which will return an extensions.K8sGatewayExtensions
 	// This is responsible for producing the extension points that this controller requires
-	ExtraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	ExtraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
-	Client                 istiokube.Client
+	ExtraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
+	ExtraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin
+	ExtraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
+	Client                   istiokube.Client
 
 	CommonCollections *common.CommonCollections
 	AugmentedPods     krt.Collection[krtcollections.LocalityPod]
@@ -183,7 +184,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 
 	var agentGatewaySyncer *agentgatewaysyncer.AgentGwSyncer
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
-		agentgatewayMergedPlugins := agentgatewayplugins.CreateDefaultPolicyManager()
+		agentgatewayMergedPlugins := agentGatewayPluginFactory(cfg)(ctx, cfg.CommonCollections)
 
 		agentGatewaySyncer = agentgatewaysyncer.NewAgentGwSyncer(
 			cfg.ControllerName,
@@ -255,6 +256,31 @@ func pluginFactoryWithBuiltin(cfg StartConfig) extensions2.K8sGatewayExtensionsF
 			plugins = append(plugins, cfg.ExtraPlugins(ctx, commoncol)...)
 		}
 		return registry.MergePlugins(plugins...)
+	}
+}
+
+func agentGatewayPluginFactory(cfg StartConfig) func(ctx context.Context, commoncol *common.CommonCollections) *agentgatewayplugins.DefaultPolicyManager {
+	return func(ctx context.Context, commoncol *common.CommonCollections) *agentgatewayplugins.DefaultPolicyManager {
+		agwManager := agentgatewayplugins.NewPolicyManager()
+
+		// Register built-in plugins
+		err := agentgatewayplugins.RegisterBuiltinPlugins(agwManager)
+		if err != nil {
+			setupLog.Error(err, "failed to register builtin agentgateway plugins")
+			return nil
+		}
+
+		// Register extra plugins if provided
+		if cfg.ExtraAgentgatewayPlugins != nil {
+			extraPlugins := cfg.ExtraAgentgatewayPlugins(ctx, commoncol)
+			for _, plugin := range extraPlugins {
+				if err := agwManager.RegisterPlugin(plugin); err != nil {
+					setupLog.Error(err, "failed to register extra agentgateway plugin", "plugin", plugin.Name())
+				}
+			}
+		}
+
+		return agwManager
 	}
 }
 
