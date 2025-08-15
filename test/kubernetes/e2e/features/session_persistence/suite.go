@@ -3,9 +3,11 @@ package session_persistence
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
@@ -40,16 +42,64 @@ func (s *testingSuite) TestHeaderSessionPersistence() {
 func (s *testingSuite) assertSessionPersistence(persistenceType string) {
 	var (
 		gatewayService metav1.ObjectMeta
+		gatewayName    string
+		routeName      string
 		sessionHeader  string
 	)
 
 	switch persistenceType {
 	case "cookie":
 		gatewayService = cookieGateway.ObjectMeta
+		gatewayName = cookieGateway.Name
+		routeName = cookieHTTPRoute.Name
 	case "header":
 		gatewayService = headerGateway.ObjectMeta
+		gatewayName = headerGateway.Name
+		routeName = headerHTTPRoute.Name
 		sessionHeader = "session-a"
 	}
+
+	timeout := 60 * time.Second
+
+	// Wait for Gateway to be accepted
+	s.TestInstallation.Assertions.EventuallyGatewayCondition(
+		s.Ctx,
+		gatewayName,
+		"default",
+		gwv1.GatewayConditionAccepted,
+		metav1.ConditionTrue,
+		timeout,
+	)
+
+	// Wait for Gateway to be programmed
+	s.TestInstallation.Assertions.EventuallyGatewayCondition(
+		s.Ctx,
+		gatewayName,
+		"default",
+		gwv1.GatewayConditionProgrammed,
+		metav1.ConditionTrue,
+		timeout,
+	)
+
+	// Wait for HTTPRoute to be accepted
+	s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(
+		s.Ctx,
+		routeName,
+		"default",
+		gwv1.RouteConditionAccepted,
+		metav1.ConditionTrue,
+		timeout,
+	)
+
+	// Wait for HTTPRoute to have resolved references before making requests
+	s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(
+		s.Ctx,
+		routeName,
+		"default",
+		gwv1.RouteConditionResolvedRefs,
+		metav1.ConditionTrue,
+		timeout,
+	)
 
 	firstCurlOpts := []curl.Option{
 		curl.WithHost(kubeutils.ServiceFQDN(gatewayService)),
