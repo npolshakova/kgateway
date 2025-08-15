@@ -8,10 +8,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/tests/base"
-
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
 	testdefaults "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
+	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/tests/base"
 )
 
 var (
@@ -48,7 +47,7 @@ var (
 
 	setup = base.TestCase{
 		Manifests: []string{testdefaults.CurlPodManifest, testdefaults.NginxPodManifest},
-		Resources: []client.Object{testdefaults.CurlPod, testdefaults.NginxPod},
+		Resources: []client.Object{testdefaults.CurlPod, testdefaults.NginxPod, testdefaults.NginxSvc},
 	}
 
 	// test cases
