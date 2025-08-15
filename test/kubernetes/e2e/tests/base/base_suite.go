@@ -9,20 +9,18 @@ import (
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	"github.com/kgateway-dev/kgateway/v2/test/helpers"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
 )
 
-// TestCase defines the manifests and resources used by a test or test suite.
-type TestCase struct {
+// SetupTestCase defines the manifests and resources used by a test or test suite.
+type SetupTestCase struct {
 	// Manifests contains a list of manifest filenames.
 	Manifests []string
 	// Resources contains a list of objects that are expected to be created by the manifest files.
@@ -38,8 +36,8 @@ type BaseTestingSuite struct {
 	suite.Suite
 	Ctx              context.Context
 	TestInstallation *e2e.TestInstallation
-	TestCases        map[string]TestCase
-	Setup            TestCase
+	TestCases        map[string]SetupTestCase
+	Setup            SetupTestCase
 }
 
 // NewBaseTestingSuite returns a BaseTestingSuite that performs all the pre-requisites of upgrading helm installations,
@@ -47,7 +45,7 @@ type BaseTestingSuite struct {
 // The pre-requisites for the suite are defined in the setup parameter and for each test in the individual testCase.
 // Currently, tests that require upgrades (eg: to change settings) can not be run in Enterprise. To do so,
 // the test must be written without upgrades and call the `NewBaseTestingSuiteWithoutUpgrades` constructor.
-func NewBaseTestingSuite(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase TestCase, testCases map[string]TestCase) *BaseTestingSuite {
+func NewBaseTestingSuite(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase SetupTestCase, testCases map[string]SetupTestCase) *BaseTestingSuite {
 	return &BaseTestingSuite{
 		Ctx:              ctx,
 		TestInstallation: testInst,
@@ -58,7 +56,7 @@ func NewBaseTestingSuite(ctx context.Context, testInst *e2e.TestInstallation, se
 
 // NewBaseTestingSuiteWithoutUpgrades returns a BaseTestingSuite without allowing upgrades and reverts before the suite and tests.
 // This is useful when creating tests that need to run in Enterprise since the helm values change between OSS and Enterprise installations.
-func NewBaseTestingSuiteWithoutUpgrades(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase TestCase, testCases map[string]TestCase) *BaseTestingSuite {
+func NewBaseTestingSuiteWithoutUpgrades(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase SetupTestCase, testCases map[string]SetupTestCase) *BaseTestingSuite {
 	return &BaseTestingSuite{
 		Ctx:              ctx,
 		TestInstallation: testInst,
@@ -152,7 +150,7 @@ func (s *BaseTestingSuite) GetKubectlOutput(command ...string) string {
 // }
 
 // ApplyManifests applies the manifests and waits until the resources are created and ready.
-func (s *BaseTestingSuite) ApplyManifests(testCase TestCase) {
+func (s *BaseTestingSuite) ApplyManifests(testCase SetupTestCase) {
 	// apply the manifests
 	for _, manifest := range testCase.Manifests {
 		gomega.Eventually(func() error {
@@ -185,7 +183,7 @@ func (s *BaseTestingSuite) ApplyManifests(testCase TestCase) {
 }
 
 // DeleteManifests deletes the manifests and waits until the resources are deleted.
-func (s *BaseTestingSuite) DeleteManifests(testCase TestCase) {
+func (s *BaseTestingSuite) DeleteManifests(testCase SetupTestCase) {
 	for _, manifest := range testCase.Manifests {
 		gomega.Eventually(func() error {
 			err := s.TestInstallation.Actions.Kubectl().DeleteFileSafe(s.Ctx, manifest)
@@ -213,7 +211,7 @@ func (s *BaseTestingSuite) DeleteManifests(testCase TestCase) {
 //   - KGateway backend resources: Backend, GatewayExtension
 //
 // Other resource types (pods, services, deployments, etc.) are safely skipped.
-func (s *BaseTestingSuite) AssertManifestResourcesAccepted(testCase TestCase) {
+func (s *BaseTestingSuite) AssertManifestResourcesAccepted(testCase SetupTestCase) {
 	for _, resource := range testCase.Resources {
 		switch obj := resource.(type) {
 		case *gwv1.Gateway:
@@ -265,13 +263,13 @@ func (s *BaseTestingSuite) AssertManifestResourcesAccepted(testCase TestCase) {
 				metav1.ConditionTrue,
 			)
 		case *v1alpha1.TrafficPolicy:
-			s.assertTrafficPolicyAccepted(obj)
+			s.TestInstallation.Assertions.EventuallyTrafficPolicyAccepted(s.Ctx, obj)
 		case *v1alpha1.Backend:
-			s.assertBackendAccepted(obj)
+			s.TestInstallation.Assertions.EventuallyBackendAccepted(s.Ctx, obj)
 		case *v1alpha1.BackendConfigPolicy:
-			s.assertBackendConfigPolicyAccepted(obj)
+			s.TestInstallation.Assertions.EventuallyBackendConfigPolicyAccepted(s.Ctx, obj)
 		case *v1alpha1.GatewayExtension:
-			s.assertGatewayExtensionAccepted(obj)
+			s.TestInstallation.Assertions.EventuallyGatewayExtensionAccepted(s.Ctx, obj)
 		default:
 			// For other resource types, we skip status validation
 			continue
@@ -282,79 +280,7 @@ func (s *BaseTestingSuite) AssertManifestResourcesAccepted(testCase TestCase) {
 // ApplyManifestsAndAssertAccepted combines applying manifests with asserting their statuses are accepted.
 // This applies manifests, waits for resources to exist and be ready, then validates that all manifest
 // resources have "Accepted" status.
-func (s *BaseTestingSuite) ApplyManifestsAndAssertAccepted(testCase TestCase) {
+func (s *BaseTestingSuite) ApplyManifestsAndAssertAccepted(testCase SetupTestCase) {
 	s.ApplyManifests(testCase)
 	s.AssertManifestResourcesAccepted(testCase)
-}
-
-// assertTrafficPolicyAccepted validates that a TrafficPolicy has "Accepted" status.
-// TrafficPolicy uses PolicyStatus with ancestors, so we check the first ancestor's conditions.
-func (s *BaseTestingSuite) assertTrafficPolicyAccepted(policy *v1alpha1.TrafficPolicy) {
-	currentTimeout, pollingInterval := helpers.GetTimeouts()
-	s.TestInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
-		obj := &v1alpha1.TrafficPolicy{}
-		objKey := client.ObjectKeyFromObject(policy)
-		err := s.TestInstallation.ClusterContext.Client.Get(s.Ctx, objKey, obj)
-		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get TrafficPolicy %s", objKey)
-
-		g.Expect(obj.Status.Ancestors).ToNot(gomega.BeEmpty(), "TrafficPolicy should have ancestors")
-
-		// Check first ancestor for Accepted condition
-		ancestorStatus := obj.Status.Ancestors[0]
-		cond := meta.FindStatusCondition(ancestorStatus.Conditions, string(v1alpha1.PolicyConditionAccepted))
-		g.Expect(cond).NotTo(gomega.BeNil(), "TrafficPolicy should have Accepted condition")
-		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "TrafficPolicy should be accepted")
-	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
-}
-
-// assertBackendAccepted validates that a Backend has "Accepted" status.
-// Backend uses direct conditions on its status.
-func (s *BaseTestingSuite) assertBackendAccepted(backend *v1alpha1.Backend) {
-	currentTimeout, pollingInterval := helpers.GetTimeouts()
-	s.TestInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
-		obj := &v1alpha1.Backend{}
-		objKey := client.ObjectKeyFromObject(backend)
-		err := s.TestInstallation.ClusterContext.Client.Get(s.Ctx, objKey, obj)
-		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get Backend %s", objKey)
-
-		cond := meta.FindStatusCondition(obj.Status.Conditions, "Accepted")
-		g.Expect(cond).NotTo(gomega.BeNil(), "Backend should have Accepted condition")
-		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "Backend should be accepted")
-	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
-}
-
-// assertBackendConfigPolicyAccepted validates that a BackendConfigPolicy has "Accepted" status.
-// BackendConfigPolicy uses PolicyStatus with ancestors, so we check the first ancestor's conditions.
-func (s *BaseTestingSuite) assertBackendConfigPolicyAccepted(policy *v1alpha1.BackendConfigPolicy) {
-	currentTimeout, pollingInterval := helpers.GetTimeouts()
-	s.TestInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
-		obj := &v1alpha1.BackendConfigPolicy{}
-		objKey := client.ObjectKeyFromObject(policy)
-		err := s.TestInstallation.ClusterContext.Client.Get(s.Ctx, objKey, obj)
-		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get BackendConfigPolicy %s", objKey)
-
-		g.Expect(obj.Status.Ancestors).ToNot(gomega.BeEmpty(), "BackendConfigPolicy should have ancestors")
-
-		// Check first ancestor for Accepted condition
-		ancestorStatus := obj.Status.Ancestors[0]
-		cond := meta.FindStatusCondition(ancestorStatus.Conditions, string(v1alpha1.PolicyConditionAccepted))
-		g.Expect(cond).NotTo(gomega.BeNil(), "BackendConfigPolicy should have Accepted condition")
-		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "BackendConfigPolicy should be accepted")
-	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
-}
-
-// assertGatewayExtensionAccepted validates that a GatewayExtension has "Accepted" status.
-// GatewayExtension uses direct conditions on its status.
-func (s *BaseTestingSuite) assertGatewayExtensionAccepted(extension *v1alpha1.GatewayExtension) {
-	currentTimeout, pollingInterval := helpers.GetTimeouts()
-	s.TestInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
-		obj := &v1alpha1.GatewayExtension{}
-		objKey := client.ObjectKeyFromObject(extension)
-		err := s.TestInstallation.ClusterContext.Client.Get(s.Ctx, objKey, obj)
-		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get GatewayExtension %s", objKey)
-
-		cond := meta.FindStatusCondition(obj.Status.Conditions, "Accepted")
-		g.Expect(cond).NotTo(gomega.BeNil(), "GatewayExtension should have Accepted condition")
-		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "GatewayExtension should be accepted")
-	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
 }
