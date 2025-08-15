@@ -23,6 +23,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	agentgatewayplugins "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
@@ -65,6 +66,12 @@ func WithAgentGatewayClassName(name string) func(*setup) {
 func WithExtraPlugins(extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin) func(*setup) {
 	return func(s *setup) {
 		s.extraPlugins = extraPlugins
+	}
+}
+
+func WithExtraAgentgatewayPlugins(extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin) func(*setup) {
+	return func(s *setup) {
+		s.extraAgentgatewayPlugins = extraAgentgatewayPlugins
 	}
 }
 
@@ -125,16 +132,17 @@ func WithGlobalSettings(settings *settings.Settings) func(*setup) {
 }
 
 type setup struct {
-	gatewayControllerName  string
-	gatewayClassName       string
-	waypointClassName      string
-	agentGatewayClassName  string
-	extraPlugins           func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
-	extraXDSCallbacks      xdsserver.Callbacks
-	xdsListener            net.Listener
-	restConfig             *rest.Config
-	ctrlMgrOptionsInitFunc func(context.Context) *ctrl.Options
+	gatewayControllerName    string
+	gatewayClassName         string
+	waypointClassName        string
+	agentGatewayClassName    string
+	extraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
+	extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin
+	extraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
+	extraXDSCallbacks        xdsserver.Callbacks
+	xdsListener              net.Listener
+	restConfig               *rest.Config
+	ctrlMgrOptionsInitFunc   func(context.Context) *ctrl.Options
 	// extra controller manager config, like adding registering additional controllers
 	extraManagerConfig []func(ctx context.Context, mgr manager.Manager, objectFilter kubetypes.DynamicObjectFilter) error
 	krtDebugger        *krt.DebugHandler
