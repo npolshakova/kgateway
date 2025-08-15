@@ -92,8 +92,7 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	res.Filters = filters
 
 	agentGatewayRouteContext := agwir.AgentGatewayRouteContext{
-		Rule:             &r,
-		AttachedPolicies: ctx.AttachedPolicies,
+		Rule: &r,
 	}
 
 	for _, pass := range ctx.pluginPasses {

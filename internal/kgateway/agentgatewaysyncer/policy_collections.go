@@ -111,13 +111,14 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 						Gateway: trafficPolicy.Namespace + "/" + string(target.Name),
 					},
 				}
-				if target.SectionName != nil {
-					gwTarget = &api.PolicyTarget{
-						Kind: &api.PolicyTarget_Listener{
-							Listener: InternalGatewayName(trafficPolicy.Namespace, string(target.Name), string(*target.SectionName)),
-						},
-					}
-				}
+				// TODO(npolshak): add listener support once https://github.com/agentgateway/agentgateway/pull/323 goes in
+				//if target.SectionName != nil {
+				//	gwTarget = &api.PolicyTarget{
+				//		Kind: &api.PolicyTarget_Listener{
+				//			Listener: InternalGatewayName(trafficPolicy.Namespace, string(target.Name), string(*target.SectionName)),
+				//		},
+				//	}
+				//}
 				translatedPolicies := translateTrafficPolicyToADP(ctx, inputs.GatewayExtensions, trafficPolicy, string(target.Name), gwTarget)
 				trafficPolicies = append(trafficPolicies, translatedPolicies...)
 			case wellknown.HTTPRouteKind:
@@ -126,13 +127,14 @@ func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGate
 						Route: trafficPolicy.Namespace + "/" + string(target.Name),
 					},
 				}
-				if target.SectionName != nil {
-					gwTarget = &api.PolicyTarget{
-						Kind: &api.PolicyTarget_RouteRule{
-							RouteRule: trafficPolicy.Namespace + "/" + string(target.Name) + "/" + string(*target.SectionName),
-						},
-					}
-				}
+				// TODO(npolshak): add route rule support once https://github.com/agentgateway/agentgateway/pull/323 goes in
+				//if target.SectionName != nil {
+				//	gwTarget = &api.PolicyTarget{
+				//		Kind: &api.PolicyTarget_RouteRule{
+				//			RouteRule: trafficPolicy.Namespace + "/" + string(target.Name) + "/" + string(*target.SectionName),
+				//		},
+				//	}
+				//}
 				translatedPolicies := translateTrafficPolicyToADP(ctx, inputs.GatewayExtensions, trafficPolicy, string(target.Name), gwTarget)
 				trafficPolicies = append(trafficPolicies, translatedPolicies...)
 			}

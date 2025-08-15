@@ -542,11 +542,11 @@ func (s *AgentGwSyncer) buildListenerFromGateway(obj GatewayListener) *ADPResour
 	l.Protocol = protocol
 	l.Tls = tlsConfig
 
-	resources := toADPResource(ADPListener{l})
+	resources := []*api.Resource{toADPResource(ADPListener{l})}
 	return toResourcep(types.NamespacedName{
 		Namespace: obj.parent.Namespace,
 		Name:      obj.parent.Name,
-	}, []*api.Resource{resources}, obj.report)
+	}, resources, obj.report)
 }
 
 // buildBackendFromBackendIR creates a backend resource from BackendObjectIR

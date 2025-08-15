@@ -208,8 +208,7 @@ func createRouteCollection[T controllers.Object](
 				inner := protomarshal.Clone(e.Route)
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
-				// Note this is the route key. The ParentSection is not appended to allow policy selection
-				inner.Key = inner.GetKey()
+				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
 				return toADPResource(ADPRoute{Route: inner})
 			},
 		)
@@ -263,8 +262,7 @@ func createTCPRouteCollection[T controllers.Object](
 				inner := protomarshal.Clone(e.TCPRoute)
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
-				// Note this is the route key. The ParentSection is not appended to allow policy selection
-				inner.Key = inner.GetKey()
+				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
 				return toADPResource(ADPTCPRoute{TCPRoute: inner})
 			},
 		)
