@@ -33,6 +33,8 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
+
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
@@ -75,11 +77,12 @@ const (
 // It watches Gateway resources with the agentgateway class and translates them to agentgateway configuration.
 type AgentGwSyncer struct {
 	// Core collections and dependencies
-	commonCols *common.CommonCollections
-	mgr        manager.Manager
-	client     kube.Client
-	plugins    pluginsdk.Plugin
-	translator *translator.AgentGatewayTranslator
+	commonCols    *common.CommonCollections
+	mgr           manager.Manager
+	client        kube.Client
+	plugins       pluginsdk.Plugin
+	policyManager *plugins.DefaultPolicyManager
+	translator    *translator.AgentGatewayTranslator
 
 	// Configuration
 	controllerName        string
@@ -114,6 +117,7 @@ func NewAgentGwSyncer(
 	mgr manager.Manager,
 	commonCols *common.CommonCollections,
 	plugins pluginsdk.Plugin,
+	policyManager *plugins.DefaultPolicyManager,
 	xdsCache envoycache.SnapshotCache,
 	systemNamespace string,
 	clusterID string,
@@ -124,6 +128,7 @@ func NewAgentGwSyncer(
 		controllerName:         controllerName,
 		agentGatewayClassName:  agentGatewayClassName,
 		plugins:                plugins,
+		policyManager:          policyManager,
 		translator:             translator.NewAgentGatewayTranslator(commonCols, plugins),
 		xdsCache:               xdsCache,
 		client:                 client,
@@ -370,7 +375,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	}
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, s.plugins)
 
-	adpPolicies := ADPPolicyCollection(inputs, binds, krtopts)
+	adpPolicies := ADPPolicyCollection(inputs, binds, krtopts, s.policyManager)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResourcesForGateway]{binds, listeners, adpRoutes, adpPolicies}, krtopts.ToOptions("ADPResources")...)

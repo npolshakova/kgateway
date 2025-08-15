@@ -313,12 +313,13 @@ var _ = DescribeTable("Basic agentgateway Tests",
 			Name:      "example-gateway",
 		},
 	}),
-	Entry("TrafficPolicy with extauth on gateway", translatorTestCase{
-		inputFile:  "trafficpolicy/extauth-listener.yaml",
-		outputFile: "trafficpolicy/extauth-listener.yaml",
-		gwNN: types.NamespacedName{
-			Namespace: "default",
-			Name:      "example-gateway",
-		},
-	}),
+	// TODO(npolshak): re-enable once listener policies are supported once https://github.com/agentgateway/agentgateway/pull/323 goes in
+	//Entry("TrafficPolicy with extauth on listener", translatorTestCase{
+	//	inputFile:  "trafficpolicy/extauth-listener.yaml",
+	//	outputFile: "trafficpolicy/extauth-listener.yaml",
+	//	gwNN: types.NamespacedName{
+	//		Namespace: "default",
+	//		Name:      "example-gateway",
+	//	},
+	//}),
 )

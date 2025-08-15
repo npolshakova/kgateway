@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
+	agentgatewayplugins "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
 	agwbuiltin "github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/plugins/builtin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
@@ -181,13 +183,16 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 
 	var agentGatewaySyncer *agentgatewaysyncer.AgentGwSyncer
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
+		agentgatewayMergedPlugins := agentgatewayplugins.CreateDefaultPolicyManager()
+
 		agentGatewaySyncer = agentgatewaysyncer.NewAgentGwSyncer(
 			cfg.ControllerName,
 			cfg.AgentGatewayClassName,
 			cfg.Client,
 			cfg.Manager,
 			cfg.CommonCollections,
-			mergedPlugins,
+			mergedPlugins, // TODO(npolshak): move away from mergedPlugins to agentGatewayPlugins
+			agentgatewayMergedPlugins,
 			cfg.SetupOpts.Cache,
 			namespaces.GetPodNamespace(),
 			cfg.Client.ClusterID().String(),

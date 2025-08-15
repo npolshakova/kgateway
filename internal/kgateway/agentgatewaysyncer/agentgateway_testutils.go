@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	agentgatewayplugins "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
+
 	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
 
 	agwbuiltin "github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/plugins/builtin"
@@ -638,6 +640,7 @@ func (tc TestCase) Run(
 	}
 	plugins = append(plugins, extraPlugs...)
 	extensions := registry.MergePlugins(plugins...)
+	agentgatewayExtensions := agentgatewayplugins.CreateDefaultPolicyManager()
 
 	commoncol.InitPlugins(ctx, extensions, *settings)
 
@@ -666,6 +669,7 @@ func (tc TestCase) Run(
 		nil, // mgr not needed for test
 		commoncol,
 		extensions,
+		agentgatewayExtensions,
 		nil, // xdsCache not needed for test
 		"istio-system",
 		"Kubernetes",

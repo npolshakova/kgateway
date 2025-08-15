@@ -83,7 +83,6 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: test-route
-      sectionName: rule1
   extAuth:
     extensionRef:
       name: basic-extauth
