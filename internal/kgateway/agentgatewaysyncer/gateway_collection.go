@@ -15,11 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
-
 	krtinternal "github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
+	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
 )
 
 func toResourcep(gw types.NamespacedName, resources []*api.Resource, rm reports.ReportMap) *ADPResourcesForGateway {
@@ -27,32 +26,18 @@ func toResourcep(gw types.NamespacedName, resources []*api.Resource, rm reports.
 	return &res
 }
 
-func toADPResources(t any) []*api.Resource {
+func toADPResource(t any) *api.Resource {
 	switch tt := t.(type) {
 	case ADPBind:
-		return []*api.Resource{
-			{Kind: &api.Resource_Bind{Bind: tt.Bind}},
-		}
+		return &api.Resource{Kind: &api.Resource_Bind{Bind: tt.Bind}}
 	case ADPListener:
-		return []*api.Resource{
-			{Kind: &api.Resource_Listener{Listener: tt.Listener}},
-		}
+		return &api.Resource{Kind: &api.Resource_Listener{Listener: tt.Listener}}
 	case ADPRoute:
-		adpRoute := t.(ADPRoute)
-		var policies []*api.Resource
-		for _, policy := range adpRoute.AttachedPolicies {
-			policies = append(policies, &api.Resource{Kind: &api.Resource_Policy{Policy: policy}})
-		}
-
-		return append(policies, &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}})
+		return &api.Resource{Kind: &api.Resource_Route{Route: tt.Route}}
 	case ADPTCPRoute:
-		return []*api.Resource{
-			{Kind: &api.Resource_TcpRoute{TcpRoute: tt.TCPRoute}},
-		}
+		return &api.Resource{Kind: &api.Resource_TcpRoute{TcpRoute: tt.TCPRoute}}
 	case ADPPolicy:
-		return []*api.Resource{
-			{Kind: &api.Resource_Policy{Policy: tt.Policy}},
-		}
+		return &api.Resource{Kind: &api.Resource_Policy{Policy: tt.Policy}}
 	}
 	panic("unknown resource kind")
 }
@@ -123,20 +108,15 @@ func (g ADPBackend) Equals(other ADPBackend) bool {
 }
 
 type ADPRoute struct {
-	Route            *api.Route
-	AttachedPolicies []*api.Policy
+	*api.Route
 }
 
 func (g ADPRoute) ResourceName() string {
-	return g.Route.Key
+	return g.Key
 }
 
 func (g ADPRoute) Equals(other ADPRoute) bool {
-	if !protoconv.Equals(g.Route, other.Route) {
-		return false
-	}
-
-	return slices.Equal(g.AttachedPolicies, other.AttachedPolicies)
+	return protoconv.Equals(g, other)
 }
 
 type ADPTCPRoute struct {
@@ -262,7 +242,7 @@ func GatewayCollection(
 				Meta: Meta{
 					CreationTimestamp: obj.CreationTimestamp.Time,
 					GroupVersionKind:  schema.GroupVersionKind{Group: wellknown.GatewayGroup, Kind: wellknown.GatewayKind},
-					Name:              InternalGatewayName(obj.Name, string(l.Name)),
+					Name:              InternalGatewayName(obj.Namespace, obj.Name, string(l.Name)),
 					Annotations:       meta,
 					Namespace:         obj.Namespace,
 				},
@@ -333,6 +313,6 @@ func BuildRouteParents(
 
 // InternalGatewayName returns the name of the internal Istio Gateway corresponding to the
 // specified gwv1-api gwv1 and listener.
-func InternalGatewayName(gwName, lName string) string {
-	return fmt.Sprintf("%s-%s-%s", gwName, AgentgatewayName, lName)
+func InternalGatewayName(gwNamespace, gwName, lName string) string {
+	return fmt.Sprintf("%s-%s-%s", gwNamespace, gwName, lName)
 }

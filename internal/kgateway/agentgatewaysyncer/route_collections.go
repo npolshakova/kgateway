@@ -58,11 +58,8 @@ func ADPRouteCollection(
 						if m != nil {
 							r.Matches = []gwv1.HTTPRouteMatch{*m}
 						}
-						res, policies, err := convertHTTPRouteToADP(ctx, r, obj, n, idx)
-						if !yield(ADPRoute{
-							Route:            res,
-							AttachedPolicies: policies,
-						}, err) {
+						res, err := convertHTTPRouteToADP(ctx, r, obj, n, idx)
+						if !yield(ADPRoute{Route: res}, err) {
 							return
 						}
 					}
@@ -142,7 +139,7 @@ func processParentReferences[T any](
 	gwResult conversionResult[T],
 	objName string,
 	routeReporter reporter.RouteReporter,
-	resourceMapper func(T, routeParentReference) []*api.Resource,
+	resourceMapper func(T, routeParentReference) *api.Resource,
 ) map[types.NamespacedName][]*api.Resource {
 	resourcesPerGateway := make(map[types.NamespacedName][]*api.Resource)
 
@@ -167,10 +164,9 @@ func processParentReferences[T any](
 		if resourcesPerGateway[gw] == nil {
 			resourcesPerGateway[gw] = make([]*api.Resource, 0)
 		}
-		for _, route := range routes {
-			resources := resourceMapper(route, parent)
-			resourcesPerGateway[gw] = append(resourcesPerGateway[gw], resources...)
-		}
+		resourcesPerGateway[gw] = append(resourcesPerGateway[gw], slices.Map(routes, func(e T) *api.Resource {
+			return resourceMapper(e, parent)
+		})...)
 	}
 	return resourcesPerGateway
 }
@@ -208,15 +204,13 @@ func createRouteCollection[T controllers.Object](
 			gwResult,
 			obj.GetName(),
 			routeReporter,
-			func(e ADPRoute, parent routeParentReference) []*api.Resource {
+			func(e ADPRoute, parent routeParentReference) *api.Resource {
 				inner := protomarshal.Clone(e.Route)
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
-				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toADPResources(ADPRoute{
-					Route:            inner,
-					AttachedPolicies: e.AttachedPolicies,
-				})
+				// Note this is the route key. The ParentSection is not appended to allow policy selection
+				inner.Key = inner.GetKey()
+				return toADPResource(ADPRoute{Route: inner})
 			},
 		)
 
@@ -265,12 +259,13 @@ func createTCPRouteCollection[T controllers.Object](
 			gwResult,
 			obj.GetName(),
 			routeReporter,
-			func(e ADPTCPRoute, parent routeParentReference) []*api.Resource {
+			func(e ADPTCPRoute, parent routeParentReference) *api.Resource {
 				inner := protomarshal.Clone(e.TCPRoute)
 				_, name, _ := strings.Cut(parent.InternalName, "/")
 				inner.ListenerKey = name
-				inner.Key = inner.GetKey() + "." + string(parent.ParentSection)
-				return toADPResources(ADPTCPRoute{TCPRoute: inner})
+				// Note this is the route key. The ParentSection is not appended to allow policy selection
+				inner.Key = inner.GetKey()
+				return toADPResource(ADPTCPRoute{TCPRoute: inner})
 			},
 		)
 
@@ -292,40 +287,18 @@ type conversionResult[O any] struct {
 }
 
 // IsNil works around comparing generic types
-func IsNil[O any](o O) bool {
-	switch v := any(o).(type) {
-	case nil:
-		return true
-	case *struct{}:
-		return v == nil
-	case interface{ IsNil() bool }:
-		return v.IsNil()
-	case interface{}:
-		// Check common nil-able types
-		switch vv := any(o).(type) {
-		case nil:
-			return true
-		case *int, *string, *float64, *bool, *byte, *rune, *complex64, *complex128:
-			return vv == nil
-		case []byte:
-			return vv == nil
-		case []int:
-			return vv == nil
-		case map[string]interface{}:
-			return vv == nil
-		case chan int:
-			return vv == nil
-		case func():
-			return vv == nil
-		}
-	}
-	return false
+func IsNil[O comparable](o O) bool {
+	var t O
+	return o == t
 }
 
 func newAgentGatewayPasses(plugs pluginsdk.Plugin,
 	rep reporter.Reporter,
 	aps pluginsdkir.AttachedPolicies) []agwir.AgentGatewayTranslationPass {
 	var out []agwir.AgentGatewayTranslationPass
+	if len(aps.Policies) == 0 {
+		return out
+	}
 	for gk, paList := range aps.Policies {
 		plugin, ok := plugs.ContributesPolicies[gk]
 		if !ok || plugin.NewAgentGatewayPass == nil {
@@ -342,7 +315,7 @@ func newAgentGatewayPasses(plugs pluginsdk.Plugin,
 }
 
 // computeRoute holds the common route building logic shared amongst all types
-func computeRoute[T controllers.Object, O any](ctx RouteContext, obj T, translator func(
+func computeRoute[T controllers.Object, O comparable](ctx RouteContext, obj T, translator func(
 	obj T,
 ) iter.Seq2[O, *reporter.RouteCondition],
 ) ([]routeParentReference, conversionResult[O]) {

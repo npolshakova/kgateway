@@ -39,7 +39,7 @@ func NewPass() *Pass {
 }
 
 // ApplyForRoute applies the builtin transformations for the given route.
-func (p *Pass) ApplyForRoute(pctx *agwir.AgentGatewayRouteContext, route *api.Route, policies *[]*api.Policy) error {
+func (p *Pass) ApplyForRoute(pctx *agwir.AgentGatewayRouteContext, route *api.Route) error {
 	var errs []error
 	err := applyTimeouts(pctx.Rule, route)
 	if err != nil {

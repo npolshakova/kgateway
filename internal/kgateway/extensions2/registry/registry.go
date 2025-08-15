@@ -19,7 +19,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/sandwich"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/serviceentry"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/trafficpolicy"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/trafficpolicy/agentgateway"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/waypoint"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 )
@@ -72,7 +71,7 @@ func MergePlugins(plug ...sdk.Plugin) sdk.Plugin {
 }
 
 func Plugins(ctx context.Context, commoncol *common.CommonCollections, waypointGatewayClassName string) []sdk.Plugin {
-	allPlugins := []sdk.Plugin{
+	return []sdk.Plugin{
 		// Add plugins here
 		backend.NewPlugin(ctx, commoncol),
 		trafficpolicy.NewPlugin(ctx, commoncol),
@@ -87,8 +86,4 @@ func Plugins(ctx context.Context, commoncol *common.CommonCollections, waypointG
 		sandwich.NewPlugin(),
 		backendconfigpolicy.NewPlugin(ctx, commoncol),
 	}
-	if commoncol.Settings.EnableAgentGateway {
-		allPlugins = append(allPlugins, agentgateway.NewPlugin(ctx, commoncol))
-	}
-	return allPlugins
 }

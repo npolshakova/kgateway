@@ -5,9 +5,6 @@ import (
 
 	"istio.io/istio/pkg/kube/krt"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/trafficpolicy/agentgateway"
-	agwir "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/ir"
-
 	envoycorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
@@ -28,11 +25,6 @@ type (
 	TrafficPolicyConstructor        = trafficpolicy.TrafficPolicyConstructor
 	ProviderNeededMap               = trafficpolicy.ProviderNeededMap
 	TrafficPolicyGatewayExtensionIR = trafficpolicy.TrafficPolicyGatewayExtensionIR
-
-	AgentGatewayTrafficPolicyIr   = agentgateway.AgentGatewayTrafficPolicyIr
-	AgentTrafficPolicyConstructor = agentgateway.TrafficPolicyConstructor
-	AgentGatewayProviderNeededMap = agentgateway.ProviderNeededMap
-	TrafficPolicyAgwExtensionIR   = agentgateway.TrafficPolicyAgwExtensionIR
 )
 
 var (
@@ -40,8 +32,6 @@ var (
 	EnableFilterPerRoute           = trafficpolicy.EnableFilterPerRoute
 	MergeTrafficPolicies           = trafficpolicy.MergeTrafficPolicies
 	AddDisableFilterIfNeeded       = trafficpolicy.AddDisableFilterIfNeeded
-
-	MergeAgwTrafficPolicies = agentgateway.MergeTrafficPolicies
 )
 
 // NewTrafficPolicyConstructor creates a traffic policy constructor. This converts a traffic policy into its IR form.
@@ -52,20 +42,8 @@ func NewTrafficPolicyConstructor(
 	return trafficpolicy.NewTrafficPolicyConstructor(ctx, commoncol)
 }
 
-// NewAgwTrafficPolicyConstructor creates an agentgateway traffic policy constructor. This converts a traffic policy into its IR form.
-func NewAgwTrafficPolicyConstructor(
-	ctx context.Context,
-	commoncol *common.CommonCollections,
-) *agentgateway.TrafficPolicyConstructor {
-	return agentgateway.NewTrafficPolicyConstructor(ctx, commoncol)
-}
-
 func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx, reporter reports.Reporter) ir.ProxyTranslationPass {
 	return trafficpolicy.NewGatewayTranslationPass(ctx, tctx, reporter)
-}
-
-func NewAgentGatewayTranslationPass(reporter reports.Reporter) agwir.AgentGatewayTranslationPass {
-	return agentgateway.NewAgentGatewayTranslationPass(reporter)
 }
 
 // ResolveExtGrpcService resolves a gateway extension gRPC service by looking up the backend reference

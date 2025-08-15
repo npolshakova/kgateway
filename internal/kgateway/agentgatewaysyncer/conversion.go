@@ -51,11 +51,14 @@ const (
 
 func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	obj *gwv1.HTTPRoute, pos int, matchPos int,
-) (*api.Route, []*api.Policy, *reporter.RouteCondition) {
-	// policies attached to the route
-	var policies []*api.Policy
+) (*api.Route, *reporter.RouteCondition) {
+	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) + "." + strconv.Itoa(matchPos)
+	if r.Name != nil {
+		// use the user provided name. this will be used to attach policies
+		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+	}
 	res := &api.Route{
-		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) + "." + strconv.Itoa(matchPos),
+		Key:         routeKey,
 		RouteName:   obj.Namespace + "/" + obj.Name,
 		ListenerKey: "",
 		RuleName:    defaultString(r.Name, ""),
@@ -64,19 +67,19 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	for _, match := range r.Matches {
 		path, err := createADPPathMatch(match)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		headers, err := createADPHeadersMatch(match)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		method, err := createADPMethodMatch(match)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		query, err := createADPQueryMatch(match)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		res.Matches = append(res.GetMatches(), &api.RouteMatch{
 			Path:        path,
@@ -94,8 +97,8 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	}
 
 	for _, pass := range ctx.pluginPasses {
-		if err := pass.ApplyForRoute(&agentGatewayRouteContext, res, &policies); err != nil {
-			return nil, nil, &reporter.RouteCondition{
+		if err := pass.ApplyForRoute(&agentGatewayRouteContext, res); err != nil {
+			return nil, &reporter.RouteCondition{
 				Type:    gwv1.RouteConditionAccepted,
 				Status:  metav1.ConditionFalse,
 				Reason:  "PluginError",
@@ -107,7 +110,7 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	// Retry: todo
 	route, backendErr, err := buildADPHTTPDestination(ctx, r.BackendRefs, obj.Namespace)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	res.Backends = route
 	res.Hostnames = slices.Map(obj.Spec.Hostnames, func(e gwv1.Hostname) string {
@@ -128,21 +131,26 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 		}
 	}
 	if len(errs) > 0 {
-		return res, nil, &reporter.RouteCondition{
+		return res, &reporter.RouteCondition{
 			Type:    gwv1.RouteConditionAccepted,
 			Status:  metav1.ConditionFalse,
 			Reason:  errorReason,
 			Message: errors.Join(errs...).Error(),
 		}
 	}
-	return res, policies, backendErr
+	return res, backendErr
 }
 
 func convertTCPRouteToADP(ctx RouteContext, r gwv1alpha2.TCPRouteRule,
 	obj *gwv1alpha2.TCPRoute, pos int,
 ) (*api.TCPRoute, *reporter.RouteCondition) {
+	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos)
+	if r.Name != nil {
+		// use the user provided name. this will be used to attach policies
+		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+	}
 	res := &api.TCPRoute{
-		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos),
+		Key:         routeKey,
 		RouteName:   obj.Namespace + "/" + obj.Name,
 		ListenerKey: "",
 		RuleName:    defaultString(r.Name, ""),
@@ -162,8 +170,13 @@ func convertTCPRouteToADP(ctx RouteContext, r gwv1alpha2.TCPRouteRule,
 func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 	obj *gwv1.GRPCRoute, pos int,
 ) (*api.Route, *reporter.RouteCondition) {
+	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos)
+	if r.Name != nil {
+		// use the user provided name. this will be used to attach policies
+		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+	}
 	res := &api.Route{
-		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos),
+		Key:         routeKey,
 		RouteName:   obj.Namespace + "/" + obj.Name,
 		ListenerKey: "",
 		RuleName:    defaultString(r.Name, ""),
@@ -221,8 +234,13 @@ func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 func convertTLSRouteToADP(ctx RouteContext, r gwv1alpha2.TLSRouteRule,
 	obj *gwv1alpha2.TLSRoute, pos int,
 ) (*api.TCPRoute, *reporter.RouteCondition) {
+	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos)
+	if r.Name != nil {
+		// use the user provided name. this will be used to attach policies
+		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+	}
 	res := &api.TCPRoute{
-		Key:         obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos),
+		Key:         routeKey,
 		RouteName:   obj.Namespace + "/" + obj.Name,
 		ListenerKey: "",
 		RuleName:    defaultString(r.Name, ""),

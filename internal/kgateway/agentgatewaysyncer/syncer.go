@@ -303,9 +303,10 @@ type Inputs struct {
 	InferencePools krt.Collection[*inf.InferencePool]
 
 	// kgateway resources
-	Backends        *krtcollections.BackendIndex
-	GatewayIndex    *krtcollections.GatewayIndex
-	DirectResponses krt.Collection[*v1alpha1.DirectResponse]
+	Backends          *krtcollections.BackendIndex
+	TrafficPolicies   krt.Collection[*v1alpha1.TrafficPolicy]
+	DirectResponses   krt.Collection[*v1alpha1.DirectResponse]
+	GatewayExtensions krt.Collection[*v1alpha1.GatewayExtension]
 }
 
 func (s *AgentGwSyncer) Init(krtopts krtinternal.KrtOptions) {
@@ -397,9 +398,10 @@ func (s *AgentGwSyncer) buildInputCollections(krtopts krtinternal.KrtOptions) In
 		InferencePools: krt.NewStaticCollection[*inf.InferencePool](nil, nil, krtopts.ToOptions("disable/inferencepools")...),
 
 		// kgateway resources
-		Backends:        s.commonCols.BackendIndex,
-		DirectResponses: krt.NewInformer[*v1alpha1.DirectResponse](s.client),
-		GatewayIndex:    s.commonCols.GatewayIndex,
+		Backends:          s.commonCols.BackendIndex,
+		DirectResponses:   krt.NewInformer[*v1alpha1.DirectResponse](s.client),
+		TrafficPolicies:   krt.NewInformer[*v1alpha1.TrafficPolicy](s.client),
+		GatewayExtensions: krt.NewInformer[*v1alpha1.GatewayExtension](s.client),
 	}
 
 	if s.EnableInferExt {
@@ -485,7 +487,7 @@ func (s *AgentGwSyncer) buildADPResources(
 			if binds[nsName] == nil {
 				binds[nsName] = make([]*api.Resource, 0)
 			}
-			binds[nsName] = append(binds[nsName], toADPResources(bind)...)
+			binds[nsName] = append(binds[nsName], toADPResource(bind))
 		}
 		for gw, res := range binds {
 			repForGw := gwReports[gw]
@@ -513,7 +515,7 @@ func (s *AgentGwSyncer) buildADPResources(
 	}
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, s.plugins)
 
-	adpPolicies := ADPPolicyCollection(inputs, krtopts, s.plugins)
+	adpPolicies := ADPPolicyCollection(inputs, binds, krtopts)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResourcesForGateway]{binds, listeners, adpRoutes, adpPolicies}, krtopts.ToOptions("ADPResources")...)
@@ -540,11 +542,11 @@ func (s *AgentGwSyncer) buildListenerFromGateway(obj GatewayListener) *ADPResour
 	l.Protocol = protocol
 	l.Tls = tlsConfig
 
-	resources := toADPResources(ADPListener{l})
+	resources := toADPResource(ADPListener{l})
 	return toResourcep(types.NamespacedName{
 		Namespace: obj.parent.Namespace,
 		Name:      obj.parent.Name,
-	}, resources, obj.report)
+	}, []*api.Resource{resources}, obj.report)
 }
 
 // buildBackendFromBackendIR creates a backend resource from BackendObjectIR
