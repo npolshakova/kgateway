@@ -35,15 +35,16 @@ func (p *InferencePlugin) Name() string {
 }
 
 // GeneratePolicies generates ADP policies for inference pools
-func (p *InferencePlugin) GeneratePolicies(ctx krt.HandlerContext, inputs *PolicyInputs) ([]ADPPolicy, error) {
+func (p *InferencePlugin) GeneratePolicies(ctx krt.HandlerContext, inputs PolicyInputsInterface[any]) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/inference")
 
-	if inputs.InferencePools == nil {
+	inferencePools := inputs.GetInferencePools()
+	if inferencePools == nil {
 		logger.Warn("inference pools collection is nil, skipping inference policy generation")
 		return nil, nil
 	}
 
-	return p.GenerateInferencePoolPolicies(ctx, inputs.InferencePools, inputs.DomainSuffix)
+	return p.GenerateInferencePoolPolicies(ctx, inferencePools, inputs.GetDomainSuffix())
 }
 
 // GenerateInferencePoolPolicies generates policies for inference pools
@@ -147,4 +148,4 @@ func (p *InferencePlugin) generatePoliciesForInferencePool(pool *inf.InferencePo
 }
 
 // Verify that InferencePlugin implements the required interfaces
-var _ PolicyPlugin = (*InferencePlugin)(nil)
+var _ PolicyPlugin[any] = (*InferencePlugin)(nil)

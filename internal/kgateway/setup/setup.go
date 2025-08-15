@@ -69,7 +69,7 @@ func WithExtraPlugins(extraPlugins func(ctx context.Context, commoncol *common.C
 	}
 }
 
-func WithExtraAgentgatewayPlugins(extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin) func(*setup) {
+func WithExtraAgentgatewayPlugins(extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin[any]) func(*setup) {
 	return func(s *setup) {
 		s.extraAgentgatewayPlugins = extraAgentgatewayPlugins
 	}
@@ -137,7 +137,7 @@ type setup struct {
 	waypointClassName        string
 	agentGatewayClassName    string
 	extraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin
+	extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin[any]
 	extraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	extraXDSCallbacks        xdsserver.Callbacks
 	xdsListener              net.Listener

@@ -36,15 +36,16 @@ func (p *TrafficPlugin) Name() string {
 }
 
 // GeneratePolicies generates agentgateway policies from TrafficPolicy resources
-func (p *TrafficPlugin) GeneratePolicies(ctx krt.HandlerContext, inputs *PolicyInputs) ([]ADPPolicy, error) {
+func (p *TrafficPlugin) GeneratePolicies(ctx krt.HandlerContext, inputs PolicyInputsInterface[any]) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/traffic")
 
-	if inputs.TrafficPolicies == nil {
+	trafficPolicies := inputs.GetTrafficPolicies()
+	if trafficPolicies == nil {
 		logger.Debug("traffic policies collection is nil, skipping traffic policy generation")
 		return nil, nil
 	}
 
-	return p.GenerateTrafficPolicies(ctx, inputs.TrafficPolicies, inputs.GatewayExtensions)
+	return p.GenerateTrafficPolicies(ctx, trafficPolicies, inputs.GetGatewayExtensions())
 }
 
 // GenerateTrafficPolicies generates policies for traffic policies
@@ -204,4 +205,4 @@ func (p *TrafficPlugin) processExtAuthPolicy(ctx krt.HandlerContext, gatewayExte
 }
 
 // Verify that TrafficPlugin implements the required interfaces
-var _ PolicyPlugin = (*TrafficPlugin)(nil)
+var _ PolicyPlugin[any] = (*TrafficPlugin)(nil)

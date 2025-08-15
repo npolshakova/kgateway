@@ -17,7 +17,7 @@ func CreateDefaultPolicyManager() *DefaultPolicyManager {
 // RegisterBuiltinPlugins registers all built-in policy plugins
 func RegisterBuiltinPlugins(manager PolicyManager) error {
 	// Create plugins directly to avoid import cycle
-	plugins := []PolicyPlugin{
+	plugins := []PolicyPlugin[any]{
 		NewTrafficPlugin(),
 		NewInferencePlugin(),
 		NewA2APlugin(),
@@ -42,8 +42,8 @@ func RegisterBuiltinPlugins(manager PolicyManager) error {
 }
 
 // GetDefaultPlugins returns a list of all default policy plugins without registering them
-func GetDefaultPlugins() []PolicyPlugin {
-	return []PolicyPlugin{
+func GetDefaultPlugins() []PolicyPlugin[any] {
+	return []PolicyPlugin[any]{
 		NewTrafficPlugin(),
 		NewInferencePlugin(),
 		NewA2APlugin(),

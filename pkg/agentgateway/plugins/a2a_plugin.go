@@ -34,15 +34,16 @@ func (p *A2APlugin) Name() string {
 }
 
 // GeneratePolicies generates ADP policies for services with a2a protocol
-func (p *A2APlugin) GeneratePolicies(ctx krt.HandlerContext, inputs *PolicyInputs) ([]ADPPolicy, error) {
+func (p *A2APlugin) GeneratePolicies(ctx krt.HandlerContext, inputs PolicyInputsInterface[any]) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/a2a")
 
-	if inputs.Services == nil {
+	services := inputs.GetServices()
+	if services == nil {
 		logger.Warn("services collection is nil, skipping A2A policy generation")
 		return nil, nil
 	}
 
-	return p.GenerateA2APolicies(ctx, inputs.Services)
+	return p.GenerateA2APolicies(ctx, services)
 }
 
 // GenerateA2APolicies generates A2A policies for services with a2a protocol
@@ -90,4 +91,4 @@ func (p *A2APlugin) generatePoliciesForService(svc *corev1.Service) []ADPPolicy 
 }
 
 // Verify that A2APlugin implements the required interfaces
-var _ PolicyPlugin = (*A2APlugin)(nil)
+var _ PolicyPlugin[any] = (*A2APlugin)(nil)
