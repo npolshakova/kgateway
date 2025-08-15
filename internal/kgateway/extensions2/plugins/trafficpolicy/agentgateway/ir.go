@@ -137,7 +137,6 @@ func ResolveExtGrpcService(krtctx krt.HandlerContext, backends *krtcollections.B
 		if err != nil {
 			return nil, err
 		}
-
 	}
 	if backend == nil {
 		return nil, errors.New("backend not found")

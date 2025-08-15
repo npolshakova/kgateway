@@ -1,6 +1,34 @@
 kind: Gateway
 apiVersion: gateway.networking.k8s.io/v1
 metadata:
+  name: super-gateway-2
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+    - protocol: HTTP
+      port: 8090
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: test-route-2
+spec:
+  parentRefs:
+    - name: super-gateway-2
+  hostnames:
+    - "example2.com"
+  rules:
+    - backendRefs:
+        - name: simple-svc
+          port: 8080
+---
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1
+metadata:
   name: super-gateway
 spec:
   gatewayClassName: agentgateway
@@ -8,6 +36,12 @@ spec:
     - protocol: HTTP
       port: 8080
       name: http
+      allowedRoutes:
+        namespaces:
+          from: All
+    - protocol: HTTP
+      port: 8088
+      name: other
       allowedRoutes:
         namespaces:
           from: All
@@ -33,8 +67,9 @@ metadata:
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: test-route
+      kind: Gateway
+      name: super-gateway
+      sectionName: http
   extAuth:
     extensionRef:
       name: basic-extauth

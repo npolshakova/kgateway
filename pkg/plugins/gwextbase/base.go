@@ -3,9 +3,10 @@ package gwextbase
 import (
 	"context"
 
+	"istio.io/istio/pkg/kube/krt"
+
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/trafficpolicy/agentgateway"
 	agwir "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/ir"
-	"istio.io/istio/pkg/kube/krt"
 
 	envoycorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 

@@ -2,6 +2,7 @@ package agentgateway
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	skubeclient "istio.io/istio/pkg/config/schema/kubeclient"
@@ -50,8 +51,6 @@ type ProviderNeededMap struct {
 type agwTrafficPolicyPluginGwPass struct {
 	reporter reports.Reporter
 	agwir.UnimplementedAgentGatewayTranslationPass
-
-	extAuth *api.PolicySpec_ExtAuthz
 }
 
 func (a agwTrafficPolicyPluginGwPass) ApplyForRoute(pCtx *agwir.AgentGatewayRouteContext, out *api.Route, policies *[]*api.Policy) error {
@@ -69,9 +68,16 @@ func (a agwTrafficPolicyPluginGwPass) ApplyForRoute(pCtx *agwir.AgentGatewayRout
 			if !ok {
 				continue
 			}
+			// TODO: does the policy name need to be unique? (per target)
+			var policyName string
+			if p.PolicyRef != nil {
+				policyName = fmt.Sprintf("trafficpolicy/%s/%s", p.PolicyRef.Namespace, p.PolicyRef.Name)
+			} else {
+				policyName = "trafficpolicy/unknown"
+			}
 			if rtPolicy.Extauth != nil {
 				*policies = append(*policies, &api.Policy{
-					Name: "extauth-" + out.GetRouteName(),
+					Name: policyName + ":extauth",
 					Target: &api.PolicyTarget{
 						Kind: &api.PolicyTarget_Route{Route: out.GetRouteName()},
 					},
