@@ -242,7 +242,7 @@ func GatewayCollection(
 				Meta: Meta{
 					CreationTimestamp: obj.CreationTimestamp.Time,
 					GroupVersionKind:  schema.GroupVersionKind{Group: wellknown.GatewayGroup, Kind: wellknown.GatewayKind},
-					Name:              InternalGatewayName(obj.Namespace, obj.Name, string(l.Name)),
+					Name:              internalGatewayName(obj.Namespace, obj.Name, string(l.Name)),
 					Annotations:       meta,
 					Namespace:         obj.Namespace,
 				},
@@ -311,8 +311,8 @@ func BuildRouteParents(
 	}
 }
 
-// InternalGatewayName returns the name of the internal Istio Gateway corresponding to the
+// internalGatewayName returns the name of the internal Istio Gateway corresponding to the
 // specified gwv1-api gwv1 and listener.
-func InternalGatewayName(gwNamespace, gwName, lName string) string {
-	return fmt.Sprintf("%s-%s-%s", gwNamespace, gwName, lName)
+func internalGatewayName(gwNamespace, gwName, lName string) string {
+	return fmt.Sprintf("%s/%s/%s", gwNamespace, gwName, lName)
 }

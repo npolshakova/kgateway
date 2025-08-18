@@ -131,7 +131,7 @@
     {
       "Kind": {
         "Listener": {
-          "key": "gwtest-http-direct-response-http",
+          "key": "gwtest/http-direct-response/http",
           "name": "http",
           "bind_key": "8080/gwtest/http-direct-response",
           "gateway_name": "gwtest/http-direct-response",

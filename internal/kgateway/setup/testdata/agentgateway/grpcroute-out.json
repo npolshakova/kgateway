@@ -174,7 +174,7 @@
     {
       "Kind": {
         "Listener": {
-          "key": "gwtest-http-grpcroute-http",
+          "key": "gwtest/http-grpcroute/http",
           "name": "http",
           "bind_key": "8080/gwtest/http-grpcroute",
           "gateway_name": "gwtest/http-grpcroute",

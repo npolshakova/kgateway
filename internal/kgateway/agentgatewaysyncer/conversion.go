@@ -52,6 +52,7 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	obj *gwv1.HTTPRoute, pos int, matchPos int,
 ) (*api.Route, *reporter.RouteCondition) {
 	routeKey := getRouteKeyPosition(obj.ObjectMeta, pos) + "." + strconv.Itoa(matchPos)
+	// TODO(npolshak): Set both routeKey and RuleName once agentgateway is bumped to pick up fix in https://github.com/agentgateway/agentgateway/pull/323
 	if r.Name != nil {
 		// use the user provided name. this will be used to attach policies
 		routeKey = getRouteKeySectionName(obj.ObjectMeta, string(*r.Name))
