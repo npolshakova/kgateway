@@ -385,9 +385,7 @@ func (s *AgentGwSyncer) buildAddressCollections(krtopts krtinternal.KrtOptions) 
 	workloads := workloadIndex.WorkloadsCollection(
 		s.agwCollections.WrappedPods,
 		workloadServices,
-		nil, // serviceEntries,
 		s.agwCollections.EndpointSlices,
-		s.agwCollections.Namespaces,
 		krtopts,
 	)
 

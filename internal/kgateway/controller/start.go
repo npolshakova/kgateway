@@ -193,7 +193,8 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.Client,
 			cfg.Manager,
 			cfg.AgwCollections,
-			mergedPlugins, // TODO(npolshak): move away from mergedPlugins to agentGatewayPlugins
+			// TODO(npolshak): move away from shared mergedPlugins to agentGatewayPlugins https://github.com/kgateway-dev/kgateway/issues/12052
+			mergedPlugins,
 			agentgatewayMergedPlugins,
 			cfg.SetupOpts.Cache,
 			namespaces.GetPodNamespace(),

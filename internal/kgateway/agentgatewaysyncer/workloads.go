@@ -54,9 +54,7 @@ type index struct {
 func (a *index) WorkloadsCollection(
 	pods krt.Collection[krtcollections.WrappedPod],
 	workloadServices krt.Collection[ServiceInfo],
-	serviceEntries krt.Collection[*networkingclient.ServiceEntry],
 	endpointSlices krt.Collection[*discovery.EndpointSlice],
-	namespaces krt.Collection[*corev1.Namespace],
 	krtopts krtinternal.KrtOptions,
 ) krt.Collection[WorkloadInfo] {
 	WorkloadServicesNamespaceIndex := krt.NewNamespaceIndex(workloadServices)
