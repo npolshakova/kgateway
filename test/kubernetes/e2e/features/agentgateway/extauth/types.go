@@ -17,19 +17,19 @@ var (
 	simpleSvc = &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "simple-svc",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 	simpleDeployment = &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "backend-0",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 
 	proxyObjMeta = metav1.ObjectMeta{
 		Name:      "super-gateway",
-		Namespace: "kgateway-test",
+		Namespace: "default",
 	}
 	proxyDeployment = &appsv1.Deployment{ObjectMeta: proxyObjMeta}
 	proxyService    = &corev1.Service{ObjectMeta: proxyObjMeta}
@@ -38,7 +38,7 @@ var (
 	extAuthSvc = &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ext-authz",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -56,7 +56,7 @@ var (
 	extAuthExtension = &v1alpha1.GatewayExtension{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "basic-extauth",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 		Spec: v1alpha1.GatewayExtensionSpec{
 			Type: v1alpha1.GatewayExtensionTypeExtAuth,
@@ -76,37 +76,37 @@ var (
 	basicSecureRoute = &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "hey-its-a-route",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 	gatewayAttachedTrafficPolicy = &v1alpha1.TrafficPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "gw-policy",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 	insecureRoute = &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "route-example-insecure",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 	insecureTrafficPolicy = &v1alpha1.TrafficPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "insecure-route-policy",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 	secureRoute = &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "route-example-secure",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 	secureTrafficPolicy = &v1alpha1.TrafficPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "secure-route-policy",
-			Namespace: "kgateway-test",
+			Namespace: "default",
 		},
 	}
 

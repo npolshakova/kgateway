@@ -40,7 +40,6 @@ func NewAgwCollections(
 	services krt.Collection[*corev1.Service],
 	gwExts krt.Collection[*v1alpha1.GatewayExtension],
 ) (*AgwCollections, error) {
-
 	return &AgwCollections{
 		Client:            client,
 		Services:          services,

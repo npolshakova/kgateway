@@ -9,10 +9,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
 )
 
-const (
-	a2aProtocol = "kgateway.dev/a2a"
-)
-
 func ADPPolicyCollection(inputs Inputs, agw *plugins.AgwCollections, binds krt.Collection[ADPResourcesForGateway], krtopts krtutil.KrtOptions, policyManager *plugins.DefaultPolicyManager) krt.Collection[ADPResourcesForGateway] {
 	// Generate all policies using the plugin system
 	allPoliciesCol := krt.NewCollection(binds, func(ctx krt.HandlerContext, i ADPResourcesForGateway) *ADPResourcesForGateway {
