@@ -89,13 +89,3 @@ func (m *DefaultPolicyManager) GenerateAllPolicies(ctx krt.HandlerContext, agw *
 	managerLogger.Info("generated all policies", "total_policies", len(allPolicies), "errors", len(allErrors))
 	return allPolicies, nil
 }
-
-// GetRegisteredPlugins returns all registered plugins (for debugging/introspection)
-func (m *DefaultPolicyManager) GetRegisteredPlugins() []PolicyPlugin {
-	// Return a copy to prevent external modification
-	result := make([]PolicyPlugin, 0, len(m.contributesPolicies))
-	for _, plugin := range m.contributesPolicies {
-		result = append(result, plugin)
-	}
-	return result
-}

@@ -668,7 +668,6 @@ func (tc TestCase) Run(
 		ourCli,
 		wellknown.DefaultGatewayControllerName,
 		*settings,
-		commoncol.BackendIndex,
 	)
 	if err != nil {
 		return nil, err

@@ -611,6 +611,7 @@ func (s *AgentGwSyncer) buildStatusReporting() {
 func (s *AgentGwSyncer) setupSyncDependencies(gateways krt.Collection[GatewayListener], adpResources krt.Collection[ADPResourcesForGateway], adpBackends krt.Collection[envoyResourceWithCustomName], addresses krt.Collection[envoyResourceWithCustomName]) {
 	s.waitForSync = []cache.InformerSynced{
 		s.commonCols.HasSynced,
+		s.agwCollections.HasSynced,
 		gateways.HasSynced,
 		// resources
 		adpResources.HasSynced,

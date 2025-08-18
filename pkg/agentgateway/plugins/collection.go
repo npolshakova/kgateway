@@ -21,7 +21,6 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
@@ -208,7 +207,6 @@ func (c *AgwCollections) HasSynced() bool {
 		c.TLSRoutes != nil && c.TLSRoutes.HasSynced() &&
 		c.ReferenceGrants != nil && c.ReferenceGrants.HasSynced() &&
 		c.InferencePools != nil && c.InferencePools.HasSynced() &&
-		c.Backends != nil && c.Backends.HasSynced() &&
 		c.TrafficPolicies != nil && c.TrafficPolicies.HasSynced() &&
 		c.DirectResponses != nil && c.DirectResponses.HasSynced() &&
 		c.GatewayExtensions != nil && c.GatewayExtensions.HasSynced() &&
@@ -226,7 +224,6 @@ func NewAgwCollections(
 	ourClient versioned.Interface,
 	controllerName string,
 	settings settings.Settings,
-	backends *krtcollections.BackendIndex,
 ) (*AgwCollections, error) {
 	// Register Gateway API and kgateway types with Istio kubeclient system
 	registerGatewayAPITypes()
@@ -264,7 +261,6 @@ func NewAgwCollections(
 		InferencePools: krt.NewStaticCollection[*inf.InferencePool](nil, nil, krtopts.ToOptions("disable/inferencepools")...),
 
 		// kgateway resources
-		Backends:          backends,
 		DirectResponses:   krt.NewInformer[*v1alpha1.DirectResponse](client),
 		TrafficPolicies:   krt.NewInformer[*v1alpha1.TrafficPolicy](client),
 		GatewayExtensions: krt.NewInformer[*v1alpha1.GatewayExtension](client),
@@ -277,15 +273,4 @@ func NewAgwCollections(
 	}
 
 	return agwCollections, nil
-}
-
-// InitPlugins set up collections that rely on plugins.
-// This can't be part of NewAgwCollections because the setup
-// of plugins themselves rely on a reference to AgwCollections.
-func (c *AgwCollections) InitPlugins(
-	ctx context.Context,
-	mergedPlugins extensionsplug.Plugin,
-	globalSettings settings.Settings,
-) {
-
 }

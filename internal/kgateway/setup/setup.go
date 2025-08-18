@@ -272,7 +272,6 @@ func (s *setup) Start(ctx context.Context) error {
 		cli,
 		s.gatewayControllerName,
 		*s.globalSettings,
-		commoncol.BackendIndex,
 	)
 	if err != nil {
 		slog.Error("error creating agw common collections", "error", err)
