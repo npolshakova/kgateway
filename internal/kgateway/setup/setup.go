@@ -69,7 +69,7 @@ func WithExtraPlugins(extraPlugins func(ctx context.Context, commoncol *common.C
 	}
 }
 
-func WithExtraAgentgatewayPlugins(extraAgentgatewayPlugins []agentgatewayplugins.PolicyPlugin) func(*setup) {
+func WithExtraAgentgatewayPlugins(extraAgentgatewayPlugins func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) []agentgatewayplugins.PolicyPlugin) func(*setup) {
 	return func(s *setup) {
 		s.extraAgentgatewayPlugins = extraAgentgatewayPlugins
 	}
@@ -137,7 +137,7 @@ type setup struct {
 	waypointClassName        string
 	agentGatewayClassName    string
 	extraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	extraAgentgatewayPlugins []agentgatewayplugins.PolicyPlugin
+	extraAgentgatewayPlugins func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) []agentgatewayplugins.PolicyPlugin
 	extraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	extraXDSCallbacks        xdsserver.Callbacks
 	xdsListener              net.Listener
@@ -302,7 +302,7 @@ func BuildKgatewayWithConfig(
 	commonCollections *collections.CommonCollections,
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
-	extraAgentgatewayPlugins []agentgatewayplugins.PolicyPlugin,
+	extraAgentgatewayPlugins func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) []agentgatewayplugins.PolicyPlugin,
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 ) error {
 	slog.Info("creating krt collections")

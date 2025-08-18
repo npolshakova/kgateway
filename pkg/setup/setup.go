@@ -24,7 +24,7 @@ type Options struct {
 	WaypointGatewayClassName string
 	AgentGatewayClassName    string
 	ExtraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	ExtraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin[any]
+	ExtraAgentgatewayPlugins func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) []agentgatewayplugins.PolicyPlugin
 	ExtraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	ExtraXDSCallbacks        xdsserver.Callbacks
 	RestConfig               *rest.Config
