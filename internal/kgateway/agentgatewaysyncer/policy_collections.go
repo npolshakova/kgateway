@@ -5,24 +5,19 @@ import (
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/slices"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
 )
 
-func ADPPolicyCollection(agw *plugins.AgwCollections, binds krt.Collection[ADPResourcesForGateway], krtopts krtutil.KrtOptions, policyManager *plugins.DefaultPolicyManager) krt.Collection[ADPResourcesForGateway] {
+func ADPPolicyCollection(binds krt.Collection[ADPResourcesForGateway], agwPlugins plugins.AgentgatewayPlugin) krt.Collection[ADPResourcesForGateway] {
 	// Generate all policies using the plugin system
 	allPoliciesCol := krt.NewCollection(binds, func(ctx krt.HandlerContext, i ADPResourcesForGateway) *ADPResourcesForGateway {
 		logger.Debug("generating policies for gateway", "gateway", i.Gateway)
 
+		var allPolicies []plugins.ADPPolicy
 		// Generate all policies from all registered plugins using contributed policies
-		allPolicies, err := policyManager.GenerateAllPolicies(ctx, agw)
-		if err != nil {
-			logger.Error("failed to generate policies", "error", err)
-			// Return empty resources but don't fail completely
-			return &ADPResourcesForGateway{
-				Resources: []*api.Resource{},
-				Gateway:   i.Gateway,
-			}
+		for _, plugin := range agwPlugins.ContributesPolicies {
+			policies := plugin.ApplyPolicies()
+			allPolicies = append(allPolicies, policies...)
 		}
 
 		// Convert all plugins.ADPPolicy structs to api.Resource structs

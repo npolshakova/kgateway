@@ -2,9 +2,10 @@ package plugins
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"google.golang.org/protobuf/proto"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -18,47 +19,62 @@ const (
 	a2aPluginName = "a2a-policy-plugin"
 )
 
-// A2APlugin converts an a2a annotated service to an agentgateway a2a policy
-type A2APlugin struct {
-	A2APolicyIr A2APolicyIr
-}
-
+// A2APolicyIr converts an A2A service to an agentgateway policy
 type A2APolicyIr struct {
 	policies []ADPPolicy
+	ct       time.Time
 }
 
-func (p *A2APolicyIr) Equals(in A2APolicyIr) bool {
-	// Compare policies slice
-	if len(p.policies) != len(in.policies) {
+func (p *A2APolicyIr) CreationTime() time.Time {
+	return p.ct
+}
+
+func (p *A2APolicyIr) Equals(in any) bool {
+	p2, ok := in.(*A2APolicyIr)
+	if !ok {
+		return false
+	}
+	if len(p.policies) != len(p2.policies) {
 		return false
 	}
 	for i, policy := range p.policies {
-		if !proto.Equal(policy.Policy, in.policies[i].Policy) {
+		if !policy.Equals(&p2.policies[i]) {
 			return false
 		}
 	}
-
 	return true
 }
 
 // NewA2APlugin creates a new A2A policy plugin
-func NewA2APlugin(agw *AgwCollections) *A2APlugin {
-	logger := logging.New("agentgateway/plugins/a2a")
+func NewA2APlugin(agw *AgwCollections) AgentgatewayPlugin {
+	gk := wellknown.ServiceGVK.GroupKind()
+	policyCol := krt.NewCollection(agw.Services, func(krtctx krt.HandlerContext, svc *corev1.Service) *PolicyWrapper {
+		objSrc := ir.ObjectSource{
+			Group:     gk.Group,
+			Kind:      gk.Kind,
+			Namespace: svc.Namespace,
+			Name:      svc.Name,
+		}
 
-	services := agw.Services
-	if services == nil {
-		logger.Warn("services collection is nil, skipping A2A policy generation")
-		return nil
-	}
-
-	policies := translateA2APolicies(services)
-	return &AgentgatewayPlugin{
-		ContributesPolicies: map[schema.GroupKind]PolicyPlugin{wellknown.ServiceGVK.GroupKind(): &A2APlugin{A2APolicyIr: A2APolicyIr{policies: policies}})},
+		policyIR, errors := translatePoliciesForService(svc)
+		return &PolicyWrapper{
+			ObjectSource: objSrc,
+			Policy:       svc,
+			PolicyIR:     policyIR,
+			Errors:       errors,
+		}
+	})
+	return AgentgatewayPlugin{
+		ContributesPolicies: map[schema.GroupKind]PolicyPlugin{
+			wellknown.ServiceGVK.GroupKind(): {
+				Policies: policyCol,
+			},
+		},
 	}
 }
 
 // GroupKind returns the GroupKind of the policy this plugin handles
-func (p *A2APlugin) GroupKind() schema.GroupKind {
+func (p *A2APolicyIr) GroupKind() schema.GroupKind {
 	return schema.GroupKind{
 		Group: wellknown.ServiceGVK.GroupKind().Group,
 		Kind:  wellknown.ServiceGVK.GroupKind().Kind,
@@ -66,36 +82,17 @@ func (p *A2APlugin) GroupKind() schema.GroupKind {
 }
 
 // Name returns the name of this plugin
-func (p *A2APlugin) Name() string {
+func (p *A2APolicyIr) Name() string {
 	return a2aPluginName
 }
 
-// ApplyPolicies applies agentgateway policies for inference pools
-func (p *A2APlugin) ApplyPolicies() []ADPPolicy {
-	return p.A2APolicyIr.policies
-}
-
-// translateA2APolicies generates agentgateway policies for services with a2a protocol
-func translateA2APolicies(services krt.Collection[*corev1.Service]) []ADPPolicy {
-	logger := logging.New("agentgateway/plugins/a2a")
-	logger.Debug("generating A2A policies")
-
-	if services == nil {
-		logger.Debug("services collection is nil, skipping A2A policy generation")
-		return nil
-	}
-
-	var a2aPolicies []ADPPolicy
-	policyCol := krt.NewManyCollection(services, func(krtctx krt.HandlerContext, svc *corev1.Service) []ADPPolicy {
-		return translatePoliciesForService(svc)
-	})
-	a2aPolicies = policyCol.List()
-	logger.Info("generated A2A policies", "count", len(a2aPolicies))
-	return a2aPolicies
+// ApplyPolicies applies agentgateway policies for A2A services
+func (p *A2APolicyIr) ApplyPolicies() []ADPPolicy {
+	return p.policies
 }
 
 // translatePoliciesForService generates A2A policies for a single service
-func translatePoliciesForService(svc *corev1.Service) []ADPPolicy {
+func translatePoliciesForService(svc *corev1.Service) (*A2APolicyIr, []error) {
 	logger := logging.New("agentgateway/plugins/a2a")
 	var a2aPolicies []ADPPolicy
 
@@ -116,9 +113,10 @@ func translatePoliciesForService(svc *corev1.Service) []ADPPolicy {
 		}
 	}
 
-	return a2aPolicies
+	return &A2APolicyIr{
+		policies: a2aPolicies,
+	}, nil
 }
 
-// Verify that A2APlugin implements the required interfaces
-var _ PolicyPlugin = (*A2APlugin)(nil)
-var _ AgentgatewayPlugin = (*A2APlugin)(nil)
+// Verify that A2APolicyIr implements the required interfaces
+var _ PolicyPluginPass = (*A2APolicyIr)(nil)

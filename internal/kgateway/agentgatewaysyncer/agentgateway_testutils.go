@@ -638,7 +638,6 @@ func (tc TestCase) Run(
 	}
 	plugins = append(plugins, extraPlugs...)
 	extensions := registry.MergePlugins(plugins...)
-	agentgatewayExtensions := agentgatewayplugins.CreateDefaultPolicyManager()
 
 	commoncol.InitPlugins(ctx, extensions, *settings)
 
@@ -665,6 +664,8 @@ func (tc TestCase) Run(
 	if err != nil {
 		return nil, err
 	}
+	agwPlugins := agentgatewayplugins.Plugins(agwCollections)
+	agwExtensions := agentgatewayplugins.MergePlugins(agwPlugins...)
 
 	// Instead of calling full Init(), manually initialize just what we need for testing
 	// to avoid race conditions with XDS collection building
@@ -675,7 +676,7 @@ func (tc TestCase) Run(
 		nil, // mgr not needed for test
 		agwCollections,
 		extensions,
-		agentgatewayExtensions,
+		agwExtensions,
 		nil, // xdsCache not needed for test
 		"istio-system",
 		"Kubernetes",

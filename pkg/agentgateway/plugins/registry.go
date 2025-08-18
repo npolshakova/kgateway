@@ -1,28 +1,23 @@
 package plugins
 
 import (
-	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type AgentgatewayPlugin struct {
 	ContributesPolicies map[schema.GroupKind]PolicyPlugin
-	// extra has sync beyond primary resources in the collections above
-	ExtraHasSynced func() bool
 }
 
 func MergePlugins(plug ...AgentgatewayPlugin) AgentgatewayPlugin {
 	ret := AgentgatewayPlugin{
 		ContributesPolicies: make(map[schema.GroupKind]PolicyPlugin),
 	}
-	var funcs []sdk.GwTranslatorFactory
-	var hasSynced []func() bool
 	for _, p := range plug {
-		if p.ExtraHasSynced != nil {
-			hasSynced = append(hasSynced, p.ExtraHasSynced)
+		// Merge contributed policies
+		for gk, policy := range p.ContributesPolicies {
+			ret.ContributesPolicies[gk] = policy
 		}
 	}
-	ret.ExtraHasSynced = mergeSynced(hasSynced)
 	return ret
 }
 

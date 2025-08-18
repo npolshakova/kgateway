@@ -2,9 +2,11 @@ package plugins
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"google.golang.org/protobuf/proto"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
+	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,50 +23,34 @@ const (
 	extauthPolicySuffix = ":extauth"
 )
 
-// TrafficPlugin converts a TrafficPolicy to an agentgateway policy
-type TrafficPlugin struct {
-	TrafficPolicies TrafficPolicyIR
-}
-
-type TrafficPolicyIR struct {
+// TrafficPluginIr converts a TrafficPolicy to an agentgateway policy
+type TrafficPluginIr struct {
 	policies []ADPPolicy
+	ct       time.Time
 }
 
-func (p *TrafficPolicyIR) Equals(in TrafficPolicyIR) bool {
-	// Compare policies slice
-	if len(p.policies) != len(in.policies) {
+func (p *TrafficPluginIr) CreationTime() time.Time {
+	return p.ct
+}
+
+func (p *TrafficPluginIr) Equals(in any) bool {
+	p2, ok := in.(*TrafficPluginIr)
+	if !ok {
+		return false
+	}
+	if len(p.policies) != len(p2.policies) {
 		return false
 	}
 	for i, policy := range p.policies {
-		if !proto.Equal(policy.Policy, in.policies[i].Policy) {
+		if !policy.Equals(&p2.policies[i]) {
 			return false
 		}
 	}
-
 	return true
 }
 
-// NewTrafficPlugin creates a new TrafficPolicy plugin
-func NewTrafficPlugin(agw *AgwCollections) *TrafficPlugin {
-	policies := translateTrafficPolicies(agw.TrafficPolicies, agw.GatewayExtensions)
-
-	// Convert to TrafficPolicyIR
-	trafficPolicyIR := TrafficPolicyIR{
-		policies: make([]ADPPolicy, 0, len(policies)),
-	}
-
-	// Separate extAuth policies from other policies
-	for _, policy := range policies {
-		trafficPolicyIR.policies = append(trafficPolicyIR.policies, policy)
-	}
-
-	return &TrafficPlugin{
-		TrafficPolicies: trafficPolicyIR,
-	}
-}
-
 // GroupKind returns the GroupKind of the policy this plugin handles
-func (p *TrafficPlugin) GroupKind() schema.GroupKind {
+func (p *TrafficPluginIr) GroupKind() schema.GroupKind {
 	return schema.GroupKind{
 		Group: wellknown.TrafficPolicyGVK.GroupKind().Group,
 		Kind:  wellknown.TrafficPolicyGVK.GroupKind().Kind,
@@ -72,31 +58,53 @@ func (p *TrafficPlugin) GroupKind() schema.GroupKind {
 }
 
 // Name returns the name of this plugin
-func (p *TrafficPlugin) Name() string {
+func (p *TrafficPluginIr) Name() string {
 	return trafficPluginName
 }
 
 // ApplyPolicies generates agentgateway policies from TrafficPolicy resources
-func (p *TrafficPlugin) ApplyPolicies() []ADPPolicy {
-	return p.TrafficPolicies.policies
+func (p *TrafficPluginIr) ApplyPolicies() []ADPPolicy {
+	return p.policies
 }
 
-// translateTrafficPolicies generates agentgateway policies from traffic policies
-func translateTrafficPolicies(trafficPolicies krt.Collection[*v1alpha1.TrafficPolicy], gatewayExtensions krt.Collection[*v1alpha1.GatewayExtension]) []ADPPolicy {
-	logger := logging.New("agentgateway/plugins/traffic")
-	logger.Debug("generating traffic policies")
+// NewTrafficPlugin creates a new TrafficPolicy plugin
+func NewTrafficPlugin(agw *AgwCollections) AgentgatewayPlugin {
+	col := krt.WrapClient(kclient.NewFiltered[*v1alpha1.TrafficPolicy](
+		agw.Client,
+		kclient.Filter{ObjectFilter: agw.Client.ObjectFilter()},
+	), agw.KrtOpts.ToOptions("TrafficPolicy")...)
+	gk := wellknown.TrafficPolicyGVK.GroupKind()
 
-	var trafficPoliciesResult []ADPPolicy
-	policyCol := krt.NewManyCollection(trafficPolicies, func(krtctx krt.HandlerContext, policyCR *v1alpha1.TrafficPolicy) []ADPPolicy {
-		return translateTrafficPolicy(krtctx, gatewayExtensions, policyCR)
+	// TrafficPolicy IR will have TypedConfig -> implement backendroute method to add prompt guard, etc.
+	policyCol := krt.NewCollection(col, func(krtctx krt.HandlerContext, policyCR *v1alpha1.TrafficPolicy) *PolicyWrapper {
+		objSrc := ir.ObjectSource{
+			Group:     gk.Group,
+			Kind:      gk.Kind,
+			Namespace: policyCR.Namespace,
+			Name:      policyCR.Name,
+		}
+
+		policyIR, errors := translateTrafficPolicy(krtctx, agw.GatewayExtensions, policyCR)
+		return &PolicyWrapper{
+			ObjectSource: objSrc,
+			Policy:       policyCR,
+			PolicyIR:     policyIR,
+			Errors:       errors,
+		}
 	})
-	trafficPoliciesResult = policyCol.List()
-	logger.Debug("generated traffic policies", "count", len(trafficPoliciesResult))
-	return trafficPoliciesResult
+
+	return AgentgatewayPlugin{
+		ContributesPolicies: map[schema.GroupKind]PolicyPlugin{
+			wellknown.TrafficPolicyGVK.GroupKind(): {
+				Policies: policyCol,
+			},
+		},
+	}
 }
 
 // translateTrafficPolicy generates policies for a single traffic policy
-func translateTrafficPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collection[*v1alpha1.GatewayExtension], trafficPolicy *v1alpha1.TrafficPolicy) []ADPPolicy {
+func translateTrafficPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collection[*v1alpha1.GatewayExtension], trafficPolicy *v1alpha1.TrafficPolicy) (*TrafficPluginIr, []error) {
+	var errors []error
 	logger := logging.New("agentgateway/plugins/traffic")
 	var adpPolicies []ADPPolicy
 
@@ -136,6 +144,7 @@ func translateTrafficPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collec
 
 		default:
 			logger.Warn("unsupported target kind", "kind", target.Kind, "policy", trafficPolicy.Name)
+			errors = append(errors, fmt.Errorf("unsupported target kind: %s", target.Kind))
 			continue
 		}
 
@@ -145,7 +154,9 @@ func translateTrafficPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collec
 		}
 	}
 
-	return adpPolicies
+	return &TrafficPluginIr{
+		policies: adpPolicies,
+	}, errors
 }
 
 // translateTrafficPolicyToADP converts a TrafficPolicy to agentgateway Policy resources
@@ -233,6 +244,5 @@ func processExtAuthPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collecti
 	return []ADPPolicy{{Policy: extauthPolicy}}
 }
 
-// Verify that TrafficPlugin implements the required interfaces
-var _ PolicyPlugin = (*TrafficPlugin)(nil)
-var _ AgentgatewayPlugin = (*TrafficPlugin)(nil)
+// Verify that TrafficPluginIr implements the required interfaces
+var _ PolicyPluginPass = (*TrafficPluginIr)(nil)

@@ -74,7 +74,7 @@ type StartConfig struct {
 	// ExtensionsFactory is the factory function which will return an extensions.K8sGatewayExtensions
 	// This is responsible for producing the extension points that this controller requires
 	ExtraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	ExtraAgentgatewayPlugins func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) []agentgatewayplugins.PolicyPlugin
+	ExtraAgentgatewayPlugins func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) []agentgatewayplugins.AgentgatewayPlugin
 	ExtraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	Client                   istiokube.Client
 
@@ -261,9 +261,9 @@ func pluginFactoryWithBuiltin(cfg StartConfig) extensions2.K8sGatewayExtensionsF
 	}
 }
 
-func agentGatewayPluginFactory(cfg StartConfig) func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) *agentgatewayplugins.DefaultPolicyManager {
-	return func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) agentgatewayplugins.PolicyPlugin {
-		plugins := agentgatewayplugins.Plugins(ctx, agw)
+func agentGatewayPluginFactory(cfg StartConfig) func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) agentgatewayplugins.AgentgatewayPlugin {
+	return func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) agentgatewayplugins.AgentgatewayPlugin {
+		plugins := agentgatewayplugins.Plugins(agw)
 		if cfg.ExtraAgentgatewayPlugins != nil {
 			plugins = append(plugins, cfg.ExtraAgentgatewayPlugins(ctx, agw)...)
 		}
