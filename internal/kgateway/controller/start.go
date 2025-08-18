@@ -262,26 +262,12 @@ func pluginFactoryWithBuiltin(cfg StartConfig) extensions2.K8sGatewayExtensionsF
 }
 
 func agentGatewayPluginFactory(cfg StartConfig) func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) *agentgatewayplugins.DefaultPolicyManager {
-	return func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) *agentgatewayplugins.DefaultPolicyManager {
-		agwManager := agentgatewayplugins.NewPolicyManager()
-
-		// Register built-in plugins
-		err := agentgatewayplugins.RegisterBuiltinPlugins(agwManager)
-		if err != nil {
-			setupLog.Error(err, "failed to register builtin agentgateway plugins")
-			return nil
-		}
-
-		// Register extra plugins if provided
+	return func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) agentgatewayplugins.PolicyPlugin {
+		plugins := agentgatewayplugins.Plugins(ctx, agw)
 		if cfg.ExtraAgentgatewayPlugins != nil {
-			for _, plugin := range cfg.ExtraAgentgatewayPlugins(ctx, agw) {
-				if err := agwManager.RegisterPlugin(plugin); err != nil {
-					setupLog.Error(err, "failed to register extra agentgateway plugin", "plugin", plugin.Name())
-				}
-			}
+			plugins = append(plugins, cfg.ExtraAgentgatewayPlugins(ctx, agw)...)
 		}
-
-		return agwManager
+		return agentgatewayplugins.MergePlugins(plugins...)
 	}
 }
 

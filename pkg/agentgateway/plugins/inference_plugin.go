@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"google.golang.org/protobuf/proto"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
@@ -20,11 +21,47 @@ const (
 )
 
 // InferencePlugin converts an inference pool to an agentgateway inference policy
-type InferencePlugin struct{}
+type InferencePlugin struct {
+	InferencePolicyIr InferencePolicyIr
+}
+
+type InferencePolicyIr struct {
+	policies []ADPPolicy
+}
+
+func (p *InferencePolicyIr) Equals(in InferencePolicyIr) bool {
+	// Compare policies slice
+	if len(p.policies) != len(in.policies) {
+		return false
+	}
+	for i, policy := range p.policies {
+		if !proto.Equal(policy.Policy, in.policies[i].Policy) {
+			return false
+		}
+	}
+
+	return true
+}
 
 // NewInferencePlugin creates a new InferencePool policy plugin
-func NewInferencePlugin() *InferencePlugin {
-	return &InferencePlugin{}
+func NewInferencePlugin(agw *AgwCollections) *InferencePlugin {
+	logger := logging.New("agentgateway/plugins/inference")
+
+	inferencePools := agw.InferencePools
+	if inferencePools == nil {
+		logger.Debug("inference pools collection is nil, skipping inference policy generation")
+		return nil
+	}
+
+	domainSuffix := kubeutils.GetClusterDomainName()
+
+	policyCol := krt.NewManyCollection(inferencePools, func(krtctx krt.HandlerContext, policyCR *inf.InferencePool) []ADPPolicy {
+		return translateInferencePoolPolicies(krtctx, inferencePools, domainSuffix)
+	})
+
+	return &InferencePlugin{
+		InferencePolicyIr: InferencePolicyIr{policies: policyCol.List()},
+	}
 }
 
 // GroupKind returns the GroupKind of the policy this plugin handles
@@ -40,22 +77,13 @@ func (p *InferencePlugin) Name() string {
 	return inferencePluginName
 }
 
-// GeneratePolicies generates ADP policies for inference pools
-func (p *InferencePlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections) ([]ADPPolicy, error) {
-	logger := logging.New("agentgateway/plugins/inference")
-
-	inferencePools := agw.InferencePools
-	if inferencePools == nil {
-		logger.Debug("inference pools collection is nil, skipping inference policy generation")
-		return nil, nil
-	}
-
-	domainSuffix := kubeutils.GetClusterDomainName()
-	return p.GenerateInferencePoolPolicies(ctx, inferencePools, domainSuffix)
+// ApplyPolicies applies agentgateway policies for inference pools
+func (p *InferencePlugin) ApplyPolicies() []ADPPolicy {
+	return p.InferencePolicyIr.policies
 }
 
-// GenerateInferencePoolPolicies generates policies for inference pools
-func (p *InferencePlugin) GenerateInferencePoolPolicies(ctx krt.HandlerContext, inferencePools krt.Collection[*inf.InferencePool], domainSuffix string) ([]ADPPolicy, error) {
+// translateInferencePoolPolicies generates policies for inference pools
+func translateInferencePoolPolicies(ctx krt.HandlerContext, inferencePools krt.Collection[*inf.InferencePool], domainSuffix string) []ADPPolicy {
 	logger := logging.New("agentgateway/plugins/inference")
 	logger.Debug("generating inference pool policies")
 
@@ -65,16 +93,16 @@ func (p *InferencePlugin) GenerateInferencePoolPolicies(ctx krt.HandlerContext, 
 	allInferencePools := krt.Fetch(ctx, inferencePools)
 
 	for _, pool := range allInferencePools {
-		policies := p.generatePoliciesForInferencePool(pool, domainSuffix)
+		policies := translatePoliciesForInferencePool(pool, domainSuffix)
 		inferencePolicies = append(inferencePolicies, policies...)
 	}
 
 	logger.Info("generated inference pool policies", "count", len(inferencePolicies))
-	return inferencePolicies, nil
+	return inferencePolicies
 }
 
-// generatePoliciesForInferencePool generates policies for a single inference pool
-func (p *InferencePlugin) generatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix string) []ADPPolicy {
+// translatePoliciesForInferencePool generates policies for a single inference pool
+func translatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix string) []ADPPolicy {
 	logger := logging.New("agentgateway/plugins/inference")
 
 	// 'service/{namespace}/{hostname}:{port}'
@@ -156,3 +184,4 @@ func (p *InferencePlugin) generatePoliciesForInferencePool(pool *inf.InferencePo
 
 // Verify that InferencePlugin implements the required interfaces
 var _ PolicyPlugin = (*InferencePlugin)(nil)
+var _ AgentgatewayPlugin = (*InferencePlugin)(nil)
