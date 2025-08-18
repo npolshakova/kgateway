@@ -6,6 +6,7 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/istio/pkg/kube/krt"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 )
@@ -23,9 +24,12 @@ func NewA2APlugin() *A2APlugin {
 	return &A2APlugin{}
 }
 
-// PolicyType returns the policy type for this plugin
-func (p *A2APlugin) PolicyType() PolicyType {
-	return PolicyTypeA2A
+// GroupKind returns the GroupKind of the policy this plugin handles
+func (p *A2APlugin) GroupKind() schema.GroupKind {
+	return schema.GroupKind{
+		Group: "", // Core API group
+		Kind:  "Service",
+	}
 }
 
 // Name returns the name of this plugin
@@ -34,7 +38,7 @@ func (p *A2APlugin) Name() string {
 }
 
 // GeneratePolicies generates ADP policies for services with a2a protocol
-func (p *A2APlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections, policyInput PolicyInput) ([]ADPPolicy, error) {
+func (p *A2APlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/a2a")
 
 	services := agw.Services

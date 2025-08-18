@@ -193,6 +193,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.Client,
 			cfg.Manager,
 			cfg.CommonCollections,
+			cfg.AgwCollections,
 			mergedPlugins, // TODO(npolshak): move away from mergedPlugins to agentGatewayPlugins
 			agentgatewayMergedPlugins,
 			cfg.SetupOpts.Cache,

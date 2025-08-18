@@ -7,6 +7,7 @@ import (
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
@@ -25,9 +26,12 @@ func NewInferencePlugin() *InferencePlugin {
 	return &InferencePlugin{}
 }
 
-// PolicyType returns the policy type for this plugin
-func (p *InferencePlugin) PolicyType() PolicyType {
-	return PolicyTypeInferencePool
+// GroupKind returns the GroupKind of the policy this plugin handles
+func (p *InferencePlugin) GroupKind() schema.GroupKind {
+	return schema.GroupKind{
+		Group: inf.GroupVersion.Group,
+		Kind:  "InferencePool",
+	}
 }
 
 // Name returns the name of this plugin
@@ -36,14 +40,10 @@ func (p *InferencePlugin) Name() string {
 }
 
 // GeneratePolicies generates ADP policies for inference pools
-func (p *InferencePlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections, policyInput PolicyInput) ([]ADPPolicy, error) {
+func (p *InferencePlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/inference")
 
-	inferencePools, ok := policyInput.(krt.Collection[*inf.InferencePool])
-	if !ok {
-		logger.Debug("policy input is not of type InferencePool, skipping inference policy generation")
-		return nil, nil
-	}
+	inferencePools := agw.InferencePools
 	if inferencePools == nil {
 		logger.Debug("inference pools collection is nil, skipping inference policy generation")
 		return nil, nil

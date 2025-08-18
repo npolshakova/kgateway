@@ -6,6 +6,7 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	"istio.io/istio/pkg/kube/krt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
@@ -25,9 +26,12 @@ func NewTrafficPlugin() *TrafficPlugin {
 	return &TrafficPlugin{}
 }
 
-// PolicyType returns the policy type for this plugin
-func (p *TrafficPlugin) PolicyType() PolicyType {
-	return PolicyTypeTraffic
+// GroupKind returns the GroupKind of the policy this plugin handles
+func (p *TrafficPlugin) GroupKind() schema.GroupKind {
+	return schema.GroupKind{
+		Group: v1alpha1.GroupVersion.Group,
+		Kind:  "TrafficPolicy",
+	}
 }
 
 // Name returns the name of this plugin
@@ -36,14 +40,10 @@ func (p *TrafficPlugin) Name() string {
 }
 
 // GeneratePolicies generates agentgateway policies from TrafficPolicy resources
-func (p *TrafficPlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections, policyInput PolicyInput) ([]ADPPolicy, error) {
+func (p *TrafficPlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/traffic")
 
-	trafficPolicies, ok := policyInput.(krt.Collection[*v1alpha1.TrafficPolicy])
-	if !ok {
-		logger.Debug("traffic policies collection is not of type TrafficPolicy, skipping traffic policy generation")
-		return nil, nil
-	}
+	trafficPolicies := agw.TrafficPolicies
 	if trafficPolicies == nil {
 		logger.Debug("traffic policies collection is nil, skipping traffic policy generation")
 		return nil, nil

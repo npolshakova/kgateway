@@ -266,6 +266,19 @@ func (s *setup) Start(ctx context.Context) error {
 		return err
 	}
 
+	agwCollections, err := agentgatewayplugins.NewAgwCollections(
+		krtOpts,
+		istioClient,
+		cli,
+		s.gatewayControllerName,
+		*s.globalSettings,
+		commoncol.BackendIndex,
+	)
+	if err != nil {
+		slog.Error("error creating agw common collections", "error", err)
+		return err
+	}
+
 	for _, mgrCfgFunc := range s.extraManagerConfig {
 		err := mgrCfgFunc(ctx, mgr, commoncol.DiscoveryNamespacesFilter)
 		if err != nil {
@@ -275,7 +288,7 @@ func (s *setup) Start(ctx context.Context) error {
 
 	BuildKgatewayWithConfig(
 		ctx, mgr, s.gatewayControllerName, s.gatewayClassName, s.waypointClassName,
-		s.agentGatewayClassName, setupOpts, s.restConfig, istioClient, commoncol, uccBuilder, s.extraPlugins, s.extraAgentgatewayPlugins, s.extraGatewayParameters)
+		s.agentGatewayClassName, setupOpts, s.restConfig, istioClient, commoncol, agwCollections, uccBuilder, s.extraPlugins, s.extraAgentgatewayPlugins, s.extraGatewayParameters)
 
 	slog.Info("starting admin server")
 	go admin.RunAdminServer(ctx, setupOpts)
@@ -300,6 +313,7 @@ func BuildKgatewayWithConfig(
 	restConfig *rest.Config,
 	kubeClient istiokube.Client,
 	commonCollections *collections.CommonCollections,
+	agwCollections *agentgatewayplugins.AgwCollections,
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
 	extraAgentgatewayPlugins func(ctx context.Context, agw *agentgatewayplugins.AgwCollections) []agentgatewayplugins.PolicyPlugin,
@@ -334,6 +348,7 @@ func BuildKgatewayWithConfig(
 		Dev:                      logging.MustGetLevel(logging.DefaultComponent) <= logging.LevelTrace,
 		KrtOptions:               krtOpts,
 		CommonCollections:        commonCollections,
+		AgwCollections:           agwCollections,
 	})
 	if err != nil {
 		slog.Error("failed initializing controller: ", "error", err)
