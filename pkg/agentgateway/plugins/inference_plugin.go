@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
@@ -29,8 +30,8 @@ func NewInferencePlugin() *InferencePlugin {
 // GroupKind returns the GroupKind of the policy this plugin handles
 func (p *InferencePlugin) GroupKind() schema.GroupKind {
 	return schema.GroupKind{
-		Group: inf.GroupVersion.Group,
-		Kind:  "InferencePool",
+		Group: wellknown.InferencePoolGVK.GroupKind().Group,
+		Kind:  wellknown.InferencePoolGVK.GroupKind().Kind,
 	}
 }
 

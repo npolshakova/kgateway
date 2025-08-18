@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 )
 
@@ -27,8 +28,8 @@ func NewA2APlugin() *A2APlugin {
 // GroupKind returns the GroupKind of the policy this plugin handles
 func (p *A2APlugin) GroupKind() schema.GroupKind {
 	return schema.GroupKind{
-		Group: "", // Core API group
-		Kind:  "Service",
+		Group: wellknown.ServiceGVK.GroupKind().Group,
+		Kind:  wellknown.ServiceGVK.GroupKind().Kind,
 	}
 }
 

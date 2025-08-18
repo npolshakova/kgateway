@@ -31,8 +31,8 @@ func NewTrafficPlugin() *TrafficPlugin {
 // GroupKind returns the GroupKind of the policy this plugin handles
 func (p *TrafficPlugin) GroupKind() schema.GroupKind {
 	return schema.GroupKind{
-		Group: v1alpha1.GroupVersion.Group,
-		Kind:  "TrafficPolicy",
+		Group: wellknown.TrafficPolicyGVK.GroupKind().Group,
+		Kind:  wellknown.TrafficPolicyGVK.GroupKind().Kind,
 	}
 }
 
