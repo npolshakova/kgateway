@@ -31,21 +31,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	agentgatewayplugins "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
-
-	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
-
-	agwbuiltin "github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/plugins/builtin"
-
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	agwbuiltin "github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/plugins/builtin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/common"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/listener"
 	krtinternal "github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	agentgatewayplugins "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned/fake"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
-	collections "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
+	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
+	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
 	"github.com/kgateway-dev/kgateway/v2/pkg/schemes"
 	"github.com/kgateway-dev/kgateway/v2/pkg/settings"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envutils"
@@ -663,11 +660,7 @@ func (tc TestCase) Run(
 
 	// Create AgwCollections with the necessary input collections
 	agwCollections, err := agentgatewayplugins.NewAgwCollections(
-		krtOpts,
-		cli,
-		ourCli,
-		wellknown.DefaultGatewayControllerName,
-		*settings,
+		commoncol,
 	)
 	if err != nil {
 		return nil, err
@@ -680,7 +673,6 @@ func (tc TestCase) Run(
 		wellknown.DefaultAgentGatewayClassName,
 		cli,
 		nil, // mgr not needed for test
-		commoncol,
 		agwCollections,
 		extensions,
 		agentgatewayExtensions,

@@ -267,11 +267,7 @@ func (s *setup) Start(ctx context.Context) error {
 	}
 
 	agwCollections, err := agentgatewayplugins.NewAgwCollections(
-		krtOpts,
-		istioClient,
-		cli,
-		s.gatewayControllerName,
-		*s.globalSettings,
+		commoncol,
 	)
 	if err != nil {
 		slog.Error("error creating agw common collections", "error", err)

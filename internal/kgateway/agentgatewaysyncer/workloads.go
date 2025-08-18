@@ -25,10 +25,9 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	krtinternal "github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 type NamespaceHostname struct {
@@ -43,7 +42,7 @@ func (n NamespaceHostname) String() string {
 // index maintains an index of ambient WorkloadInfo objects by various keys.
 // These are intentionally pre-computed based on events such that lookups are efficient.
 type index struct {
-	namespaces krt.Collection[krtcollections.NamespaceMetadata]
+	namespaces krt.Collection[*corev1.Namespace]
 
 	SystemNamespace string
 	ClusterID       string

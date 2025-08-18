@@ -18,8 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	infextv1a2 "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
-	agentgatewayplugins "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
-
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
 	agwbuiltin "github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer/plugins/builtin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
@@ -31,6 +29,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/proxy_syncer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/metrics"
 	krtinternal "github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
+	agentgatewayplugins "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
 	"github.com/kgateway-dev/kgateway/v2/pkg/deployer"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	sdk "github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk"
@@ -185,6 +184,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 
 	var agentGatewaySyncer *agentgatewaysyncer.AgentGwSyncer
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
+		cfg.AgwCollections.InitPlugins(ctx, mergedPlugins, globalSettings)
 		agentgatewayMergedPlugins := agentGatewayPluginFactory(cfg)(ctx, cfg.AgwCollections)
 
 		agentGatewaySyncer = agentgatewaysyncer.NewAgentGwSyncer(
@@ -192,7 +192,6 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.AgentGatewayClassName,
 			cfg.Client,
 			cfg.Manager,
-			cfg.CommonCollections,
 			cfg.AgwCollections,
 			mergedPlugins, // TODO(npolshak): move away from mergedPlugins to agentGatewayPlugins
 			agentgatewayMergedPlugins,

@@ -35,14 +35,13 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	agwir "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/ir"
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
-
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
+	agwir "github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 const (
@@ -52,10 +51,10 @@ const (
 func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 	obj *gwv1.HTTPRoute, pos int, matchPos int,
 ) (*api.Route, *reporter.RouteCondition) {
-	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos) + "." + strconv.Itoa(matchPos)
+	routeKey := getRouteKeyPosition(obj.ObjectMeta, pos) + "." + strconv.Itoa(matchPos)
 	if r.Name != nil {
 		// use the user provided name. this will be used to attach policies
-		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+		routeKey = getRouteKeySectionName(obj.ObjectMeta, string(*r.Name))
 	}
 	res := &api.Route{
 		Key:         routeKey,
@@ -143,10 +142,10 @@ func convertHTTPRouteToADP(ctx RouteContext, r gwv1.HTTPRouteRule,
 func convertTCPRouteToADP(ctx RouteContext, r gwv1alpha2.TCPRouteRule,
 	obj *gwv1alpha2.TCPRoute, pos int,
 ) (*api.TCPRoute, *reporter.RouteCondition) {
-	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos)
+	routeKey := getRouteKeyPosition(obj.ObjectMeta, pos)
 	if r.Name != nil {
 		// use the user provided name. this will be used to attach policies
-		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+		routeKey = getRouteKeySectionName(obj.ObjectMeta, string(*r.Name))
 	}
 	res := &api.TCPRoute{
 		Key:         routeKey,
@@ -169,10 +168,10 @@ func convertTCPRouteToADP(ctx RouteContext, r gwv1alpha2.TCPRouteRule,
 func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 	obj *gwv1.GRPCRoute, pos int,
 ) (*api.Route, *reporter.RouteCondition) {
-	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos)
+	routeKey := getRouteKeyPosition(obj.ObjectMeta, pos)
 	if r.Name != nil {
 		// use the user provided name. this will be used to attach policies
-		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+		routeKey = getRouteKeySectionName(obj.ObjectMeta, string(*r.Name))
 	}
 	res := &api.Route{
 		Key:         routeKey,
@@ -233,10 +232,10 @@ func convertGRPCRouteToADP(ctx RouteContext, r gwv1.GRPCRouteRule,
 func convertTLSRouteToADP(ctx RouteContext, r gwv1alpha2.TLSRouteRule,
 	obj *gwv1alpha2.TLSRoute, pos int,
 ) (*api.TCPRoute, *reporter.RouteCondition) {
-	routeKey := obj.Namespace + "." + obj.Name + "." + strconv.Itoa(pos)
+	routeKey := getRouteKeyPosition(obj.ObjectMeta, pos)
 	if r.Name != nil {
 		// use the user provided name. this will be used to attach policies
-		routeKey = obj.Namespace + "/" + obj.Name + "/" + string(*r.Name)
+		routeKey = getRouteKeySectionName(obj.ObjectMeta, string(*r.Name))
 	}
 	res := &api.TCPRoute{
 		Key:         routeKey,
@@ -1401,4 +1400,12 @@ func routeGroupKindEqual(rgk1, rgk2 gwv1.RouteGroupKind) bool {
 
 func getGroup(rgk gwv1.RouteGroupKind) gwv1.Group {
 	return ptr.OrDefault(rgk.Group, wellknown.GatewayGroup)
+}
+
+func getRouteKeyPosition(obj metav1.ObjectMeta, pos int) string {
+	return obj.GetNamespace() + "." + obj.GetName() + "." + strconv.Itoa(pos)
+}
+
+func getRouteKeySectionName(obj metav1.ObjectMeta, sectionName string) string {
+	return obj.GetNamespace() + "/" + obj.GetName() + "/" + sectionName
 }

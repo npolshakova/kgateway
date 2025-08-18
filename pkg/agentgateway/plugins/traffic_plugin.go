@@ -16,6 +16,8 @@ import (
 
 const (
 	trafficPluginName = "traffic-policy-plugin"
+
+	extauthPolicySuffix = ":extauth"
 )
 
 // TrafficPlugin converts a TrafficPolicy to an agentgateway policy
@@ -189,7 +191,7 @@ func (p *TrafficPlugin) processExtAuthPolicy(ctx krt.HandlerContext, gatewayExte
 	}
 
 	extauthPolicy := &api.Policy{
-		Name:   policyName + ":extauth",
+		Name:   policyName + extauthPolicySuffix,
 		Target: policyTarget,
 		Spec: &api.PolicySpec{
 			Kind: &api.PolicySpec_ExtAuthz{
