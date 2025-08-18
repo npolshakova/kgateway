@@ -150,11 +150,12 @@ func (s *testingSuite) TestExtAuthPolicy() {
 			},
 			expectedStatus: http.StatusForbidden,
 		},
-		{
-			name:           "request allowed on insecure route",
-			hostname:       "insecureroute.com",
-			expectedStatus: http.StatusOK,
-		},
+		// TODO(npolshak): re-enable once we can disable filters on agentgateway: https://github.com/agentgateway/agentgateway/issues/330
+		//{
+		//	name:           "request allowed on insecure route",
+		//	hostname:       "insecureroute.com",
+		//	expectedStatus: http.StatusOK,
+		//},
 	}
 
 	for _, tc := range testCases {
@@ -225,11 +226,12 @@ func (s *testingSuite) TestRouteTargetedExtAuthPolicy() {
 			hostname:       "example.com",
 			expectedStatus: http.StatusOK,
 		},
-		{
-			name:           "request allowed on insecure route",
-			hostname:       "insecureroute.com",
-			expectedStatus: http.StatusOK,
-		},
+		// TODO(npolshak): re-enable once we can disable filters on agentgateway: https://github.com/agentgateway/agentgateway/issues/330
+		//{
+		//	name:           "request allowed on insecure route",
+		//	hostname:       "insecureroute.com",
+		//	expectedStatus: http.StatusOK,
+		//},
 		{
 			name: "request allowed with allow header on secured route",
 			headers: map[string]string{
