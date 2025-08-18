@@ -36,16 +36,20 @@ func (p *TrafficPlugin) Name() string {
 }
 
 // GeneratePolicies generates agentgateway policies from TrafficPolicy resources
-func (p *TrafficPlugin) GeneratePolicies(ctx krt.HandlerContext, inputs PolicyInputsInterface[any]) ([]ADPPolicy, error) {
+func (p *TrafficPlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections, policyInput PolicyInput) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/traffic")
 
-	trafficPolicies := inputs.GetTrafficPolicies()
+	trafficPolicies, ok := policyInput.(krt.Collection[*v1alpha1.TrafficPolicy])
+	if !ok {
+		logger.Debug("traffic policies collection is not of type TrafficPolicy, skipping traffic policy generation")
+		return nil, nil
+	}
 	if trafficPolicies == nil {
 		logger.Debug("traffic policies collection is nil, skipping traffic policy generation")
 		return nil, nil
 	}
 
-	return p.GenerateTrafficPolicies(ctx, trafficPolicies, inputs.GetGatewayExtensions())
+	return p.GenerateTrafficPolicies(ctx, trafficPolicies, agw.GatewayExtensions)
 }
 
 // GenerateTrafficPolicies generates policies for traffic policies
@@ -156,11 +160,12 @@ func (p *TrafficPlugin) processExtAuthPolicy(ctx krt.HandlerContext, gatewayExte
 		logger.Error("gateway extension not found or not of type ExtAuth", "extension", gwExtKey)
 		return nil
 	}
+	extAuth := (*gwExt).Spec.ExtAuth
 
 	// Extract service target from GatewayExtension's ExtAuth configuration
 	var extauthSvcTarget *api.BackendReference
-	if (*gwExt).Spec.ExtAuth.GrpcService != nil && (*gwExt).Spec.ExtAuth.GrpcService.BackendRef != nil {
-		backendRef := (*gwExt).Spec.ExtAuth.GrpcService.BackendRef
+	if extAuth.GrpcService != nil && extAuth.GrpcService.BackendRef != nil {
+		backendRef := extAuth.GrpcService.BackendRef
 		serviceName := string(backendRef.Name)
 		port := uint32(80) // default port
 		if backendRef.Port != nil {
@@ -205,4 +210,4 @@ func (p *TrafficPlugin) processExtAuthPolicy(ctx krt.HandlerContext, gatewayExte
 }
 
 // Verify that TrafficPlugin implements the required interfaces
-var _ PolicyPlugin[any] = (*TrafficPlugin)(nil)
+var _ PolicyPlugin = (*TrafficPlugin)(nil)

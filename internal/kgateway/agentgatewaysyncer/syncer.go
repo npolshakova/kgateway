@@ -374,7 +374,11 @@ func (s *AgentGwSyncer) buildADPResources(
 	}
 	adpRoutes := ADPRouteCollection(inputs.HTTPRoutes, inputs.GRPCRoutes, inputs.TCPRoutes, inputs.TLSRoutes, routeInputs, krtopts, s.plugins)
 
-	adpPolicies := ADPPolicyCollection(inputs, binds, krtopts, s.policyManager)
+	agwCollections, err := plugins.NewAgwCollections(s.client, s.controllerName, inputs.Services, inputs.GatewayExtensions)
+	if err != nil {
+		return nil
+	}
+	adpPolicies := ADPPolicyCollection(inputs, agwCollections, binds, krtopts, s.policyManager)
 
 	// Join all ADP resources
 	allADPResources := krt.JoinCollection([]krt.Collection[ADPResourcesForGateway]{binds, listeners, adpRoutes, adpPolicies}, krtopts.ToOptions("ADPResources")...)

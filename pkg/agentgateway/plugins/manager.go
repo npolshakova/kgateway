@@ -10,20 +10,20 @@ import (
 
 // DefaultPolicyManager implements the PolicyManager interface
 type DefaultPolicyManager struct {
-	plugins       []PolicyPlugin[any]
-	pluginsByType map[PolicyType][]PolicyPlugin[any]
+	plugins       []PolicyPlugin
+	pluginsByType map[PolicyType][]PolicyPlugin
 }
 
 // NewPolicyManager creates a new DefaultPolicyManager
 func NewPolicyManager() *DefaultPolicyManager {
 	return &DefaultPolicyManager{
-		plugins:       make([]PolicyPlugin[any], 0),
-		pluginsByType: make(map[PolicyType][]PolicyPlugin[any]),
+		plugins:       make([]PolicyPlugin, 0),
+		pluginsByType: make(map[PolicyType][]PolicyPlugin),
 	}
 }
 
 // RegisterPlugin registers a policy plugin
-func (m *DefaultPolicyManager) RegisterPlugin(plugin PolicyPlugin[any]) error {
+func (m *DefaultPolicyManager) RegisterPlugin(plugin PolicyPlugin) error {
 	if plugin == nil {
 		return fmt.Errorf("cannot register nil plugin")
 	}
@@ -37,7 +37,7 @@ func (m *DefaultPolicyManager) RegisterPlugin(plugin PolicyPlugin[any]) error {
 	// Add to type-specific map
 	policyType := plugin.PolicyType()
 	if m.pluginsByType[policyType] == nil {
-		m.pluginsByType[policyType] = make([]PolicyPlugin[any], 0)
+		m.pluginsByType[policyType] = make([]PolicyPlugin, 0)
 	}
 	m.pluginsByType[policyType] = append(m.pluginsByType[policyType], plugin)
 
@@ -45,19 +45,19 @@ func (m *DefaultPolicyManager) RegisterPlugin(plugin PolicyPlugin[any]) error {
 }
 
 // GetPluginsByType returns all plugins of a specific type
-func (m *DefaultPolicyManager) GetPluginsByType(policyType PolicyType) []PolicyPlugin[any] {
+func (m *DefaultPolicyManager) GetPluginsByType(policyType PolicyType) []PolicyPlugin {
 	plugins, exists := m.pluginsByType[policyType]
 	if !exists {
-		return make([]PolicyPlugin[any], 0)
+		return make([]PolicyPlugin, 0)
 	}
 	// Return a copy to prevent external modification
-	result := make([]PolicyPlugin[any], len(plugins))
+	result := make([]PolicyPlugin, len(plugins))
 	copy(result, plugins)
 	return result
 }
 
 // GenerateAllPolicies generates policies from all registered ADP plugins
-func (m *DefaultPolicyManager) GenerateAllPolicies(ctx krt.HandlerContext, inputs PolicyInputsInterface[any]) ([]ADPPolicy, error) {
+func (m *DefaultPolicyManager) GenerateAllPolicies(ctx krt.HandlerContext, agw *AgwCollections, policyInput PolicyInput) ([]ADPPolicy, error) {
 	var allPolicies []ADPPolicy
 	var allErrors []error
 
@@ -65,7 +65,7 @@ func (m *DefaultPolicyManager) GenerateAllPolicies(ctx krt.HandlerContext, input
 		managerLogger := logging.New("agentgateway/plugins/manager")
 		managerLogger.Debug("generating policies", "plugin", plugin.Name(), "type", plugin.PolicyType())
 
-		policies, err := plugin.GeneratePolicies(ctx, inputs)
+		policies, err := plugin.GeneratePolicies(ctx, agw, policyInput)
 		if err != nil {
 			managerLogger.Error("failed to generate policies", "plugin", plugin.Name(), "error", err)
 			allErrors = append(allErrors, fmt.Errorf("plugin %s failed: %w", plugin.Name(), err))
@@ -89,9 +89,9 @@ func (m *DefaultPolicyManager) GenerateAllPolicies(ctx krt.HandlerContext, input
 }
 
 // GetRegisteredPlugins returns all registered plugins (for debugging/introspection)
-func (m *DefaultPolicyManager) GetRegisteredPlugins() []PolicyPlugin[any] {
+func (m *DefaultPolicyManager) GetRegisteredPlugins() []PolicyPlugin {
 	// Return a copy to prevent external modification
-	result := make([]PolicyPlugin[any], len(m.plugins))
+	result := make([]PolicyPlugin, len(m.plugins))
 	copy(result, m.plugins)
 	return result
 }

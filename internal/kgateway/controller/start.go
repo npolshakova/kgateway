@@ -75,7 +75,7 @@ type StartConfig struct {
 	// ExtensionsFactory is the factory function which will return an extensions.K8sGatewayExtensions
 	// This is responsible for producing the extension points that this controller requires
 	ExtraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	ExtraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin[any]
+	ExtraAgentgatewayPlugins []agentgatewayplugins.PolicyPlugin
 	ExtraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	Client                   istiokube.Client
 
@@ -272,8 +272,7 @@ func agentGatewayPluginFactory(cfg StartConfig) func(ctx context.Context, common
 
 		// Register extra plugins if provided
 		if cfg.ExtraAgentgatewayPlugins != nil {
-			extraPlugins := cfg.ExtraAgentgatewayPlugins(ctx, commoncol)
-			for _, plugin := range extraPlugins {
+			for _, plugin := range cfg.ExtraAgentgatewayPlugins {
 				if err := agwManager.RegisterPlugin(plugin); err != nil {
 					setupLog.Error(err, "failed to register extra agentgateway plugin", "plugin", plugin.Name())
 				}

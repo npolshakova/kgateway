@@ -10,6 +10,7 @@ import (
 	inf "sigs.k8s.io/gateway-api-inference-extension/api/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 const (
@@ -35,16 +36,21 @@ func (p *InferencePlugin) Name() string {
 }
 
 // GeneratePolicies generates ADP policies for inference pools
-func (p *InferencePlugin) GeneratePolicies(ctx krt.HandlerContext, inputs PolicyInputsInterface[any]) ([]ADPPolicy, error) {
+func (p *InferencePlugin) GeneratePolicies(ctx krt.HandlerContext, agw *AgwCollections, policyInput PolicyInput) ([]ADPPolicy, error) {
 	logger := logging.New("agentgateway/plugins/inference")
 
-	inferencePools := inputs.GetInferencePools()
+	inferencePools, ok := policyInput.(krt.Collection[*inf.InferencePool])
+	if !ok {
+		logger.Debug("policy input is not of type InferencePool, skipping inference policy generation")
+		return nil, nil
+	}
 	if inferencePools == nil {
-		logger.Warn("inference pools collection is nil, skipping inference policy generation")
+		logger.Debug("inference pools collection is nil, skipping inference policy generation")
 		return nil, nil
 	}
 
-	return p.GenerateInferencePoolPolicies(ctx, inferencePools, inputs.GetDomainSuffix())
+	domainSuffix := kubeutils.GetClusterDomainName()
+	return p.GenerateInferencePoolPolicies(ctx, inferencePools, domainSuffix)
 }
 
 // GenerateInferencePoolPolicies generates policies for inference pools
@@ -148,4 +154,4 @@ func (p *InferencePlugin) generatePoliciesForInferencePool(pool *inf.InferencePo
 }
 
 // Verify that InferencePlugin implements the required interfaces
-var _ PolicyPlugin[any] = (*InferencePlugin)(nil)
+var _ PolicyPlugin = (*InferencePlugin)(nil)

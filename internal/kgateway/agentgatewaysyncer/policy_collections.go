@@ -7,31 +7,20 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils/krtutil"
 	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 const (
 	a2aProtocol = "kgateway.dev/a2a"
 )
 
-func ADPPolicyCollection(inputs Inputs, binds krt.Collection[ADPResourcesForGateway], krtopts krtutil.KrtOptions, policyManager *plugins.DefaultPolicyManager) krt.Collection[ADPResourcesForGateway] {
-	domainSuffix := kubeutils.GetClusterDomainName()
-
-	// Create policy inputs for all plugins
-	policyInputs := &plugins.PolicyInputs{
-		Services:          inputs.Services,
-		InferencePools:    inputs.InferencePools,
-		TrafficPolicies:   inputs.TrafficPolicies,
-		GatewayExtensions: inputs.GatewayExtensions,
-		DomainSuffix:      domainSuffix,
-	}
-
+func ADPPolicyCollection(inputs Inputs, agw *plugins.AgwCollections, binds krt.Collection[ADPResourcesForGateway], krtopts krtutil.KrtOptions, policyManager *plugins.DefaultPolicyManager) krt.Collection[ADPResourcesForGateway] {
 	// Generate all policies using the plugin system
 	allPoliciesCol := krt.NewCollection(binds, func(ctx krt.HandlerContext, i ADPResourcesForGateway) *ADPResourcesForGateway {
 		logger.Debug("generating policies for gateway", "gateway", i.Gateway)
 
+		anyTrafficPolicies := inputs.TrafficPolicies.(plugins.PolicyInput)
 		// Generate all policies from all registered plugins
-		allPolicies, err := policyManager.GenerateAllPolicies(ctx, policyInputs)
+		allPolicies, err := policyManager.GenerateAllPolicies(ctx, agw, anyTrafficPolicies)
 		if err != nil {
 			logger.Error("failed to generate policies", "error", err)
 			// Return empty resources but don't fail completely

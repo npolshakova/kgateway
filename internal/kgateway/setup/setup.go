@@ -69,7 +69,7 @@ func WithExtraPlugins(extraPlugins func(ctx context.Context, commoncol *common.C
 	}
 }
 
-func WithExtraAgentgatewayPlugins(extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin[any]) func(*setup) {
+func WithExtraAgentgatewayPlugins(extraAgentgatewayPlugins []agentgatewayplugins.PolicyPlugin[any]) func(*setup) {
 	return func(s *setup) {
 		s.extraAgentgatewayPlugins = extraAgentgatewayPlugins
 	}
@@ -137,7 +137,7 @@ type setup struct {
 	waypointClassName        string
 	agentGatewayClassName    string
 	extraPlugins             func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin
-	extraAgentgatewayPlugins func(ctx context.Context, commoncol *common.CommonCollections) []agentgatewayplugins.PolicyPlugin[any]
+	extraAgentgatewayPlugins []agentgatewayplugins.PolicyPlugin[any]
 	extraGatewayParameters   func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters
 	extraXDSCallbacks        xdsserver.Callbacks
 	xdsListener              net.Listener
@@ -275,7 +275,7 @@ func (s *setup) Start(ctx context.Context) error {
 
 	BuildKgatewayWithConfig(
 		ctx, mgr, s.gatewayControllerName, s.gatewayClassName, s.waypointClassName,
-		s.agentGatewayClassName, setupOpts, s.restConfig, istioClient, commoncol, uccBuilder, s.extraPlugins, s.extraGatewayParameters)
+		s.agentGatewayClassName, setupOpts, s.restConfig, istioClient, commoncol, uccBuilder, s.extraPlugins, s.extraAgentgatewayPlugins, s.extraGatewayParameters)
 
 	slog.Info("starting admin server")
 	go admin.RunAdminServer(ctx, setupOpts)
@@ -302,6 +302,7 @@ func BuildKgatewayWithConfig(
 	commonCollections *collections.CommonCollections,
 	uccBuilder krtcollections.UniquelyConnectedClientsBulider,
 	extraPlugins func(ctx context.Context, commoncol *common.CommonCollections) []sdk.Plugin,
+	extraAgentgatewayPlugins []agentgatewayplugins.PolicyPlugin[any],
 	extraGatewayParameters func(cli client.Client, inputs *deployer.Inputs) []deployer.ExtraGatewayParameters,
 ) error {
 	slog.Info("creating krt collections")
@@ -323,6 +324,7 @@ func BuildKgatewayWithConfig(
 		WaypointGatewayClassName: waypointClassName,
 		AgentGatewayClassName:    agentGatewayClassName,
 		ExtraPlugins:             extraPlugins,
+		ExtraAgentgatewayPlugins: extraAgentgatewayPlugins,
 		ExtraGatewayParameters:   extraGatewayParameters,
 		RestConfig:               restConfig,
 		SetupOpts:                setupOpts,
