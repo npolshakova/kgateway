@@ -113,12 +113,12 @@ func (s *testingSuite) assertSessionPersistence(persistenceType string) {
 	s.Assert().NoError(err, "first request should succeed")
 
 	firstPodName := s.extractPodNameFromResponse(firstResp.StdOut)
-	s.Assert().NotEmpty(firstPodName, "should be able to extract pod name from first response. Response was: %s", firstResp.StdOut)
+	s.Assert().NotEmptyf(firstPodName, "should be able to extract pod name from first response. Response was: %s", firstResp.StdOut)
 
 	var subsequentCurlOpts []curl.Option
 	if persistenceType == "cookie" {
 		cookie := s.extractSessionCookieFromResponse(firstResp.StdOut)
-		s.Assert().NotEmpty(cookie, "should have received a session cookie. Response was: %s", firstResp.StdOut)
+		s.Assert().NotEmptyf(cookie, "should have received a session cookie. Response was: %s", firstResp.StdOut)
 		subsequentCurlOpts = []curl.Option{
 			curl.WithHost(kubeutils.ServiceFQDN(gatewayService)),
 			curl.WithHostHeader("echo.local"),
@@ -128,7 +128,7 @@ func (s *testingSuite) assertSessionPersistence(persistenceType string) {
 		}
 	} else {
 		headerValue := s.extractSessionHeaderFromResponse(firstResp.StdOut)
-		s.Assert().NotEmpty(headerValue, "should have received a session header. Response was: %s", firstResp.StdOut)
+		s.Assert().NotEmptyf(headerValue, "should have received a session header. Response was: %s", firstResp.StdOut)
 		subsequentCurlOpts = []curl.Option{
 			curl.WithHost(kubeutils.ServiceFQDN(gatewayService)),
 			curl.WithHostHeader("echo.local"),
