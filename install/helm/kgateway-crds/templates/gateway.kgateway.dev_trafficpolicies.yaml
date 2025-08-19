@@ -725,6 +725,8 @@ spec:
                     - Allow
                     - Deny
                     type: string
+                  disable:
+                    type: object
                   policies:
                     items:
                       properties:

@@ -97,7 +97,7 @@ type trafficPolicySpecIr struct {
 	autoHostRewrite *autoHostRewriteIR
 	retry           *retryIR
 	timeouts        *timeoutsIR
-	rbac            *rbacIr
+	rbac            *rbacIR
 }
 
 func (d *TrafficPolicy) CreationTime() time.Time {
@@ -595,8 +595,6 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 		filters = append(filters, filter)
 	}
 
-	// Add the RBAC filter to enable RBAC for the listener.
-	// Requires the RBAC policy to be set as typed_per_filter_config.
 	if f := p.rbacInChain[fcc.FilterChainName]; f != nil {
 		filter := plugins.MustNewStagedFilter(rbacFilterNamePrefix,
 			p.rbacInChain[fcc.FilterChainName],
@@ -630,7 +628,7 @@ func (p *trafficPolicyPluginGwPass) handlePolicies(
 	p.handleCsrf(fcn, typedFilterConfig, spec.csrf)
 	p.handleHeaderModifiers(fcn, typedFilterConfig, spec.headerModifiers)
 	p.handleBuffer(fcn, typedFilterConfig, spec.buffer)
-	p.handleRbac(fcn, typedFilterConfig, spec.rbac)
+	p.handleRBAC(fcn, typedFilterConfig, spec.rbac)
 }
 
 // handlePerRoutePolicies handles policies that are meant to be processed at the route level
@@ -712,7 +710,7 @@ func MergeTrafficPolicies(
 		mergeAutoHostRewrite,
 		mergeTimeouts,
 		mergeRetry,
-		mergeRbac,
+		mergeRBAC,
 	}
 
 	for _, mergeFunc := range mergeFuncs {
