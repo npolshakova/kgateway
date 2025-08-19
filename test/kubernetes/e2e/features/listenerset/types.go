@@ -125,26 +125,26 @@ var (
 
 	curlExitErrorCode = 28
 
-	setup = base.SetupTestCase{
+	setup = base.TestCase{
 		Manifests: []string{e2edefaults.CurlPodManifest, setupManifest},
 		Resources: []client.Object{e2edefaults.CurlPod, exampleSvc, nginxPod, proxyDeployment, proxyService, allowedNamespace},
 	}
 
 	// test cases
-	testCases = map[string]base.SetupTestCase{
-		"TestValidListenerSet": base.SetupTestCase{
+	testCases = map[string]base.TestCase{
+		"TestValidListenerSet": base.TestCase{
 			Manifests: []string{validListenerSetManifest},
 			Resources: []client.Object{validListenerSet},
 		},
-		"TestInvalidListenerSetNotAllowed": base.SetupTestCase{
+		"TestInvalidListenerSetNotAllowed": base.TestCase{
 			Manifests: []string{invalidListenerSetNotAllowedManifest},
 			Resources: []client.Object{invalidListenerSetNotAllowed},
 		},
-		"TestInvalidListenerSetNonExistingGW": base.SetupTestCase{
+		"TestInvalidListenerSetNonExistingGW": base.TestCase{
 			Manifests: []string{invalidListenerSetNonExistingGWManifest},
 			Resources: []client.Object{invalidListenerSetNonExistingGW},
 		},
-		"TestPolicies": base.SetupTestCase{
+		"TestPolicies": base.TestCase{
 			Manifests: []string{validListenerSetManifest, validListenerSetManifest2, policyManifest},
 			Resources: []client.Object{validListenerSet, validListenerSet2},
 		},

@@ -35,7 +35,7 @@ var (
 		},
 	}
 
-	zeroDowntimeTestCases = map[string]*base.SetupTestCase{
+	zeroDowntimeTestCases = map[string]*base.TestCase{
 		"TestZeroDowntimeRollout": {
 			SimpleTestCase: base.SimpleTestCase{
 				Manifests: []string{defaults.CurlPodManifest, serviceManifest, routeWithServiceManifest},

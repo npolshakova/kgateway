@@ -73,7 +73,7 @@ var (
 	}
 
 	// test cases
-	testCases = map[string]*base.SetupTestCase{
+	testCases = map[string]*base.TestCase{
 		"TestKubeServiceSuccessStats": {
 			SimpleTestCase: base.SimpleTestCase{
 				Manifests: []string{testdefaults.CurlPodManifest, exampleServiceManifest, gatewayAndRouteToServiceManifest},

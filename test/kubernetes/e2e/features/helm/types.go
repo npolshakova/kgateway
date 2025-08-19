@@ -13,7 +13,7 @@ var (
 	productionRecommendationsSetup = filepath.Join(fsutils.MustGetThisDir(), "testdata/manifests", "production-recommendations.yaml")
 	configMapChangeSetup           = filepath.Join(fsutils.MustGetThisDir(), "testdata/manifests", "config-map-change.yaml")
 
-	helmTestCases = map[string]*base.SetupTestCase{
+	helmTestCases = map[string]*base.TestCase{
 		"TestProductionRecommendations": {
 			SimpleTestCase: base.SimpleTestCase{
 				UpgradeValues: productionRecommendationsSetup,

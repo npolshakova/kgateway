@@ -19,8 +19,8 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
 )
 
-// SetupTestCase defines the manifests and resources used by a test or test suite.
-type SetupTestCase struct {
+// TestCase defines the manifests and resources used by a test or test suite.
+type TestCase struct {
 	// Manifests contains a list of manifest filenames.
 	Manifests []string
 	// Resources contains a list of objects that are expected to be created by the manifest files.
@@ -36,8 +36,8 @@ type BaseTestingSuite struct {
 	suite.Suite
 	Ctx              context.Context
 	TestInstallation *e2e.TestInstallation
-	TestCases        map[string]SetupTestCase
-	Setup            SetupTestCase
+	TestCases        map[string]TestCase
+	Setup            TestCase
 }
 
 // NewBaseTestingSuite returns a BaseTestingSuite that performs all the pre-requisites of upgrading helm installations,
@@ -45,7 +45,7 @@ type BaseTestingSuite struct {
 // The pre-requisites for the suite are defined in the setup parameter and for each test in the individual testCase.
 // Currently, tests that require upgrades (eg: to change settings) can not be run in Enterprise. To do so,
 // the test must be written without upgrades and call the `NewBaseTestingSuiteWithoutUpgrades` constructor.
-func NewBaseTestingSuite(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase SetupTestCase, testCases map[string]SetupTestCase) *BaseTestingSuite {
+func NewBaseTestingSuite(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase TestCase, testCases map[string]TestCase) *BaseTestingSuite {
 	return &BaseTestingSuite{
 		Ctx:              ctx,
 		TestInstallation: testInst,
@@ -56,7 +56,7 @@ func NewBaseTestingSuite(ctx context.Context, testInst *e2e.TestInstallation, se
 
 // NewBaseTestingSuiteWithoutUpgrades returns a BaseTestingSuite without allowing upgrades and reverts before the suite and tests.
 // This is useful when creating tests that need to run in Enterprise since the helm values change between OSS and Enterprise installations.
-func NewBaseTestingSuiteWithoutUpgrades(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase SetupTestCase, testCases map[string]SetupTestCase) *BaseTestingSuite {
+func NewBaseTestingSuiteWithoutUpgrades(ctx context.Context, testInst *e2e.TestInstallation, setupTestCase TestCase, testCases map[string]TestCase) *BaseTestingSuite {
 	return &BaseTestingSuite{
 		Ctx:              ctx,
 		TestInstallation: testInst,
@@ -66,7 +66,7 @@ func NewBaseTestingSuiteWithoutUpgrades(ctx context.Context, testInst *e2e.TestI
 }
 
 func (s *BaseTestingSuite) SetupSuite() {
-	s.ApplyManifestsAndAssertAccepted(s.Setup)
+	s.SetupTestCaseAndAssertAccepted(s.Setup)
 
 	// TODO handle upgrades https://github.com/kgateway-dev/kgateway/issues/10609
 	// if s.Setup.UpgradeValues != "" {
@@ -90,7 +90,7 @@ func (s *BaseTestingSuite) TearDownSuite() {
 	// 	s.TestInstallation.Assertions.Require.NoError(err)
 	// }
 
-	s.DeleteManifests(s.Setup)
+	s.TearDownTestCase(s.Setup)
 }
 
 func (s *BaseTestingSuite) BeforeTest(suiteName, testName string) {
@@ -112,7 +112,7 @@ func (s *BaseTestingSuite) BeforeTest(suiteName, testName string) {
 	// 	s.TestInstallation.Assertions.Require.NoError(err)
 	// }
 
-	s.ApplyManifestsAndAssertAccepted(testCase)
+	s.SetupTestCaseAndAssertAccepted(testCase)
 }
 
 func (s *BaseTestingSuite) AfterTest(suiteName, testName string) {
@@ -130,7 +130,7 @@ func (s *BaseTestingSuite) AfterTest(suiteName, testName string) {
 	// 	s.TestInstallation.Assertions.Require.NoError(err)
 	// }
 
-	s.DeleteManifests(testCase)
+	s.TearDownTestCase(testCase)
 }
 
 func (s *BaseTestingSuite) GetKubectlOutput(command ...string) string {
@@ -149,8 +149,8 @@ func (s *BaseTestingSuite) GetKubectlOutput(command ...string) string {
 // 	s.TestInstallation.Assertions.Require.NoError(err)
 // }
 
-// ApplyManifests applies the manifests and waits until the resources are created and ready.
-func (s *BaseTestingSuite) ApplyManifests(testCase SetupTestCase) {
+// SetupTestCase applies the manifests and waits until the resources are created and ready.
+func (s *BaseTestingSuite) SetupTestCase(testCase TestCase) {
 	// apply the manifests
 	for _, manifest := range testCase.Manifests {
 		gomega.Eventually(func() error {
@@ -182,8 +182,8 @@ func (s *BaseTestingSuite) ApplyManifests(testCase SetupTestCase) {
 	}
 }
 
-// DeleteManifests deletes the manifests and waits until the resources are deleted.
-func (s *BaseTestingSuite) DeleteManifests(testCase SetupTestCase) {
+// TearDownTestCase deletes the manifests and waits until the resources are deleted.
+func (s *BaseTestingSuite) TearDownTestCase(testCase TestCase) {
 	for _, manifest := range testCase.Manifests {
 		gomega.Eventually(func() error {
 			err := s.TestInstallation.Actions.Kubectl().DeleteFileSafe(s.Ctx, manifest)
@@ -204,14 +204,14 @@ func (s *BaseTestingSuite) DeleteManifests(testCase SetupTestCase) {
 	}
 }
 
-// AssertManifestResourcesAccepted validates that all manifest resources have "Accepted" status.
+// AssertTestCaseResourcesAccepted validates that all manifest resources have "Accepted" status.
 // This method supports:
 //   - Gateway API resources: Gateway, HTTPRoute, TCPRoute, TLSRoute, GRPCRoute
 //   - KGateway policy resources: HTTPListenerPolicy, TrafficPolicy, BackendConfigPolicy
 //   - KGateway backend resources: Backend, GatewayExtension
 //
 // Other resource types (pods, services, deployments, etc.) are safely skipped.
-func (s *BaseTestingSuite) AssertManifestResourcesAccepted(testCase SetupTestCase) {
+func (s *BaseTestingSuite) AssertTestCaseResourcesAccepted(testCase TestCase) {
 	for _, resource := range testCase.Resources {
 		switch obj := resource.(type) {
 		case *gwv1.Gateway:
@@ -277,10 +277,10 @@ func (s *BaseTestingSuite) AssertManifestResourcesAccepted(testCase SetupTestCas
 	}
 }
 
-// ApplyManifestsAndAssertAccepted combines applying manifests with asserting their statuses are accepted.
+// SetupTestCaseAndAssertAccepted combines applying manifests with asserting their statuses are accepted.
 // This applies manifests, waits for resources to exist and be ready, then validates that all manifest
 // resources have "Accepted" status.
-func (s *BaseTestingSuite) ApplyManifestsAndAssertAccepted(testCase SetupTestCase) {
-	s.ApplyManifests(testCase)
-	s.AssertManifestResourcesAccepted(testCase)
+func (s *BaseTestingSuite) SetupTestCaseAndAssertAccepted(testCase TestCase) {
+	s.SetupTestCase(testCase)
+	s.AssertTestCaseResourcesAccepted(testCase)
 }
