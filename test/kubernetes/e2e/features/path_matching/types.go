@@ -43,26 +43,26 @@ var (
 		},
 	}
 
-	setup = base.SetupTestCase{
+	setup = base.TestCase{
 		Manifests: []string{e2edefaults.CurlPodManifest, setupManifest},
 		Resources: []client.Object{e2edefaults.CurlPod, httpbinDeployment, gatewayService, gatewayDeployment},
 	}
 
 	// test cases
-	testCases = map[string]base.SetupTestCase{
-		"TestExactMatch": base.SetupTestCase{
+	testCases = map[string]base.TestCase{
+		"TestExactMatch": base.TestCase{
 			Manifests: []string{exactManifest},
 			Resources: []client.Object{route},
 		},
-		"TestPrefixMatch": base.SetupTestCase{
+		"TestPrefixMatch": base.TestCase{
 			Manifests: []string{prefixManifest},
 			Resources: []client.Object{route},
 		},
-		"TestRegexMatch": base.SetupTestCase{
+		"TestRegexMatch": base.TestCase{
 			Manifests: []string{regexManifest},
 			Resources: []client.Object{route},
 		},
-		"TestPrefixRewrite": base.SetupTestCase{
+		"TestPrefixRewrite": base.TestCase{
 			Manifests: []string{prefixRewriteManifest},
 			Resources: []client.Object{route},
 		},

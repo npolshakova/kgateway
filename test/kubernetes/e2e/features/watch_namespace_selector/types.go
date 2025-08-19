@@ -43,7 +43,7 @@ var (
 		Manifests: []string{e2edefaults.CurlPodManifest},
 	}
 
-	testCases = map[string]*base.SetupTestCase{
+	testCases = map[string]*base.TestCase{
 		"TestMatchLabels": {
 			SimpleTestCase: base.SimpleTestCase{
 				Manifests: []string{unlabeledRandomNamespaceManifest, randomVSManifest},

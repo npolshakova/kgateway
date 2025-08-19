@@ -23,7 +23,7 @@ type testingSuite struct {
 
 func NewTestingSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.TestingSuite {
 	return &testingSuite{
-		base.NewBaseTestingSuite(ctx, testInst, base.SetupTestCase{}, testCases),
+		base.NewBaseTestingSuite(ctx, testInst, base.TestCase{}, testCases),
 	}
 }
 

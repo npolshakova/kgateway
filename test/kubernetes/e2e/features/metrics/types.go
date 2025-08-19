@@ -97,7 +97,7 @@ var (
 		},
 	}
 
-	setup = base.SetupTestCase{
+	setup = base.TestCase{
 		Manifests: []string{setupManifest, e2edefaults.CurlPodManifest},
 		Resources: []client.Object{
 			kgatewayMetricsService,
@@ -116,7 +116,7 @@ var (
 		},
 	}
 
-	testCases = map[string]base.SetupTestCase{
+	testCases = map[string]base.TestCase{
 		"TestMetrics": {},
 	}
 )
