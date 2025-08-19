@@ -2,10 +2,8 @@ package plugins
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/agentgateway/agentgateway/go/api"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
@@ -17,87 +15,28 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 )
 
-const (
-	inferencePluginName = "inference-pool-policy-plugin"
-)
-
-// InferencePluginIr converts a InferencePool to an agentgateway policy
-type InferencePluginIr struct {
-	policies []ADPPolicy
-	ct       time.Time
-}
-
-func (p *InferencePluginIr) CreationTime() time.Time {
-	return p.ct
-}
-
-func (p *InferencePluginIr) Equals(in any) bool {
-	p2, ok := in.(*InferencePluginIr)
-	if !ok {
-		return false
-	}
-	if len(p.policies) != len(p2.policies) {
-		return false
-	}
-	for i, policy := range p.policies {
-		if !policy.Equals(&p2.policies[i]) {
-			return false
-		}
-	}
-	return true
-}
-
 // NewInferencePlugin creates a new InferencePool policy plugin
 func NewInferencePlugin(agw *AgwCollections) AgentgatewayPlugin {
-	gk := wellknown.ServiceGVK.GroupKind()
 	domainSuffix := kubeutils.GetClusterDomainName()
-	policyCol := krt.NewCollection(agw.InferencePools, func(krtctx krt.HandlerContext, infPool *inf.InferencePool) *PolicyWrapper {
-		objSrc := ir.ObjectSource{
-			Group:     gk.Group,
-			Kind:      gk.Kind,
-			Namespace: infPool.Namespace,
-			Name:      infPool.Name,
-		}
-
-		policyIR, errors := translatePoliciesForInferencePool(infPool, domainSuffix)
-		return &PolicyWrapper{
-			ObjectSource: objSrc,
-			Policy:       infPool,
-			PolicyIR:     policyIR,
-			Errors:       errors,
-		}
+	policyCol := krt.NewManyCollection(agw.InferencePools, func(krtctx krt.HandlerContext, infPool *inf.InferencePool) []ADPPolicy {
+		return translatePoliciesForInferencePool(infPool, domainSuffix)
 	})
 	return AgentgatewayPlugin{
 		ContributesPolicies: map[schema.GroupKind]PolicyPlugin{
-			wellknown.ServiceGVK.GroupKind(): {
+			wellknown.InferencePoolGVK.GroupKind(): {
 				Policies: policyCol,
 			},
+		},
+		ExtraHasSynced: func() bool {
+			return policyCol.HasSynced() && agw.InferencePools.HasSynced()
 		},
 	}
 }
 
-// GroupKind returns the GroupKind of the policy this plugin handles
-func (p *InferencePluginIr) GroupKind() schema.GroupKind {
-	return schema.GroupKind{
-		Group: wellknown.InferencePoolGVK.GroupKind().Group,
-		Kind:  wellknown.InferencePoolGVK.GroupKind().Kind,
-	}
-}
-
-// Name returns the name of this plugin
-func (p *InferencePluginIr) Name() string {
-	return inferencePluginName
-}
-
-// ApplyPolicies applies agentgateway policies for inference pools
-func (p *InferencePluginIr) ApplyPolicies() []ADPPolicy {
-	return p.policies
-}
-
 // translatePoliciesForInferencePool generates policies for a single inference pool
-func translatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix string) (*InferencePluginIr, []error) {
+func translatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix string) []ADPPolicy {
 	logger := logging.New("agentgateway/plugins/inference")
-	var errors []error
+	var infPolicies []ADPPolicy
 
 	// 'service/{namespace}/{hostname}:{port}'
 	svc := fmt.Sprintf("service/%v/%v.%v.inference.%v:%v",
@@ -105,22 +44,19 @@ func translatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix str
 
 	er := pool.Spec.ExtensionRef
 	if er == nil {
-		logger.Debug("inference pool has no extension ref", "pool", pool.Name)
-		errors = append(errors, fmt.Errorf("inference pool has no extension ref: %v", pool.Name))
-		return nil, errors
+		logger.Warn("inference pool has no extension ref", "pool", pool.Name)
+		return nil
 	}
 
 	erf := er.ExtensionReference
 	if erf.Group != nil && *erf.Group != "" {
-		logger.Debug("inference pool extension ref has non-empty group, skipping", "pool", pool.Name, "group", *erf.Group)
-		errors = append(errors, fmt.Errorf("inference pool extension ref has non-empty group: %v", pool.Name))
-		return nil, errors
+		logger.Warn("inference pool extension ref has non-empty group, skipping", "pool", pool.Name, "group", *erf.Group)
+		return nil
 	}
 
 	if erf.Kind != nil && *erf.Kind != "Service" {
-		logger.Debug("inference pool extension ref is not a Service, skipping", "pool", pool.Name, "kind", *erf.Kind)
-		errors = append(errors, fmt.Errorf("inference pool extension ref is not a Service: %v", pool.Name))
-		return nil, errors
+		logger.Warn("inference pool extension ref is not a Service, skipping", "pool", pool.Name, "kind", *erf.Kind)
+		return nil
 	}
 
 	eppPort := ptr.OrDefault(erf.PortNumber, 9002)
@@ -151,6 +87,7 @@ func translatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix str
 			},
 		},
 	}
+	infPolicies = append(infPolicies, ADPPolicy{Policy: inferencePolicy})
 
 	// Create the TLS policy for the endpoint picker
 	// TODO: we would want some way if they explicitly set a BackendTLSPolicy for the EPP to respect that
@@ -166,6 +103,7 @@ func translatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix str
 			},
 		},
 	}
+	infPolicies = append(infPolicies, ADPPolicy{Policy: inferencePolicyTLS})
 
 	logger.Debug("generated inference pool policies",
 		"pool", pool.Name,
@@ -173,13 +111,5 @@ func translatePoliciesForInferencePool(pool *inf.InferencePool, domainSuffix str
 		"inference_policy", inferencePolicy.Name,
 		"tls_policy", inferencePolicyTLS.Name)
 
-	return &InferencePluginIr{
-		policies: []ADPPolicy{
-			{Policy: inferencePolicy},
-			{Policy: inferencePolicyTLS},
-		},
-	}, errors
+	return infPolicies
 }
-
-// Verify that InferencePlugin implements the required interfaces
-var _ PolicyPluginPass = (*InferencePluginIr)(nil)

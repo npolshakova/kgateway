@@ -8,7 +8,7 @@
           "hostname": "gateway-pool-endpoint-picker.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAALA=="
+              "address": "CgAAJA=="
             }
           ],
           "ports": [
@@ -109,7 +109,7 @@
           "hostname": "http-inferencepool.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAQg=="
+              "address": "CgAAWQ=="
             }
           ],
           "ports": [
@@ -136,7 +136,7 @@
           "ports": [
             {
               "service_port": 443,
-              "target_port": 44805
+              "target_port": 59613
             }
           ],
           "ip_families": 1
@@ -155,7 +155,7 @@
           "service_account": "default",
           "node": "worker",
           "canonical_name": "reviews",
-          "canonical_revision": "latest",
+          "canonical_revision": "v1",
           "workload_type": 2,
           "workload_name": "reviews-1",
           "status": 1
@@ -174,7 +174,7 @@
           "service_account": "default",
           "node": "worker2",
           "canonical_name": "reviews",
-          "canonical_revision": "latest",
+          "canonical_revision": "v2",
           "workload_type": 2,
           "workload_name": "reviews-2",
           "status": 1
@@ -212,7 +212,7 @@
           "service_account": "default",
           "node": "worker4",
           "canonical_name": "reviews",
-          "canonical_revision": "latest",
+          "canonical_revision": "v1",
           "workload_type": 2,
           "workload_name": "reviews-4",
           "status": 1
@@ -308,7 +308,7 @@
             {
               "backend": {
                 "Kind": {
-                  "Service": "gwtest/gateway-pool.gwtest.svc.cluster.local"
+                  "Service": "gwtest/gateway-pool.gwtest.inference.cluster.local"
                 },
                 "port": 8080
               },

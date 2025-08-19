@@ -6,18 +6,25 @@ import (
 
 type AgentgatewayPlugin struct {
 	ContributesPolicies map[schema.GroupKind]PolicyPlugin
+	// extra has sync beyond primary resources in the collections above
+	ExtraHasSynced func() bool
 }
 
 func MergePlugins(plug ...AgentgatewayPlugin) AgentgatewayPlugin {
 	ret := AgentgatewayPlugin{
 		ContributesPolicies: make(map[schema.GroupKind]PolicyPlugin),
 	}
+	var hasSynced []func() bool
 	for _, p := range plug {
 		// Merge contributed policies
 		for gk, policy := range p.ContributesPolicies {
 			ret.ContributesPolicies[gk] = policy
 		}
+		if p.ExtraHasSynced != nil {
+			hasSynced = append(hasSynced, p.ExtraHasSynced)
+		}
 	}
+	ret.ExtraHasSynced = mergeSynced(hasSynced)
 	return ret
 }
 
@@ -39,4 +46,16 @@ func Plugins(agw *AgwCollections) []AgentgatewayPlugin {
 		NewInferencePlugin(agw),
 		NewA2APlugin(agw),
 	}
+}
+
+func (p AgentgatewayPlugin) HasSynced() bool {
+	for _, pol := range p.ContributesPolicies {
+		if pol.Policies != nil && !pol.Policies.HasSynced() {
+			return false
+		}
+	}
+	if p.ExtraHasSynced != nil && !p.ExtraHasSynced() {
+		return false
+	}
+	return true
 }

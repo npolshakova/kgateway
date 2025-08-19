@@ -392,6 +392,7 @@ func sortTranslationResult(tr *translationResult) *translationResult {
 	sort.Slice(tr.Routes, func(i, j int) bool {
 		return tr.Routes[i].GetKey() < tr.Routes[j].GetKey()
 	})
+
 	sort.Slice(tr.TCPRoutes, func(i, j int) bool {
 		return tr.TCPRoutes[i].GetKey() < tr.TCPRoutes[j].GetKey()
 	})
@@ -652,7 +653,6 @@ func (tc TestCase) Run(
 	for i, plug := range extraPlugs {
 		kubeclient.WaitForCacheSync(fmt.Sprintf("extra-%d", i), ctx.Done(), plug.HasSynced)
 	}
-
 	time.Sleep(1 * time.Second)
 
 	results := make(map[types.NamespacedName]ActualTestResult)
@@ -666,6 +666,13 @@ func (tc TestCase) Run(
 	}
 	agwPlugins := agentgatewayplugins.Plugins(agwCollections)
 	agwExtensions := agentgatewayplugins.MergePlugins(agwPlugins...)
+	kubeclient.WaitForCacheSync("trafficpolicies", ctx.Done(), agwCollections.TrafficPolicies.HasSynced)
+	kubeclient.WaitForCacheSync("infpool", ctx.Done(), agwCollections.InferencePools.HasSynced)
+	for i, plug := range agwPlugins {
+		kubeclient.WaitForCacheSync(fmt.Sprintf("extra-%d", i), ctx.Done(), plug.HasSynced)
+	}
+	// Wait for the agw collections to sync
+	time.Sleep(1 * time.Second)
 
 	// Instead of calling full Init(), manually initialize just what we need for testing
 	// to avoid race conditions with XDS collection building

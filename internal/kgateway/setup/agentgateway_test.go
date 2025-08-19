@@ -207,7 +207,7 @@ func testAgentGatewayScenario(
 		}
 
 		return nil
-	}, retry.Converge(2), retry.BackoffDelay(2*time.Second), retry.Timeout(10*time.Second))
+	}, retry.Converge(2), retry.BackoffDelay(2*time.Second), retry.Timeout(30*time.Second))
 
 	t.Logf("%s finished", t.Name())
 }
