@@ -9,9 +9,8 @@ import (
 // RBACApplyConfiguration represents a declarative configuration of the RBAC type for use
 // with apply.
 type RBACApplyConfiguration struct {
-	Policy  *RBACPolicyApplyConfiguration          `json:"policy,omitempty"`
-	Action  *apiv1alpha1.AuthorizationPolicyAction `json:"action,omitempty"`
-	Disable *apiv1alpha1.PolicyDisable             `json:"disable,omitempty"`
+	Policy *RBACPolicyApplyConfiguration          `json:"policy,omitempty"`
+	Action *apiv1alpha1.AuthorizationPolicyAction `json:"action,omitempty"`
 }
 
 // RBACApplyConfiguration constructs a declarative configuration of the RBAC type for use with
@@ -33,13 +32,5 @@ func (b *RBACApplyConfiguration) WithPolicy(value *RBACPolicyApplyConfiguration)
 // If called multiple times, the Action field is set to the value of the last call.
 func (b *RBACApplyConfiguration) WithAction(value apiv1alpha1.AuthorizationPolicyAction) *RBACApplyConfiguration {
 	b.Action = &value
-	return b
-}
-
-// WithDisable sets the Disable field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Disable field is set to the value of the last call.
-func (b *RBACApplyConfiguration) WithDisable(value apiv1alpha1.PolicyDisable) *RBACApplyConfiguration {
-	b.Disable = &value
 	return b
 }

@@ -599,7 +599,6 @@ func (p *trafficPolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filt
 		filter := plugins.MustNewStagedFilter(rbacFilterNamePrefix,
 			p.rbacInChain[fcc.FilterChainName],
 			plugins.DuringStage(plugins.AuthZStage))
-		filter.Filter.Disabled = true
 		filters = append(filters, filter)
 	}
 

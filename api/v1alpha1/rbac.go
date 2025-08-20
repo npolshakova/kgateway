@@ -12,11 +12,6 @@ type RBAC struct {
 	// +kubebuilder:validation:Enum=Allow;Deny
 	// +kubebuilder:default=Allow
 	Action AuthorizationPolicyAction `json:"action,omitempty"`
-
-	// Disable the RBAC filter.
-	// Can be used to disable RBAC policies applied at a higher level in the config hierarchy.
-	// +optional
-	Disable *PolicyDisable `json:"disable,omitempty"`
 }
 
 // RBACPolicy defines a single RBAC rule.

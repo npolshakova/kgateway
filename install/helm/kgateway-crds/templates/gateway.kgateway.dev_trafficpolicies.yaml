@@ -725,8 +725,6 @@ spec:
                     - Allow
                     - Deny
                     type: string
-                  disable:
-                    type: object
                   policy:
                     properties:
                       matchExpressions:

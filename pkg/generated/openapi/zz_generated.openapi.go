@@ -6093,18 +6093,12 @@ func schema_kgateway_v2_api_v1alpha1_RBAC(ref common.ReferenceCallback) common.O
 							Format:      "",
 						},
 					},
-					"disable": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Disable the RBAC filter. Can be used to disable RBAC policies applied at a higher level in the config hierarchy.",
-							Ref:         ref("github.com/kgateway-dev/kgateway/v2/api/v1alpha1.PolicyDisable"),
-						},
-					},
 				},
 				Required: []string{"policy"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.PolicyDisable", "github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RBACPolicy"},
+			"github.com/kgateway-dev/kgateway/v2/api/v1alpha1.RBACPolicy"},
 	}
 }
 
