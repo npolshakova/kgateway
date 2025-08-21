@@ -264,25 +264,6 @@ func TestBasic(t *testing.T) {
 		})
 	})
 
-	t.Run("TrafficPolicy with AI invalided default values", func(t *testing.T) {
-		test(t, translatorTestCase{
-			inputFile:  "traffic-policy/ai-invalid-default-value.yaml",
-			outputFile: "traffic-policy/ai-invalid-default-value.yaml",
-			gwNN: types.NamespacedName{
-				Namespace: "infra",
-				Name:      "example-gateway",
-			},
-			assertReports: translatortest.AssertRouteInvalid(
-				t,
-				"example-route",
-				"infra",
-				reporter.RouteRuleReplacedReason,
-				`field invalid_object contains invalid JSON string: "model":"gpt-4"`,
-				`field invalid_slices contains invalid JSON string: [1,2,3`,
-			),
-		})
-	})
-
 	t.Run("TrafficPolicy merging", func(t *testing.T) {
 		test(t, translatorTestCase{
 			inputFile:  "traffic-policy/merge.yaml",
@@ -398,6 +379,39 @@ func TestBasic(t *testing.T) {
 		test(t, translatorTestCase{
 			inputFile:  "traffic-policy/buffer-route.yaml",
 			outputFile: "traffic-policy/buffer-route.yaml",
+			gwNN: types.NamespacedName{
+				Namespace: "default",
+				Name:      "example-gateway",
+			},
+		})
+	})
+
+	t.Run("TrafficPolicy with header modifiers attached to gateway", func(t *testing.T) {
+		test(t, translatorTestCase{
+			inputFile:  "traffic-policy/header-modifiers-gateway.yaml",
+			outputFile: "traffic-policy/header-modifiers-gateway.yaml",
+			gwNN: types.NamespacedName{
+				Namespace: "default",
+				Name:      "example-gateway",
+			},
+		})
+	})
+
+	t.Run("TrafficPolicy with header modifiers attached to routes", func(t *testing.T) {
+		test(t, translatorTestCase{
+			inputFile:  "traffic-policy/header-modifiers-route.yaml",
+			outputFile: "traffic-policy/header-modifiers-route.yaml",
+			gwNN: types.NamespacedName{
+				Namespace: "default",
+				Name:      "example-gateway",
+			},
+		})
+	})
+
+	t.Run("TrafficPolicy with header modifiers attached to routes listenerset and gateway", func(t *testing.T) {
+		test(t, translatorTestCase{
+			inputFile:  "traffic-policy/header-modifiers-all.yaml",
+			outputFile: "traffic-policy/header-modifiers-all.yaml",
 			gwNN: types.NamespacedName{
 				Namespace: "default",
 				Name:      "example-gateway",
@@ -1044,6 +1058,17 @@ func TestBasic(t *testing.T) {
 		})
 	})
 
+	t.Run("Backend Config Policy with OutlierDetection", func(t *testing.T) {
+		test(t, translatorTestCase{
+			inputFile:  "backendconfigpolicy/outlierdetection.yaml",
+			outputFile: "backendconfigpolicy/outlierdetection.yaml",
+			gwNN: types.NamespacedName{
+				Namespace: "default",
+				Name:      "example-gateway",
+			},
+		})
+	})
+
 	t.Run("Backend Config Policy with Common HTTP Protocol - HTTP backend", func(t *testing.T) {
 		test(t, translatorTestCase{
 			inputFile:  "backendconfigpolicy/commonhttpprotocol-httpbackend.yaml",
@@ -1387,6 +1412,57 @@ func TestRouteReplacement(t *testing.T) {
 				)
 			},
 		},
+		{
+			name:      "AI Invalid Default Values",
+			category:  "policy",
+			inputFile: "policy-ai-default-value-invalid.yaml",
+			minMode:   settings.RouteReplacementStandard,
+			assertStandard: func(t *testing.T) translatortest.AssertReports {
+				return translatortest.AssertRouteInvalid(
+					t,
+					"example-route",
+					"gwtest",
+					reporter.RouteRuleReplacedReason,
+					`field invalid_object contains invalid JSON string: "model":"gpt-4"`,
+				)
+			},
+			assertStrict: func(t *testing.T) translatortest.AssertReports {
+				return translatortest.AssertRouteInvalid(
+					t,
+					"example-route",
+					"gwtest",
+					reporter.RouteRuleReplacedReason,
+					`field invalid_object contains invalid JSON string: "model":"gpt-4"`,
+				)
+			},
+		},
+		// TODO(tim): Uncomment this test once #11995 is fixed.
+		// {
+		// 	name:      "Multiple Invalid Policies Conflict",
+		// 	category:  "policy",
+		// 	inputFile: "policy-multiple-invalid-conflict.yaml",
+		// 	minMode:   settings.RouteReplacementStandard,
+		// 	assertStandard: func(t *testing.T) translatortest.AssertReports {
+		// 		return translatortest.AssertRouteInvalid(
+		// 			t,
+		// 			"conflict-route",
+		// 			"gwtest",
+		// 			reporter.RouteRuleReplacedReason,
+		// 			"field config contains invalid JSON string",
+		// 			"invalid template",
+		// 		)
+		// 	},
+		// 	assertStrict: func(t *testing.T) translatortest.AssertReports {
+		// 		return translatortest.AssertRouteInvalid(
+		// 			t,
+		// 			"conflict-route",
+		// 			"gwtest",
+		// 			reporter.RouteRuleReplacedReason,
+		// 			"field config contains invalid JSON string",
+		// 			"invalid template",
+		// 		)
+		// 	},
+		// },
 		{
 			name:      "ExtAuth Extension Ref Invalid",
 			category:  "policy",
