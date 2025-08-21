@@ -2374,20 +2374,25 @@ func schema_kgateway_v2_api_v1alpha1_Cookie(ref common.ReferenceCallback) common
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
-					"attributes": {
+					"secure": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Attributes are additional attributes for the cookie.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
+							Description: "Secure specifies whether the cookie is secure. If true, the cookie will only be sent over HTTPS.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"httpOnly": {
+						SchemaProps: spec.SchemaProps{
+							Description: "HttpOnly specifies whether the cookie is HTTP only, i.e. not accessible to JavaScript.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"sameSite": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SameSite controls cross-site sending of cookies. Supported values are Strict, Lax, and None.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -3940,6 +3945,20 @@ func schema_kgateway_v2_api_v1alpha1_HTTPListenerPolicySpec(ref common.Reference
 						SchemaProps: spec.SchemaProps{
 							Description: "PreserveHttp1HeaderCase determines whether to preserve the case of HTTP1 request headers. See here for more information: https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/header_casing",
 							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"acceptHttp10": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AcceptHTTP10 determines whether to accept incoming HTTP/1.0 and HTTP 0.9 requests. See here for more information: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/protocol.proto#config-core-v3-http1protocoloptions",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"defaultHostForHttp10": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DefaultHostForHttp10 specifies a default host for HTTP/1.0 requests. This is highly suggested if acceptHttp10 is true and a no-op if acceptHttp10 is false. See here for more information: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/protocol.proto#config-core-v3-http1protocoloptions",
+							Type:        []string{"string"},
 							Format:      "",
 						},
 					},

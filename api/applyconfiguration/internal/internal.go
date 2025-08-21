@@ -680,11 +680,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Cookie
   map:
     fields:
-    - name: attributes
+    - name: httpOnly
       type:
-        map:
-          elementType:
-            scalar: string
+        scalar: boolean
     - name: name
       type:
         scalar: string
@@ -692,6 +690,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: path
       type:
         scalar: string
+    - name: sameSite
+      type:
+        scalar: string
+    - name: secure
+      type:
+        scalar: boolean
     - name: ttl
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
@@ -1182,12 +1186,18 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.HTTPListenerPolicySpec
   map:
     fields:
+    - name: acceptHttp10
+      type:
+        scalar: boolean
     - name: accessLog
       type:
         list:
           elementType:
             namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.AccessLog
           elementRelationship: atomic
+    - name: defaultHostForHttp10
+      type:
+        scalar: string
     - name: healthCheck
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.EnvoyHealthCheck

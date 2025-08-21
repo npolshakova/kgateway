@@ -1125,12 +1125,20 @@ func (in *Cookie) DeepCopyInto(out *Cookie) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
-	if in.Attributes != nil {
-		in, out := &in.Attributes, &out.Attributes
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+	if in.Secure != nil {
+		in, out := &in.Secure, &out.Secure
+		*out = new(bool)
+		**out = **in
+	}
+	if in.HttpOnly != nil {
+		in, out := &in.HttpOnly, &out.HttpOnly
+		*out = new(bool)
+		**out = **in
+	}
+	if in.SameSite != nil {
+		in, out := &in.SameSite, &out.SameSite
+		*out = new(string)
+		**out = **in
 	}
 }
 
@@ -2157,6 +2165,16 @@ func (in *HTTPListenerPolicySpec) DeepCopyInto(out *HTTPListenerPolicySpec) {
 	if in.PreserveHttp1HeaderCase != nil {
 		in, out := &in.PreserveHttp1HeaderCase, &out.PreserveHttp1HeaderCase
 		*out = new(bool)
+		**out = **in
+	}
+	if in.AcceptHttp10 != nil {
+		in, out := &in.AcceptHttp10, &out.AcceptHttp10
+		*out = new(bool)
+		**out = **in
+	}
+	if in.DefaultHostForHttp10 != nil {
+		in, out := &in.DefaultHostForHttp10, &out.DefaultHostForHttp10
+		*out = new(string)
 		**out = **in
 	}
 }
