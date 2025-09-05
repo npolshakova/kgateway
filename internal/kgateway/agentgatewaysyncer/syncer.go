@@ -135,6 +135,10 @@ type PolicyStatusAsyncQueue struct {
 	queue utils.AsyncQueue[krt.ObjectWithStatus[controllers.Object, v1alpha1.PolicyStatus]]
 }
 
+func (b *PolicyStatusAsyncQueue) Enqueue(obj krt.ObjectWithStatus[controllers.Object, v1alpha1.PolicyStatus]) {
+	b.queue.Enqueue(obj)
+}
+
 func (b *PolicyStatusCollections) Enqueue(obj krt.ObjectWithStatus[controllers.Object, v1alpha1.PolicyStatus]) {
 	b.queue.Enqueue(obj)
 }
@@ -148,6 +152,13 @@ func NewPolicyStatusCollections() *PolicyStatusCollections {
 // GetAsyncQueue returns the underlying AsyncQueue for use in status syncer
 func (b *PolicyStatusAsyncQueue) GetAsyncQueue() utils.AsyncQueue[krt.ObjectWithStatus[controllers.Object, v1alpha1.PolicyStatus]] {
 	return b.queue
+}
+
+// NewPolicyStatusAsyncQueue creates a new PolicyStatusAsyncQueue
+func NewPolicyStatusAsyncQueue() *PolicyStatusAsyncQueue {
+	return &PolicyStatusAsyncQueue{
+		queue: utils.NewAsyncQueue[krt.ObjectWithStatus[controllers.Object, v1alpha1.PolicyStatus]](),
+	}
 }
 
 // PolicyStatusQueue defines an interface for queuing policy status updates
@@ -210,6 +221,10 @@ func (s *AgentGwSyncer) Init(krtopts krtinternal.KrtOptions) {
 
 	// Pass finalBackends into buildResourceCollections instead of storing on syncer
 	s.buildResourceCollections(finalBackends, krtopts)
+}
+
+func (s *AgentGwSyncer) PolicyStatusQueue() *PolicyStatusCollections {
+	return s.policyStatusQueue
 }
 
 func (s *AgentGwSyncer) buildResourceCollections(finalBackends krt.Collection[ir.BackendObjectIR], krtopts krtinternal.KrtOptions) {
