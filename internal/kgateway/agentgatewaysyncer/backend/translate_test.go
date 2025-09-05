@@ -14,7 +14,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 )
 
 func TestBuildMCPIr(t *testing.T) {
@@ -23,7 +22,7 @@ func TestBuildMCPIr(t *testing.T) {
 		name        string
 		backend     *v1alpha1.Backend
 		services    krt.Collection[*corev1.Service]
-		namespaces  krt.Collection[krtcollections.NamespaceMetadata]
+		namespaces  krt.Collection[*corev1.Namespace]
 		expectError bool
 		validate    func(mcpIr *MCPIr) bool
 	}{
@@ -896,9 +895,9 @@ func createMockServiceCollection(t test.Failer) krt.Collection[*corev1.Service] 
 }
 
 // createMockNamespaceCollection creates a basic mock namespace collection
-func createMockNamespaceCollection(t test.Failer) krt.Collection[krtcollections.NamespaceMetadata] {
+func createMockNamespaceCollection(t test.Failer) krt.Collection[*corev1.Namespace] {
 	mock := krttest.NewMock(t, []any{})
-	return krttest.GetMockCollection[krtcollections.NamespaceMetadata](mock)
+	return krttest.GetMockCollection[*corev1.Namespace](mock)
 }
 
 // createMockServiceCollectionWithMCPService creates a mock service collection with a specific MCP service
@@ -1017,24 +1016,30 @@ func createMockServiceCollectionMultiNamespace(t test.Failer) krt.Collection[*co
 }
 
 // createMockNamespaceCollectionWithLabels creates a mock namespace collection with labeled namespaces
-func createMockNamespaceCollectionWithLabels(t test.Failer) krt.Collection[krtcollections.NamespaceMetadata] {
-	namespaces := []krtcollections.NamespaceMetadata{
+func createMockNamespaceCollectionWithLabels(t test.Failer) krt.Collection[*corev1.Namespace] {
+	namespaces := []*corev1.Namespace{
 		{
-			Name: "test-ns",
-			Labels: map[string]string{
-				"environment": "test",
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-ns",
+				Labels: map[string]string{
+					"environment": "test",
+				},
 			},
 		},
 		{
-			Name: "prod-ns",
-			Labels: map[string]string{
-				"environment": "production",
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "prod-ns",
+				Labels: map[string]string{
+					"environment": "production",
+				},
 			},
 		},
 		{
-			Name: "dev-ns",
-			Labels: map[string]string{
-				"environment": "development",
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "dev-ns",
+				Labels: map[string]string{
+					"environment": "development",
+				},
 			},
 		},
 	}
@@ -1045,7 +1050,7 @@ func createMockNamespaceCollectionWithLabels(t test.Failer) krt.Collection[krtco
 	}
 
 	mock := krttest.NewMock(t, inputs)
-	mockCol := krttest.GetMockCollection[krtcollections.NamespaceMetadata](mock)
+	mockCol := krttest.GetMockCollection[*corev1.Namespace](mock)
 	// Ensure the index is fully synced before returning
 	for !mockCol.HasSynced() {
 		time.Sleep(50 * time.Millisecond)
