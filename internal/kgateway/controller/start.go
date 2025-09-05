@@ -183,7 +183,6 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 	var agentGatewaySyncer *agentgatewaysyncer.AgentGwSyncer
 	if cfg.SetupOpts.GlobalSettings.EnableAgentGateway {
 		agentgatewayMergedPlugins := agentGatewayPluginFactory(cfg)(ctx, cfg.AgwCollections)
-		cfg.AgwCollections.InitPlugins(ctx, mergedPlugins, globalSettings)
 
 		agentGatewaySyncer = agentgatewaysyncer.NewAgentGwSyncer(
 			cfg.ControllerName,
@@ -191,8 +190,6 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			cfg.Client,
 			cfg.Manager,
 			cfg.AgwCollections,
-			// TODO(npolshak): move away from shared mergedPlugins to agentGatewayPlugins https://github.com/kgateway-dev/kgateway/issues/12052
-			mergedPlugins,
 			agentgatewayMergedPlugins,
 			cfg.SetupOpts.Cache,
 			namespaces.GetPodNamespace(),
@@ -206,6 +203,9 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			return nil, err
 		}
 
+		backendStatusAsyncQueue := agentgatewaysyncer.NewBackendStatusAsyncQueue()
+		agentGatewaySyncer.BackendStatusQueue().SetQueue(backendStatusAsyncQueue)
+
 		agentGatewayStatusSyncer := agentgatewaysyncer.NewAgentGwStatusSyncer(
 			cfg.ControllerName,
 			cfg.AgentGatewayClassName,
@@ -214,6 +214,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			agentGatewaySyncer.GatewayReportQueue(),
 			agentGatewaySyncer.ListenerSetReportQueue(),
 			agentGatewaySyncer.RouteReportQueue(),
+			backendStatusAsyncQueue.GetAsyncQueue(),
 			agentGatewaySyncer.CacheSyncs(),
 		)
 		if err := cfg.Manager.Add(agentGatewayStatusSyncer); err != nil {

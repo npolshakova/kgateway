@@ -4,15 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"istio.io/istio/pkg/kube"
+	"istio.io/istio/pkg/kube/controllers"
+	"istio.io/istio/pkg/kube/krt"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -20,12 +24,22 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwxv1a1 "sigs.k8s.io/gateway-api/apisx/v1alpha1"
 
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/reports"
 )
 
 var _ manager.LeaderElectionRunnable = &AgentGwStatusSyncer{}
+
+const (
+	// Retry configuration constants for status updates
+	maxRetryAttempts = 5
+	retryDelay       = 100 * time.Millisecond
+
+	// Log message keys
+	logKeyError = "error"
+)
 
 // AgentGwStatusSyncer runs only on the leader and syncs the status of agent gateway resources.
 // It subscribes to the report queues, parses and updates the resource status.
@@ -42,6 +56,7 @@ type AgentGwStatusSyncer struct {
 	gatewayReportQueue     utils.AsyncQueue[GatewayReports]
 	listenerSetReportQueue utils.AsyncQueue[ListenerSetReports]
 	routeReportQueue       utils.AsyncQueue[RouteReports]
+	backendStatusQueue     utils.AsyncQueue[krt.ObjectWithStatus[*v1alpha1.Backend, v1alpha1.BackendStatus]]
 
 	// Synchronization
 	cacheSyncs []cache.InformerSynced
@@ -55,6 +70,7 @@ func NewAgentGwStatusSyncer(
 	gatewayReportQueue utils.AsyncQueue[GatewayReports],
 	listenerSetReportQueue utils.AsyncQueue[ListenerSetReports],
 	routeReportQueue utils.AsyncQueue[RouteReports],
+	backendStatusQueue utils.AsyncQueue[krt.ObjectWithStatus[*v1alpha1.Backend, v1alpha1.BackendStatus]],
 	cacheSyncs []cache.InformerSynced,
 ) *AgentGwStatusSyncer {
 	return &AgentGwStatusSyncer{
@@ -65,6 +81,7 @@ func NewAgentGwStatusSyncer(
 		gatewayReportQueue:     gatewayReportQueue,
 		listenerSetReportQueue: listenerSetReportQueue,
 		routeReportQueue:       routeReportQueue,
+		backendStatusQueue:     backendStatusQueue,
 		cacheSyncs:             cacheSyncs,
 	}
 }
@@ -91,6 +108,7 @@ func (s *AgentGwStatusSyncer) Start(ctx context.Context) error {
 	routeStatusLogger := logger.With("subcomponent", "routeStatusSyncer")
 	listenerSetStatusLogger := logger.With("subcomponent", "listenerSetStatusSyncer")
 	gatewayStatusLogger := logger.With("subcomponent", "gatewayStatusSyncer")
+	backendStatusLogger := logger.With("subcomponent", "backendStatusSyncer")
 
 	// Gateway status syncer
 	go func() {
@@ -128,8 +146,60 @@ func (s *AgentGwStatusSyncer) Start(ctx context.Context) error {
 		}
 	}()
 
+	// Backend status syncer
+	go func() {
+		for {
+			backendStatusUpdate, err := s.backendStatusQueue.Dequeue(ctx)
+			if err != nil {
+				logger.Error("failed to dequeue backend status", "error", err)
+				return
+			}
+			s.syncBackendStatus(ctx, backendStatusLogger, backendStatusUpdate)
+		}
+	}()
+
 	<-ctx.Done()
 	return nil
+}
+
+func (s *AgentGwStatusSyncer) syncBackendStatus(ctx context.Context, logger *slog.Logger, backendStatusUpdate krt.ObjectWithStatus[*v1alpha1.Backend, v1alpha1.BackendStatus]) {
+	stopwatch := utils.NewTranslatorStopWatch("BackendStatusSyncer")
+	stopwatch.Start()
+	defer stopwatch.Stop(ctx)
+
+	backendNameNs := types.NamespacedName{
+		Namespace: backendStatusUpdate.Obj.GetNamespace(),
+		Name:      backendStatusUpdate.Obj.GetName(),
+	}
+
+	err := retry.Do(func() error {
+		backend := v1alpha1.Backend{}
+		err := s.mgr.GetClient().Get(ctx, backendNameNs, &backend)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.Debug("backend not found, skipping status update", "backend", backendNameNs.String())
+				return nil
+			}
+			logger.Error("error getting backend", logKeyError, err, "backend", backendNameNs.String())
+			return err
+		}
+
+		// Update the status if it's different
+		if !cmp.Equal(backend.Status, backendStatusUpdate.Status, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")) {
+			backend.Status = backendStatusUpdate.Status
+			err = s.mgr.GetClient().Status().Update(ctx, &backend)
+			if err != nil {
+				logger.Error("error updating backend status", logKeyError, err, "backend", backendNameNs.String())
+				return err
+			}
+			logger.Debug("updated backend status", "backend", backendNameNs.String(), "status", backend.Status)
+		}
+		return nil
+	}, retry.Attempts(maxRetryAttempts), retry.Delay(retryDelay))
+
+	if err != nil {
+		logger.Error("failed to sync backend status after retries", logKeyError, err, "backend", backendNameNs.String())
+	}
 }
 
 func (s *AgentGwStatusSyncer) syncRouteStatus(ctx context.Context, logger *slog.Logger, routeReports RouteReports) {
@@ -601,4 +671,78 @@ func ensureParentRefNamespaces(parentRefs []gwv1.ParentReference, routeNamespace
 			parentRefs[i].Namespace = &routeNs
 		}
 	}
+}
+
+// BackendStatusQueue defines an interface for queuing backend status updates
+type BackendStatusQueue interface {
+	Enqueue(krt.ObjectWithStatus[*v1alpha1.Backend, v1alpha1.BackendStatus])
+}
+
+// BackendStatusRegistration is a function that creates a handler registration for a backend status queue
+type BackendStatusRegistration func(statusWriter BackendStatusQueue) krt.HandlerRegistration
+
+// BackendStatusCollections stores a variety of backend status collections that can write status.
+// These can be fed into a queue which can be dynamically changed (to handle leader election)
+type BackendStatusCollections struct {
+	mu           sync.Mutex
+	constructors []BackendStatusRegistration
+	active       []krt.HandlerRegistration
+	queue        BackendStatusQueue
+}
+
+func (s *BackendStatusCollections) Register(sr BackendStatusRegistration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.constructors = append(s.constructors, sr)
+}
+
+func (s *BackendStatusCollections) UnsetQueue() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Now we are disabled
+	s.queue = nil
+	for _, act := range s.active {
+		act.UnregisterHandler()
+	}
+	s.active = nil
+}
+
+func (s *BackendStatusCollections) SetQueue(queue BackendStatusQueue) []krt.Syncer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Now we are enabled!
+	s.queue = queue
+	// Register all constructors
+	s.active = make([]krt.HandlerRegistration, len(s.constructors))
+	for i, reg := range s.constructors {
+		s.active[i] = reg(queue)
+	}
+	syncers := make([]krt.Syncer, len(s.active))
+	for i, e := range s.active {
+		syncers[i] = e
+	}
+	return syncers
+}
+
+// RegisterBackendStatus takes a backend status collection and registers it to be managed by the backend status queue.
+func RegisterBackendStatus(s *BackendStatusCollections, statusCol krt.StatusCollection[*v1alpha1.Backend, v1alpha1.BackendStatus]) {
+	reg := func(statusWriter BackendStatusQueue) krt.HandlerRegistration {
+		h := statusCol.Register(func(o krt.Event[krt.ObjectWithStatus[*v1alpha1.Backend, v1alpha1.BackendStatus]]) {
+			l := o.Latest()
+			liveStatus := l.Obj.Status
+			if krt.Equal(liveStatus, l.Status) {
+				// We want the same status we already have! No need for a write so skip this.
+				logger.Debug("suppress change", "resource", l.ResourceName(), "version", l.Obj.GetResourceVersion())
+				return
+			}
+			if o.Event == controllers.EventDelete {
+				// if the object is being deleted, we should not reset status
+				return
+			}
+			statusWriter.Enqueue(l)
+			logger.Debug("Enqueued backend status update", "resource", l.ResourceName(), "version", l.Obj.GetResourceVersion(), "status", l.Status)
+		})
+		return h
+	}
+	s.Register(reg)
 }

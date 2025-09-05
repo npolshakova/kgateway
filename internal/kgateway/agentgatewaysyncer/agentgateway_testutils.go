@@ -652,19 +652,10 @@ func (tc TestCase) Run(
 	if err != nil {
 		return nil, err
 	}
-
 	proxySyncerPlugins := proxySyncerPluginFactory(ctx, commoncol, wellknown.DefaultAgentGatewayClassName, extraPluginsFn, *settings)
 	commoncol.InitPlugins(ctx, proxySyncerPlugins, *settings)
 
 	cli.RunAndWait(ctx.Done())
-	commoncol.GatewayIndex.Gateways.WaitUntilSynced(ctx.Done())
-
-	kubeclient.WaitForCacheSync("routes", ctx.Done(), commoncol.Routes.HasSynced)
-	kubeclient.WaitForCacheSync("extensions", ctx.Done(), proxySyncerPlugins.HasSynced)
-	kubeclient.WaitForCacheSync("commoncol", ctx.Done(), commoncol.HasSynced)
-	kubeclient.WaitForCacheSync("backends", ctx.Done(), commoncol.BackendIndex.HasSynced)
-	kubeclient.WaitForCacheSync("endpoints", ctx.Done(), commoncol.Endpoints.HasSynced)
-
 	results := make(map[types.NamespacedName]ActualTestResult)
 
 	// Create AgwCollections with the necessary input collections
@@ -675,6 +666,11 @@ func (tc TestCase) Run(
 		return nil, err
 	}
 	agwMergedPlugins := agentGatewayPluginFactory(ctx, agwCollections)
+	kubeclient.WaitForCacheSync("tlsroutes", ctx.Done(), agwCollections.TLSRoutes.HasSynced)
+	kubeclient.WaitForCacheSync("tcproutes", ctx.Done(), agwCollections.TCPRoutes.HasSynced)
+	kubeclient.WaitForCacheSync("httproutes", ctx.Done(), agwCollections.HTTPRoutes.HasSynced)
+	kubeclient.WaitForCacheSync("grpcroutes", ctx.Done(), agwCollections.GRPCRoutes.HasSynced)
+	kubeclient.WaitForCacheSync("backends", ctx.Done(), agwCollections.Backends.HasSynced)
 	kubeclient.WaitForCacheSync("trafficpolicies", ctx.Done(), agwCollections.TrafficPolicies.HasSynced)
 	kubeclient.WaitForCacheSync("infpool", ctx.Done(), agwCollections.InferencePools.HasSynced)
 
@@ -686,7 +682,6 @@ func (tc TestCase) Run(
 		cli,
 		nil, // mgr not needed for test
 		agwCollections,
-		proxySyncerPlugins,
 		agwMergedPlugins,
 		nil, // xdsCache not needed for test
 		"istio-system",
@@ -695,20 +690,17 @@ func (tc TestCase) Run(
 	)
 	agentGwSyncer.translator.Init()
 
-	_, adpBackendsCollection := agentGwSyncer.buildBackendCollections(krtOpts)
-
 	gatewayClasses := GatewayClassesCollection(agwCollections.GatewayClasses, krtOpts)
 	refGrants := BuildReferenceGrants(ReferenceGrantsCollection(agwCollections.ReferenceGrants, krtOpts))
 	gateways := agentGwSyncer.buildGatewayCollection(gatewayClasses, refGrants, krtOpts)
 
 	// Build ADP resources and addresses collections
 	adpResourcesCollection := agentGwSyncer.buildADPResources(gateways, refGrants, krtOpts)
-
+	_, adpBackendsCollection := agentGwSyncer.newADPBackendCollection(agwCollections.Backends, krtOpts)
 	addressesCollection := agentGwSyncer.buildAddressCollections(krtOpts)
 
 	// Wait for collections to sync
 	kubeclient.WaitForCacheSync("adp-resources", ctx.Done(), adpResourcesCollection.HasSynced)
-	kubeclient.WaitForCacheSync("adp-backends", ctx.Done(), adpBackendsCollection.HasSynced)
 	kubeclient.WaitForCacheSync("addresses", ctx.Done(), addressesCollection.HasSynced)
 
 	// build final proxy xds result
