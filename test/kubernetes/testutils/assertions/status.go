@@ -8,6 +8,8 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -545,30 +547,74 @@ func (p *Provider) EventuallyHTTPListenerPolicyCondition(
 	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
 }
 
-// EventuallyBackendCondition checks that provided Backend condition is set to expect.
-func (p *Provider) EventuallyBackendCondition(
-	ctx context.Context,
-	name string,
-	namespace string,
-	condition string,
-	expect metav1.ConditionStatus,
-	timeout ...time.Duration,
-) {
-	ginkgo.GinkgoHelper()
-	currentTimeout, pollingInterval := helpers.GetTimeouts(timeout...)
+// EventuallyTrafficPolicyAccepted validates that a TrafficPolicy has "Accepted" status.
+// TrafficPolicy uses PolicyStatus with ancestors, so we check the first ancestor's conditions.
+func (p *Provider) EventuallyTrafficPolicyAccepted(ctx context.Context, policy *v1alpha1.TrafficPolicy) {
+	currentTimeout, pollingInterval := helpers.GetTimeouts()
 	p.Gomega.Eventually(func(g gomega.Gomega) {
-		backend := &v1alpha1.Backend{}
-		err := p.clusterContext.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, backend)
-		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get Backend %s/%s", namespace, name)
+		obj := &v1alpha1.TrafficPolicy{}
+		objKey := client.ObjectKeyFromObject(policy)
+		err := p.clusterContext.Client.Get(ctx, objKey, obj)
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get TrafficPolicy %s", objKey)
 
-		var conditionFound bool
-		for _, cond := range backend.Status.Conditions {
-			if cond.Type == condition && cond.Status == expect {
-				conditionFound = true
-				break
-			}
-		}
-		g.Expect(conditionFound).To(gomega.BeTrue(), fmt.Sprintf("%v condition is not %v for Backend %s/%s",
-			condition, expect, namespace, name))
+		g.Expect(obj.Status.Ancestors).ToNot(gomega.BeEmpty(), "TrafficPolicy should have ancestors")
+
+		// Check first ancestor for Accepted condition
+		ancestorStatus := obj.Status.Ancestors[0]
+		cond := meta.FindStatusCondition(ancestorStatus.Conditions, string(v1alpha1.PolicyConditionAccepted))
+		g.Expect(cond).NotTo(gomega.BeNil(), "TrafficPolicy should have Accepted condition")
+		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "TrafficPolicy should be accepted")
+	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
+}
+
+// EventuallyBackendAccepted validates that a Backend has "Accepted" status.
+// Backend uses direct conditions on its status.
+func (p *Provider) EventuallyBackendAccepted(ctx context.Context, backend *v1alpha1.Backend) {
+	currentTimeout, pollingInterval := helpers.GetTimeouts()
+	p.Gomega.Eventually(func(g gomega.Gomega) {
+		obj := &v1alpha1.Backend{}
+		objKey := client.ObjectKeyFromObject(backend)
+		err := p.clusterContext.Client.Get(ctx, objKey, obj)
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get Backend %s", objKey)
+
+		cond := meta.FindStatusCondition(obj.Status.Conditions, string(v1alpha1.PolicyConditionAccepted))
+		g.Expect(cond).NotTo(gomega.BeNil(), "Backend should have Accepted condition")
+		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "Backend should be accepted")
+	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
+}
+
+// EventuallyBackendConfigPolicyAccepted validates that a BackendConfigPolicy has "Accepted" status.
+// BackendConfigPolicy uses PolicyStatus with ancestors, so we check the first ancestor's conditions.
+func (p *Provider) EventuallyBackendConfigPolicyAccepted(ctx context.Context, policy *v1alpha1.BackendConfigPolicy) {
+	currentTimeout, pollingInterval := helpers.GetTimeouts()
+	p.Gomega.Eventually(func(g gomega.Gomega) {
+		obj := &v1alpha1.BackendConfigPolicy{}
+		objKey := client.ObjectKeyFromObject(policy)
+		err := p.clusterContext.Client.Get(ctx, objKey, obj)
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get BackendConfigPolicy %s", objKey)
+
+		g.Expect(obj.Status.Ancestors).ToNot(gomega.BeEmpty(), "BackendConfigPolicy should have ancestors")
+
+		// Check first ancestor for Accepted condition
+		ancestorStatus := obj.Status.Ancestors[0]
+		cond := meta.FindStatusCondition(ancestorStatus.Conditions, string(v1alpha1.PolicyConditionAccepted))
+		g.Expect(cond).NotTo(gomega.BeNil(), "BackendConfigPolicy should have Accepted condition")
+		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "BackendConfigPolicy should be accepted")
+	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
+}
+
+// EventuallyGatewayExtensionAccepted validates that a GatewayExtension has "Accepted" status.
+// GatewayExtension uses direct conditions on its status.
+func (p *Provider) EventuallyGatewayExtensionAccepted(ctx context.Context, extension *v1alpha1.GatewayExtension) {
+	currentTimeout, pollingInterval := helpers.GetTimeouts()
+	p.Gomega.Eventually(func(g gomega.Gomega) {
+		obj := &v1alpha1.GatewayExtension{}
+		objKey := client.ObjectKeyFromObject(extension)
+		err := p.clusterContext.Client.Get(ctx, objKey, obj)
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get GatewayExtension %s", objKey)
+
+		cond := meta.FindStatusCondition(obj.Status.Conditions, string(v1alpha1.PolicyConditionAccepted))
+		g.Expect(cond).NotTo(gomega.BeNil(), "GatewayExtension should have Accepted condition")
+		g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue), "GatewayExtension should be accepted")
 	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
 }

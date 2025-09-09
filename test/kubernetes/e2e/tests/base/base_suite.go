@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
@@ -130,6 +133,79 @@ func (s *BaseTestingSuite) DeleteManifests(testCase TestCase) {
 			s.TestInstallation.Assertions.EventuallyPodsNotExist(s.Ctx, deployment.Namespace, metav1.ListOptions{
 				LabelSelector: fmt.Sprintf("%s=%s", defaults.WellKnownAppLabel, deployment.Name),
 			}, time.Second*120, time.Second*2)
+		}
+	}
+}
+
+// AssertTestCaseResourcesAccepted validates that all manifest resources have "Accepted" status.
+// This method supports:
+//   - Gateway API resources: Gateway, HTTPRoute, TCPRoute, TLSRoute, GRPCRoute
+//   - KGateway policy resources: HTTPListenerPolicy, TrafficPolicy, BackendConfigPolicy
+//   - KGateway backend resources: Backend, GatewayExtension
+//
+// Other resource types (pods, services, deployments, etc.) are safely skipped.
+func (s *BaseTestingSuite) AssertTestCaseResourcesAccepted(testCase TestCase) {
+	for _, resource := range testCase.Resources {
+		switch obj := resource.(type) {
+		case *gwv1.Gateway:
+			s.TestInstallation.Assertions.EventuallyGatewayCondition(
+				s.Ctx,
+				obj.Name,
+				obj.Namespace,
+				gwv1.GatewayConditionAccepted,
+				metav1.ConditionTrue,
+			)
+		case *gwv1.HTTPRoute:
+			s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(
+				s.Ctx,
+				obj.Name,
+				obj.Namespace,
+				gwv1.RouteConditionAccepted,
+				metav1.ConditionTrue,
+			)
+		case *gwv1a2.TCPRoute:
+			s.TestInstallation.Assertions.EventuallyTCPRouteCondition(
+				s.Ctx,
+				obj.Name,
+				obj.Namespace,
+				gwv1.RouteConditionAccepted,
+				metav1.ConditionTrue,
+			)
+		case *gwv1a2.TLSRoute:
+			s.TestInstallation.Assertions.EventuallyTLSRouteCondition(
+				s.Ctx,
+				obj.Name,
+				obj.Namespace,
+				gwv1.RouteConditionAccepted,
+				metav1.ConditionTrue,
+			)
+		case *gwv1.GRPCRoute:
+			s.TestInstallation.Assertions.EventuallyGRPCRouteCondition(
+				s.Ctx,
+				obj.Name,
+				obj.Namespace,
+				gwv1.RouteConditionAccepted,
+				metav1.ConditionTrue,
+			)
+		case *v1alpha1.HTTPListenerPolicy:
+			s.TestInstallation.Assertions.EventuallyHTTPListenerPolicyCondition(
+				s.Ctx,
+				obj.Name,
+				obj.Namespace,
+				gwv1.GatewayConditionAccepted,
+				metav1.ConditionTrue,
+			)
+		case *v1alpha1.TrafficPolicy:
+			s.TestInstallation.Assertions.EventuallyTrafficPolicyAccepted(s.Ctx, obj)
+		case *v1alpha1.Backend:
+			s.TestInstallation.Assertions.EventuallyBackendAccepted(s.Ctx, obj)
+		case *v1alpha1.BackendConfigPolicy:
+			s.TestInstallation.Assertions.EventuallyBackendConfigPolicyAccepted(s.Ctx, obj)
+		case *v1alpha1.GatewayExtension:
+			s.TestInstallation.Assertions.EventuallyGatewayExtensionAccepted(s.Ctx, obj)
+		default:
+			// For other resource types, we skip status validation
+			continue
 		}
 	}
 }

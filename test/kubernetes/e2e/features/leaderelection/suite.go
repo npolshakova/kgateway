@@ -97,7 +97,10 @@ func (s *testingSuite) TestLeaderWritesBackendStatus() {
 	s.assertBackendHasNoStatus()
 
 	begin := time.Now()
-	s.TestInstallation.Assertions.EventuallyBackendCondition(s.Ctx, "httpbin-static", "default", "Accepted", metav1.ConditionTrue)
+	backend := &v1alpha1.Backend{}
+	err = s.TestInstallation.ClusterContext.Client.Get(s.Ctx, types.NamespacedName{Name: "httpbin-static", Namespace: "default"}, backend)
+	s.NoError(err)
+	s.TestInstallation.Assertions.EventuallyBackendAccepted(s.Ctx, backend)
 	diff := time.Since(begin)
 
 	// The time to deploy the write the status is greater than the lease renewal period.
