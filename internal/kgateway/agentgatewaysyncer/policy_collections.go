@@ -10,6 +10,7 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
+	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/translator"
 )
 
 func ADPPolicyCollection(binds krt.Collection[ir.ADPResourcesForGateway], agwPlugins plugins.AgentgatewayPlugin) (krt.Collection[ir.ADPResourcesForGateway], map[schema.GroupKind]krt.StatusCollection[controllers.Object, v1alpha2.PolicyStatus]) {
@@ -35,7 +36,7 @@ func ADPPolicyCollection(binds krt.Collection[ir.ADPResourcesForGateway], agwPlu
 		// Convert all plugins.ADPPolicy structs to api.Resource structs
 		fetchedPolicies := krt.Fetch(ctx, joinPolicies)
 		allResources := slices.Map(fetchedPolicies, func(policy plugins.ADPPolicy) *api.Resource {
-			return toADPResource(ADPPolicy{policy.Policy})
+			return translator.ToADPResource(translator.ADPPolicy{policy.Policy})
 		})
 
 		return &ir.ADPResourcesForGateway{

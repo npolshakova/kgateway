@@ -1,4 +1,4 @@
-package agentgatewaysyncer
+package translator
 
 import (
 	"fmt"
@@ -10,8 +10,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/reporter"
 )
+
+var logger = logging.New("agentgateway/syncer")
 
 func createADPMethodMatch(match gwv1.HTTPRouteMatch) (*api.MethodMatch, *reporter.RouteCondition) {
 	if match.Method == nil {
