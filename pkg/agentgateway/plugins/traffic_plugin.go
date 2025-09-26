@@ -1103,7 +1103,7 @@ func convertTransformSpec(spec *v1alpha1.Transform) (*api.PolicySpec_Transformat
 				Expression: string(header.Value),
 			})
 		} else {
-			errs = append(errs, fmt.Errorf("invalid header value: %s", headerValue))
+			errs = append(errs, fmt.Errorf("header value is not a valid CEL expression: %s", headerValue))
 		}
 	}
 
@@ -1148,7 +1148,7 @@ func convertTransformSpec(spec *v1alpha1.Transform) (*api.PolicySpec_Transformat
 					Expression: string(bodyValue),
 				}
 			} else {
-				errs = append(errs, fmt.Errorf("invalid body value: %s", bodyValue))
+				errs = append(errs, fmt.Errorf("body value is not a valid CEL expression: %s", bodyValue))
 			}
 		}
 	}
