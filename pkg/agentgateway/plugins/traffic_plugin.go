@@ -214,8 +214,8 @@ func TranslateTrafficPolicy(
 			translatedPolicies, err := translateTrafficPolicyToAgw(ctx, gatewayExtensions, secrets, trafficPolicy, string(target.Name), policyTarget, isMcpTarget)
 			agwPolicies = append(agwPolicies, translatedPolicies...)
 			var conds []metav1.Condition
-			// TODO: support partial translation statuses https://github.com/kgateway-dev/kgateway/issues/12413
 			if err != nil {
+				// TODO: validate the target exists with dataplane https://github.com/kgateway-dev/kgateway/issues/12275
 				// Build success conditions per ancestor
 				meta.SetStatusCondition(&conds, metav1.Condition{
 					Type:    string(v1alpha1.PolicyConditionAccepted),
@@ -223,22 +223,45 @@ func TranslateTrafficPolicy(
 					Reason:  string(v1alpha1.PolicyReasonInvalid),
 					Message: err.Error(),
 				})
-			} else {
-				// Build success conditions per ancestor
+				// Ensure Attached is not set to True when Accepted is False
 				meta.SetStatusCondition(&conds, metav1.Condition{
-					Type:    string(v1alpha1.PolicyConditionAccepted),
-					Status:  metav1.ConditionTrue,
-					Reason:  string(v1alpha1.PolicyReasonValid),
-					Message: reporter.PolicyAcceptedMsg,
+					Type:    string(v1alpha1.PolicyConditionAttached),
+					Status:  metav1.ConditionFalse,
+					Reason:  string(v1alpha1.PolicyReasonPending),
+					Message: "Policy is not attached due to invalid status",
 				})
+			} else {
+				// Check for partial validity
+				if isPartiallyValid(translatedPolicies) {
+					meta.SetStatusCondition(&conds, metav1.Condition{
+						Type:    string(v1alpha1.PolicyConditionAccepted),
+						Status:  metav1.ConditionFalse,
+						Reason:  "PartiallyValid",
+						Message: "Some transformations are invalid",
+					})
+					meta.SetStatusCondition(&conds, metav1.Condition{
+						Type:    string(v1alpha1.PolicyConditionAttached),
+						Status:  metav1.ConditionFalse,
+						Reason:  string(v1alpha1.PolicyReasonPending),
+						Message: "Policy is partially attached due to some invalid transformations",
+					})
+				} else {
+					// Build success conditions per ancestor
+					meta.SetStatusCondition(&conds, metav1.Condition{
+						Type:    string(v1alpha1.PolicyConditionAccepted),
+						Status:  metav1.ConditionTrue,
+						Reason:  string(v1alpha1.PolicyReasonValid),
+						Message: reporter.PolicyAcceptedMsg,
+					})
+					meta.SetStatusCondition(&conds, metav1.Condition{
+						Type:    string(v1alpha1.PolicyConditionAttached),
+						Status:  metav1.ConditionTrue,
+						Reason:  string(v1alpha1.PolicyReasonAttached),
+						Message: reporter.PolicyAttachedMsg,
+					})
+				}
 			}
 			// TODO: validate the target exists with dataplane https://github.com/kgateway-dev/kgateway/issues/12275
-			meta.SetStatusCondition(&conds, metav1.Condition{
-				Type:    string(v1alpha1.PolicyConditionAttached),
-				Status:  metav1.ConditionTrue,
-				Reason:  string(v1alpha1.PolicyReasonAttached),
-				Message: reporter.PolicyAttachedMsg,
-			})
 			// Ensure LastTransitionTime is set for all conditions
 			for i := range conds {
 				if conds[i].LastTransitionTime.IsZero() {
@@ -359,6 +382,7 @@ func translateTrafficPolicyToAgw(
 
 // processExtAuthPolicy processes ExtAuth configuration and creates corresponding agentgateway policies
 func processExtAuthPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collection[*v1alpha1.GatewayExtension], trafficPolicy *v1alpha1.TrafficPolicy, policyName string, policyTarget *api.PolicyTarget) ([]AgwPolicy, error) {
+	var errs []error
 	// Look up the GatewayExtension referenced by the ExtAuth policy
 	extensionName := trafficPolicy.Spec.ExtAuth.ExtensionRef.Name
 	extensionNamespace := string(ptr.Deref(trafficPolicy.Spec.ExtAuth.ExtensionRef.Namespace, ""))
@@ -411,10 +435,18 @@ func processExtAuthPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collecti
 		},
 	}
 
+	if extauthPolicy.Spec.GetExtAuthz().Context == nil {
+		errs = append(errs, fmt.Errorf("missing context for ExtAuth policy"))
+	}
+
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+
 	logger.Debug("generated ExtAuth policy",
 		"policy", trafficPolicy.Name,
 		"agentgateway_policy", extauthPolicy.Name,
-		"target", extauthSvcTarget)
+		"target", policyTarget)
 
 	return []AgwPolicy{{Policy: extauthPolicy}}, nil
 }
@@ -471,11 +503,15 @@ func processAIPolicy(krtctx krt.HandlerContext, secrets krt.Collection[*corev1.S
 		}
 	}
 
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+
 	logger.Debug("generated AI policy",
 		"policy", trafficPolicy.Name,
 		"agentgateway_policy", aiPolicy.Name)
 
-	return []AgwPolicy{{Policy: aiPolicy}}, errors.Join(errs...)
+	return []AgwPolicy{{Policy: aiPolicy}}, nil
 }
 
 func processRequestGuard(krtctx krt.HandlerContext, secrets krt.Collection[*corev1.Secret], namespace string, req *v1alpha1.PromptguardRequest) *api.PolicySpec_Ai_RequestGuard {
@@ -741,6 +777,10 @@ func processRBACPolicy(
 		}
 	}
 
+	if len(allowPolicies) == 0 && len(denyPolicies) == 0 {
+		return nil, fmt.Errorf("no match expressions for RBAC policy")
+	}
+
 	logger.Debug("generated RBAC policy",
 		"policy", trafficPolicy.Name,
 		"agentgateway_policy", rbacPolicy.Name,
@@ -764,6 +804,7 @@ func getGatewayExtensionKey(extensionNamespace, extensionName string) string {
 // processRateLimitPolicy processes RateLimit configuration and creates corresponding agentgateway policies
 func processRateLimitPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collection[*v1alpha1.GatewayExtension], trafficPolicy *v1alpha1.TrafficPolicy, policyName string, policyTarget *api.PolicyTarget) ([]AgwPolicy, error) {
 	var agwPolicies []AgwPolicy
+	var errs []error
 
 	// Process local rate limiting if present
 	if trafficPolicy.Spec.RateLimit.Local != nil {
@@ -771,7 +812,7 @@ func processRateLimitPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collec
 		if localPolicy != nil && err == nil {
 			agwPolicies = append(agwPolicies, *localPolicy)
 		} else {
-			return nil, err
+			errs = append(errs, err)
 		}
 	}
 
@@ -781,8 +822,12 @@ func processRateLimitPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collec
 		if globalPolicy != nil && err == nil {
 			agwPolicies = append(agwPolicies, *globalPolicy)
 		} else {
-			return nil, err
+			errs = append(errs, err)
 		}
+	}
+
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	return agwPolicies, nil
@@ -1183,4 +1228,42 @@ func attachmentName(target *api.PolicyTarget) string {
 	default:
 		panic(fmt.Sprintf("unknown target kind %T", target))
 	}
+}
+
+// isPartiallyValid checks if the translated policies contain any invalid parts.
+func isPartiallyValid(translatedPolicies []AgwPolicy) bool {
+	for _, policy := range translatedPolicies {
+		switch spec := policy.Policy.Spec.Kind.(type) {
+		case *api.PolicySpec_ExtAuthz:
+			if spec.ExtAuthz.Context == nil {
+				return true
+			}
+		case *api.PolicySpec_Authorization:
+			if len(spec.Authorization.Allow) == 0 && len(spec.Authorization.Deny) == 0 {
+				return true
+			}
+		case *api.PolicySpec_Ai_:
+			if spec.Ai.Prompts == nil && spec.Ai.PromptGuard == nil {
+				return true
+			}
+		case *api.PolicySpec_Transformation:
+			if spec.Transformation.Request == nil || spec.Transformation.Response == nil {
+				return true
+			}
+		case *api.PolicySpec_LocalRateLimit_:
+			if spec.LocalRateLimit == nil {
+				return true
+			}
+		case *api.PolicySpec_RemoteRateLimit_:
+			if spec.RemoteRateLimit == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// TranslatedPolicy represents a policy that has been translated.
+type TranslatedPolicy struct {
+	HasInvalidTransformation bool
 }

@@ -373,6 +373,50 @@ func TestProcessTransformationPolicy(t *testing.T) {
 				assert.Nil(t, policies)
 			},
 		},
+		{
+			name: "partially valid transformations",
+			policy: &v1alpha1.TrafficPolicy{
+				Spec: v1alpha1.TrafficPolicySpec{
+					Transformation: &v1alpha1.TransformationPolicy{
+						Request: &v1alpha1.Transform{
+							Set: []v1alpha1.HeaderTransformation{
+								{
+									Name:  "x-valid-header",
+									Value: "'valid'",
+								},
+								{
+									Name:  "x-invalid-header",
+									Value: "invalid.cel.expression.(",
+								},
+							},
+						},
+					},
+				},
+			},
+			policyName: "test-policy",
+			policyTarget: &api.PolicyTarget{
+				Kind: &api.PolicyTarget_Route{
+					Route: "test-route",
+				},
+			},
+			wantErr:     true,
+			errContains: "header value is not a valid CEL expression",
+			validate: func(t *testing.T, policies []AgwPolicy, err error) {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "header value is not a valid CEL expression: invalid.cel.expression.(")
+				// partially valid transformation, one policy should still be translated
+				require.Len(t, policies, 1)
+				policy := policies[0].Policy
+				assert.Equal(t, "test-policy:transformation", policy.Name)
+				assert.Equal(t, "test-route", policy.Target.GetRoute())
+				transformation := policy.Spec.GetTransformation()
+				require.NotNil(t, transformation)
+				require.NotNil(t, transformation.Request)
+				require.Len(t, transformation.Request.Set, 1)
+				assert.Equal(t, "x-valid-header", transformation.Request.Set[0].Name)
+				assert.Equal(t, "'valid'", transformation.Request.Set[0].Expression)
+			},
+		},
 	}
 
 	for _, tt := range tests {
