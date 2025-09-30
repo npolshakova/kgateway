@@ -215,21 +215,29 @@ func TranslateTrafficPolicy(
 			agwPolicies = append(agwPolicies, translatedPolicies...)
 			var conds []metav1.Condition
 			if err != nil {
-				// TODO: validate the target exists with dataplane https://github.com/kgateway-dev/kgateway/issues/12275
-				// Build success conditions per ancestor
-				meta.SetStatusCondition(&conds, metav1.Condition{
-					Type:    string(v1alpha1.PolicyConditionAccepted),
-					Status:  metav1.ConditionFalse,
-					Reason:  string(v1alpha1.PolicyReasonInvalid),
-					Message: err.Error(),
-				})
-				// Ensure Attached is not set to True when Accepted is False
-				meta.SetStatusCondition(&conds, metav1.Condition{
-					Type:    string(v1alpha1.PolicyConditionAttached),
-					Status:  metav1.ConditionFalse,
-					Reason:  string(v1alpha1.PolicyReasonPending),
-					Message: "Policy is not attached due to invalid status",
-				})
+				// If we produced some policies alongside errors, treat as partial validity
+				if len(translatedPolicies) > 0 {
+					meta.SetStatusCondition(&conds, metav1.Condition{
+						Type:    string(v1alpha1.PolicyConditionAccepted),
+						Status:  metav1.ConditionFalse,
+						Reason:  "PartiallyValid",
+						Message: err.Error(),
+					})
+				} else {
+					// No policies produced and error present -> invalid
+					meta.SetStatusCondition(&conds, metav1.Condition{
+						Type:    string(v1alpha1.PolicyConditionAccepted),
+						Status:  metav1.ConditionFalse,
+						Reason:  string(v1alpha1.PolicyReasonInvalid),
+						Message: err.Error(),
+					})
+					meta.SetStatusCondition(&conds, metav1.Condition{
+						Type:    string(v1alpha1.PolicyConditionAttached),
+						Status:  metav1.ConditionFalse,
+						Reason:  string(v1alpha1.PolicyReasonPending),
+						Message: "Policy is not attached due to invalid status",
+					})
+				}
 			} else {
 				// Check for partial validity
 				if isPartiallyValid(translatedPolicies) {
@@ -439,16 +447,12 @@ func processExtAuthPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collecti
 		errs = append(errs, fmt.Errorf("missing context for ExtAuth policy"))
 	}
 
-	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-
 	logger.Debug("generated ExtAuth policy",
 		"policy", trafficPolicy.Name,
 		"agentgateway_policy", extauthPolicy.Name,
 		"target", policyTarget)
 
-	return []AgwPolicy{{Policy: extauthPolicy}}, nil
+	return []AgwPolicy{{Policy: extauthPolicy}}, errors.Join(errs...)
 }
 
 // processAIPolicy processes AI configuration and creates corresponding Agw policies
@@ -503,15 +507,11 @@ func processAIPolicy(krtctx krt.HandlerContext, secrets krt.Collection[*corev1.S
 		}
 	}
 
-	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-
 	logger.Debug("generated AI policy",
 		"policy", trafficPolicy.Name,
 		"agentgateway_policy", aiPolicy.Name)
 
-	return []AgwPolicy{{Policy: aiPolicy}}, nil
+	return []AgwPolicy{{Policy: aiPolicy}}, errors.Join(errs...)
 }
 
 func processRequestGuard(krtctx krt.HandlerContext, secrets krt.Collection[*corev1.Secret], namespace string, req *v1alpha1.PromptguardRequest) *api.PolicySpec_Ai_RequestGuard {
@@ -826,11 +826,7 @@ func processRateLimitPolicy(ctx krt.HandlerContext, gatewayExtensions krt.Collec
 		}
 	}
 
-	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-
-	return agwPolicies, nil
+	return agwPolicies, errors.Join(errs...)
 }
 
 // processLocalRateLimitPolicy processes local rate limiting configuration
