@@ -407,7 +407,7 @@ func TestProcessTransformationPolicy(t *testing.T) {
 				// partially valid transformation, one policy should still be translated
 				require.Len(t, policies, 1)
 				policy := policies[0].Policy
-				assert.Equal(t, "test-policy:transformation", policy.Name)
+				assert.Equal(t, "test-policy:transformation:test-route", policy.Name)
 				assert.Equal(t, "test-route", policy.Target.GetRoute())
 				transformation := policy.Spec.GetTransformation()
 				require.NotNil(t, transformation)

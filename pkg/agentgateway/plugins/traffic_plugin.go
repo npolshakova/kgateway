@@ -113,11 +113,11 @@ func TranslateTrafficPolicy(
 		var policyTarget *api.PolicyTarget
 		// Build a base ParentReference for status
 		parentRef := gwv1.ParentReference{
-			Name:      gwv1.ObjectName(target.Name),
+			Name:      target.Name,
 			Namespace: ptr.To(gwv1.Namespace(trafficPolicy.Namespace)),
 		}
 		if target.SectionName != nil {
-			parentRef.SectionName = (*gwv1.SectionName)(target.SectionName)
+			parentRef.SectionName = target.SectionName
 		}
 
 		switch string(target.Kind) {
@@ -1235,15 +1235,15 @@ func isPartiallyValid(translatedPolicies []AgwPolicy) bool {
 	for _, policy := range translatedPolicies {
 		switch spec := policy.Policy.Spec.Kind.(type) {
 		case *api.PolicySpec_ExtAuthz:
-			if spec.ExtAuthz.Context == nil {
+			if spec.ExtAuthz.Target != nil {
 				return true
 			}
 		case *api.PolicySpec_Authorization:
-			if len(spec.Authorization.Allow) == 0 && len(spec.Authorization.Deny) == 0 {
+			if len(spec.Authorization.Allow) == 0 || len(spec.Authorization.Deny) == 0 {
 				return true
 			}
 		case *api.PolicySpec_Ai_:
-			if spec.Ai.Prompts == nil && spec.Ai.PromptGuard == nil {
+			if spec.Ai.Prompts == nil || spec.Ai.PromptGuard == nil {
 				return true
 			}
 		case *api.PolicySpec_Transformation:
@@ -1261,9 +1261,4 @@ func isPartiallyValid(translatedPolicies []AgwPolicy) bool {
 		}
 	}
 	return false
-}
-
-// TranslatedPolicy represents a policy that has been translated.
-type TranslatedPolicy struct {
-	HasInvalidTransformation bool
 }
