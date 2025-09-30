@@ -443,9 +443,18 @@ func (s *AgentGwStatusSyncer) syncRouteStatus(ctx context.Context, logger *slog.
 
 // ensureBasicGatewayConditions ensures that the required Gateway conditions exist
 // This is needed because agent-gateway bypasses normal reporter initialization
-func ensureBasicGatewayConditions(status *gwv1.GatewayStatus, generation int64) {
+func ensureBasicGatewayConditions(status *gwv1.GatewayStatus) {
 	if status == nil {
 		return
+	}
+
+	// Derive the observedGeneration from the report-built status if available.
+	// BuildGWStatus stamps conditions using the report's generation
+	var reportGen int64
+	if len(status.Conditions) > 0 {
+		reportGen = status.Conditions[0].ObservedGeneration
+	} else if len(status.Listeners) > 0 && len(status.Listeners[0].Conditions) > 0 {
+		reportGen = status.Listeners[0].Conditions[0].ObservedGeneration
 	}
 
 	// Ensure Accepted condition exists
@@ -455,7 +464,7 @@ func ensureBasicGatewayConditions(status *gwv1.GatewayStatus, generation int64) 
 			Status:             metav1.ConditionTrue,
 			Reason:             string(gwv1.GatewayReasonAccepted),
 			Message:            "Gateway is accepted by agent-gateway controller",
-			ObservedGeneration: generation,
+			ObservedGeneration: reportGen,
 		})
 	}
 
@@ -466,19 +475,19 @@ func ensureBasicGatewayConditions(status *gwv1.GatewayStatus, generation int64) 
 			Status:             metav1.ConditionTrue,
 			Reason:             string(gwv1.GatewayReasonProgrammed),
 			Message:            "Gateway is programmed by agent-gateway controller",
-			ObservedGeneration: generation,
+			ObservedGeneration: reportGen,
 		})
 	}
 
 	// Ensure all existing conditions have the correct observedGeneration
 	for i := range status.Conditions {
-		status.Conditions[i].ObservedGeneration = generation
+		status.Conditions[i].ObservedGeneration = reportGen
 	}
 
 	// Ensure all listener conditions have the correct observedGeneration
 	for i := range status.Listeners {
 		for j := range status.Listeners[i].Conditions {
-			status.Listeners[i].Conditions[j].ObservedGeneration = generation
+			status.Listeners[i].Conditions[j].ObservedGeneration = reportGen
 		}
 	}
 }
@@ -531,11 +540,10 @@ func (s *AgentGwStatusSyncer) syncGatewayStatus(ctx context.Context, logger *slo
 
 			if status := rm.BuildGWStatus(ctx, gw, attachedRoutesForGw); status != nil {
 				// Ensure basic Gateway conditions exist (agent-gateway bypasses normal reporter init)
-				ensureBasicGatewayConditions(status, gw.Generation)
+				ensureBasicGatewayConditions(status)
 
 				// normalize per-listener AttachedRoutes, defaulting to 0 where absent.
 				normalizeListenerAttachedRoutes(&gw, status, attachedRoutesForGw)
-				setObservedGen(&gw, status)
 
 				if !isGatewayStatusEqual(&gwStatusWithoutAddress, status) {
 					gw.Status = *status
@@ -686,21 +694,6 @@ func isListenerSetStatusEqual(objA, objB *gwxv1a1.ListenerSetStatus) bool {
 
 func isGatewayStatusEqual(objA, objB *gwv1.GatewayStatus) bool {
 	return cmp.Equal(objA, objB, opts)
-}
-
-// setObservedGen stamps ObservedGeneration on all gateway + listener conditions.
-func setObservedGen(gw *gwv1.Gateway, st *gwv1.GatewayStatus) {
-	if st == nil {
-		return
-	}
-	for i := range st.Conditions {
-		st.Conditions[i].ObservedGeneration = gw.Generation
-	}
-	for li := range st.Listeners {
-		for ci := range st.Listeners[li].Conditions {
-			st.Listeners[li].Conditions[ci].ObservedGeneration = gw.Generation
-		}
-	}
 }
 
 func calculateSupportedKinds(listener gwv1.Listener) []gwv1.RouteGroupKind {
