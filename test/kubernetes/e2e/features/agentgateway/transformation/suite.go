@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,7 +57,6 @@ func (s *testingSuite) TestGatewayWithTransformedRoute() {
 		gateway.Namespace,
 		gwv1.GatewayConditionProgrammed,
 		metav1.ConditionTrue,
-		time.Minute*2,
 	)
 	s.TestInstallation.Assertions.EventuallyGatewayCondition(
 		s.Ctx,
@@ -66,7 +64,6 @@ func (s *testingSuite) TestGatewayWithTransformedRoute() {
 		gateway.Namespace,
 		gwv1.GatewayConditionAccepted,
 		metav1.ConditionTrue,
-		time.Minute*2,
 	)
 
 	testCases := []struct {
