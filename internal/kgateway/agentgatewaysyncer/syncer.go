@@ -575,7 +575,7 @@ func (s *Syncer) buildStatusReporting(policyStatuses map[schema.GroupKind]krt.St
 			if gwRep, ok := p.Reports.Gateways[p.NamespacedName]; ok {
 				merged[p.NamespacedName] = gwRep
 			}
-			// record observed generation for this gateway
+			// record observed generation for this gateway to update report
 			generations[p.NamespacedName] = p.GatewayGeneration
 			// take max per listener across proxies
 			if attached[p.NamespacedName] == nil {

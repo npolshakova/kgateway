@@ -198,37 +198,35 @@ func getDesiredAddresses(gw *api.Gateway, svc *corev1.Service) []api.GatewayStat
 	var ret []api.GatewayStatusAddress
 	seen := sets.New[api.GatewayStatusAddress]()
 
-	if svc != nil {
-		if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && len(svc.Status.LoadBalancer.Ingress) > 0 {
-			// Prefer load balancer ingress addresses when available
-			for _, ing := range svc.Status.LoadBalancer.Ingress {
-				if addr, ok := convertIngressAddr(ing); ok {
-					seen.Insert(addr)
-					ret = append(ret, addr)
-				}
+	if svc != nil && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		if len(svc.Status.LoadBalancer.Ingress) == 0 {
+			return nil
+		}
+		for _, ing := range svc.Status.LoadBalancer.Ingress {
+			if addr, ok := convertIngressAddr(ing); ok {
+				seen.Insert(addr)
+				ret = append(ret, addr)
 			}
-		} else {
-			// Fall back to ClusterIP/ClusterIPs when there is no LB ingress (or LB is not used)
-			t := api.IPAddressType
-			if len(svc.Spec.ClusterIPs) != 0 {
-				for _, ip := range svc.Spec.ClusterIPs {
-					addr := api.GatewayStatusAddress{Type: &t, Value: ip}
-					if !seen.Has(addr) {
-						seen.Insert(addr)
-						ret = append(ret, addr)
-					}
-				}
-			} else if svc.Spec.ClusterIP != "" {
-				addr := api.GatewayStatusAddress{Type: &t, Value: svc.Spec.ClusterIP}
-				if !seen.Has(addr) {
-					seen.Insert(addr)
-					ret = append(ret, addr)
-				}
+		}
+
+		return ret
+	} else if svc != nil {
+		t := api.IPAddressType
+		if len(svc.Spec.ClusterIPs) != 0 {
+			for _, ip := range svc.Spec.ClusterIPs {
+				ret = append(ret, api.GatewayStatusAddress{
+					Type:  &t,
+					Value: ip,
+				})
 			}
+		} else if svc.Spec.ClusterIP != "" {
+			ret = append(ret, api.GatewayStatusAddress{
+				Type:  &t,
+				Value: svc.Spec.ClusterIP,
+			})
 		}
 	}
 
-	// Include any explicit Gateway spec addresses not already present
 	for _, specAddr := range gw.Spec.Addresses {
 		addr := api.GatewayStatusAddress{
 			Type:  specAddr.Type,
