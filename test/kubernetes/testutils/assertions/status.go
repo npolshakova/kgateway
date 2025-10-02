@@ -98,9 +98,14 @@ func (p *Provider) EventuallyGatewayCondition(
 		g.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("failed to get Gateway %s/%s", gatewayNamespace, gatewayName))
 
 		condition := getConditionByType(gateway.Status.Conditions, string(cond))
-		g.Expect(condition).NotTo(gomega.BeNil(), fmt.Sprintf("%v condition not found for Gateway %s/%s", cond, gatewayNamespace, gatewayName))
-		g.Expect(condition.Status).To(gomega.Equal(expect), fmt.Sprintf("%v condition is not %v for Gateway %s/%s",
-			cond, expect, gatewayNamespace, gatewayName))
+		g.Expect(condition).NotTo(
+			gomega.BeNil(),
+			fmt.Sprintf("%v condition not found for Gateway %s/%s. Full status: %+v", cond, gatewayNamespace, gatewayName, gateway.Status),
+		)
+		g.Expect(condition.Status).To(
+			gomega.Equal(expect),
+			fmt.Sprintf("%v condition is not %v for Gateway %s/%s. Full status: %+v", cond, expect, gatewayNamespace, gatewayName, gateway.Status),
+		)
 	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
 }
 

@@ -87,6 +87,17 @@ func (r *ReportMap) GatewayNamespaceName(key types.NamespacedName) *GatewayRepor
 	return r.Gateways[key]
 }
 
+// GatewayObservedGenerationFor returns the observed generation stored in the
+// GatewayReport for the provided namespaced name. The boolean indicates whether
+// a report was present for the provided key.
+func (r *ReportMap) GatewayObservedGenerationFor(key types.NamespacedName) (int64, bool) {
+	gr := r.GatewayNamespaceName(key)
+	if gr == nil {
+		return 0, false
+	}
+	return gr.observedGeneration, true
+}
+
 func (r *ReportMap) newGatewayReport(gateway *gwv1.Gateway) *GatewayReport {
 	gr := &GatewayReport{}
 	gr.observedGeneration = gateway.Generation
