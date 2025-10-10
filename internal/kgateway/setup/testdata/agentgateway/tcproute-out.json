@@ -8,7 +8,7 @@
           "hostname": "bar.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAA8A=="
+              "address": "CgAAhA=="
             }
           ],
           "ports": [
@@ -30,7 +30,7 @@
           "hostname": "foo.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAhw=="
+              "address": "CgAA3A=="
             }
           ],
           "ports": [
@@ -47,96 +47,12 @@
     {
       "Type": {
         "Service": {
-          "name": "http-direct-response",
-          "namespace": "gwtest",
-          "hostname": "http-direct-response.gwtest.svc.cluster.local",
-          "addresses": [
-            {
-              "address": "CgAAYw=="
-            }
-          ],
-          "ports": [
-            {
-              "service_port": 8080,
-              "target_port": 8080
-            }
-          ],
-          "ip_families": 1
-        }
-      }
-    },
-    {
-      "Type": {
-        "Service": {
-          "name": "http-grpcroute",
-          "namespace": "gwtest",
-          "hostname": "http-grpcroute.gwtest.svc.cluster.local",
-          "addresses": [
-            {
-              "address": "CgAA4A=="
-            }
-          ],
-          "ports": [
-            {
-              "service_port": 8080,
-              "target_port": 8080
-            }
-          ],
-          "ip_families": 1
-        }
-      }
-    },
-    {
-      "Type": {
-        "Service": {
-          "name": "http-httproute",
-          "namespace": "gwtest",
-          "hostname": "http-httproute.gwtest.svc.cluster.local",
-          "addresses": [
-            {
-              "address": "CgAARQ=="
-            }
-          ],
-          "ports": [
-            {
-              "service_port": 8080,
-              "target_port": 8080
-            }
-          ],
-          "ip_families": 1
-        }
-      }
-    },
-    {
-      "Type": {
-        "Service": {
-          "name": "http-inferencepool",
-          "namespace": "gwtest",
-          "hostname": "http-inferencepool.gwtest.svc.cluster.local",
-          "addresses": [
-            {
-              "address": "CgAAIw=="
-            }
-          ],
-          "ports": [
-            {
-              "service_port": 8080,
-              "target_port": 8080
-            }
-          ],
-          "ip_families": 1
-        }
-      }
-    },
-    {
-      "Type": {
-        "Service": {
           "name": "http-tcproute",
           "namespace": "gwtest",
           "hostname": "http-tcproute.gwtest.svc.cluster.local",
           "addresses": [
             {
-              "address": "CgAAhA=="
+              "address": "CgAA1w=="
             }
           ],
           "ports": [
@@ -167,7 +83,7 @@
           "ports": [
             {
               "service_port": 443,
-              "target_port": 37023
+              "target_port": 56778
             }
           ],
           "ip_families": 1
@@ -177,18 +93,18 @@
     {
       "Type": {
         "Workload": {
-          "uid": "/discovery.k8s.io/EndpointSlice/default/kubernetes/192.168.4.24",
+          "uid": "/discovery.k8s.io/EndpointSlice/default/kubernetes/192.168.0.88",
           "name": "kubernetes",
           "namespace": "default",
           "addresses": [
-            "wKgEGA=="
+            "wKgAWA=="
           ],
           "services": {
             "default/kubernetes.default.svc.cluster.local": {
               "ports": [
                 {
                   "service_port": 443,
-                  "target_port": 37023
+                  "target_port": 56778
                 }
               ]
             }
@@ -212,7 +128,12 @@
           "canonical_revision": "v1",
           "workload_type": 2,
           "workload_name": "reviews-1",
-          "status": 1
+          "status": 1,
+          "locality": {
+            "region": "r1",
+            "zone": "r1z2",
+            "subzone": "r1z2s3"
+          }
         }
       }
     },
@@ -231,7 +152,12 @@
           "canonical_revision": "v2",
           "workload_type": 2,
           "workload_name": "reviews-2",
-          "status": 1
+          "status": 1,
+          "locality": {
+            "region": "r1",
+            "zone": "r1z2",
+            "subzone": "r1z2s4"
+          }
         }
       }
     },
@@ -250,7 +176,12 @@
           "canonical_revision": "latest",
           "workload_type": 2,
           "workload_name": "reviews-3",
-          "status": 1
+          "status": 1,
+          "locality": {
+            "region": "r1",
+            "zone": "r1z3",
+            "subzone": "r1z3s4"
+          }
         }
       }
     },
@@ -269,7 +200,12 @@
           "canonical_revision": "v1",
           "workload_type": 2,
           "workload_name": "reviews-4",
-          "status": 1
+          "status": 1,
+          "locality": {
+            "region": "r2",
+            "zone": "r2z1",
+            "subzone": "r2z1s1"
+          }
         }
       }
     }
@@ -316,7 +252,8 @@
     {
       "Kind": {
         "TcpRoute": {
-          "key": "gwtest/tcp-app-1.0",
+          "key": "gwtest/tcp-app-1.0.foo",
+          "listener_key": "gwtest/http-tcproute.foo",
           "route_name": "gwtest/tcp-app-1",
           "backends": [
             {
@@ -335,7 +272,8 @@
     {
       "Kind": {
         "TcpRoute": {
-          "key": "gwtest/tcp-app-2.0",
+          "key": "gwtest/tcp-app-2.0.bar",
+          "listener_key": "gwtest/http-tcproute.bar",
           "route_name": "gwtest/tcp-app-2",
           "backends": [
             {
