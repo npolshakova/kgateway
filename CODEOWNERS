@@ -1,0 +1,15 @@
+# CODEOWNERS file for kgateway
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# API definitions and CRDs - critical for API compatibility
+/api/ @kgateway/kgateway-api-owners
+# Require approval for everything under install/
+/install/ @kgateway/kgateway-api-owners
+
+# CI workflows
+/.github @kgateway/kgateway-ci-owners
+# core dependency management code
+/go.mod @kgateway/kgateway-ci-owners
+/go.sum @kgateway/kgateway-ci-owners
+
+# Note: Other directories are intentionally not assigned specific owners at this time to avoid process overhead.
