@@ -2,20 +2,20 @@
 # See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # API definitions and CRDs - critical for API compatibility
-/api/ @kgateway/kgateway-api-owners
+/api/ @kgateway-dev/kgateway-api-owners
 # Require approval for everything under install/
-/install/ @kgateway/kgateway-api-owners
+/install/ @kgateway-dev/kgateway-api-owners
 
 # CI workflows
-/.github @kgateway/kgateway-ci-owners
-/.githooks
-/.gitignore @kgateway/kgateway-ci-owners
-/.gitattributes @kgateway/kgateway-ci-owners
-/.golangci.yaml @kgateway/kgateway-ci-owners
-/.goreleaser.yaml @kgateway/kgateway-ci-owners
-Makefile* @kgateway/kgateway-ci-owners
+/.github @kgateway-dev/kgateway-ci-owners
+/.githooks @kgateway-dev/kgateway-ci-owners
+/.gitignore @kgateway-dev/kgateway-ci-owners
+/.gitattributes @kgateway-dev/kgateway-ci-owners
+/.golangci.yaml @kgateway-dev/kgateway-ci-owners
+/.goreleaser.yaml @kgateway-dev/kgateway-ci-owners
+Makefile* @kgateway-dev/kgateway-ci-owners
 # core dependency management code
-/go.mod @kgateway/kgateway-ci-owners
-/go.sum @kgateway/kgateway-ci-owners
+/go.mod @kgateway-dev/kgateway-ci-owners
+/go.sum @kgateway-dev/kgateway-ci-owners
 
 # Note: Other directories are intentionally not assigned specific owners at this time to avoid process overhead.
