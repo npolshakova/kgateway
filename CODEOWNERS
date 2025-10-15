@@ -8,6 +8,12 @@
 
 # CI workflows
 /.github @kgateway/kgateway-ci-owners
+/.githooks
+/.gitignore @kgateway/kgateway-ci-owners
+/.gitattributes @kgateway/kgateway-ci-owners
+/.golangci.yaml @kgateway/kgateway-ci-owners
+/.goreleaser.yaml @kgateway/kgateway-ci-owners
+Makefile* @kgateway/kgateway-ci-owners
 # core dependency management code
 /go.mod @kgateway/kgateway-ci-owners
 /go.sum @kgateway/kgateway-ci-owners
