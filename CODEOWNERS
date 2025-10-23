@@ -5,11 +5,12 @@
 /api/ @kgateway-dev/kgateway-api-owners
 # Require approval for everything under install/
 /install/ @kgateway-dev/kgateway-api-owners
+# Require approval for helm templates
+/internal/kgateway/helm @kgateway-dev/kgateway-api-owners
 
 # CI workflows
 /.github @kgateway-dev/kgateway-ci-owners
 /.githooks @kgateway-dev/kgateway-ci-owners
-/.gitignore @kgateway-dev/kgateway-ci-owners
 /.gitattributes @kgateway-dev/kgateway-ci-owners
 /.golangci.yaml @kgateway-dev/kgateway-ci-owners
 /.goreleaser.yaml @kgateway-dev/kgateway-ci-owners
