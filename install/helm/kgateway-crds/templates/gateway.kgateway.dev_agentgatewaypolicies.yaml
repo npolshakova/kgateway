@@ -2394,6 +2394,7 @@ spec:
                                   description: inline specifies an inline JSON Web
                                     Key Set used validate the signature of the JWT.
                                   maxLength: 65536
+                                  minLength: 2
                                   type: string
                                 remote:
                                   description: remote specifies how to reach the JSON
@@ -2477,6 +2478,8 @@ spec:
                                   type: object
                               type: object
                               x-kubernetes-validations:
+                              - message: remote is not currently implemented
+                                rule: '!has(self.remote)'
                               - message: exactly one of the fields in [remote inline]
                                   must be set
                                 rule: '[has(self.remote),has(self.inline)].filter(x,x==true).size()

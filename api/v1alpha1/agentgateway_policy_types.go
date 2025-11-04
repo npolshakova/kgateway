@@ -419,10 +419,12 @@ type AgentJWTProvider struct {
 }
 
 // +kubebuilder:validation:ExactlyOneOf=remote;inline
+// +kubebuilder:validation:XValidation:rule="!has(self.remote)",message="remote is not currently implemented"
 type AgentJWKS struct {
 	// remote specifies how to reach the JSON Web Key Set from a remote address.
-	Remote AgentRemoteJWKS `json:"remote,omitempty"`
+	Remote *AgentRemoteJWKS `json:"remote,omitempty"`
 	// inline specifies an inline JSON Web Key Set used validate the signature of the JWT.
+	// +kubebuilder:validation:MinLength=2
 	// +kubebuilder:validation:MaxLength=65536
 	Inline string `json:"inline,omitempty"`
 }
