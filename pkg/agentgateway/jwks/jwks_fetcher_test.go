@@ -9,8 +9,9 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/golang/mock/gomock"
-	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/jwks/mocks"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/jwks/mocks"
 )
 
 func TestRestoreCacheState(t *testing.T) {
@@ -37,7 +38,7 @@ func TestAddKeysetToFetcher(t *testing.T) {
 	f := NewJwksFetcher(NewJwksCache())
 	f.AddKeyset("https://test/jwks", 5*time.Minute)
 
-	expectedKeysetSource := keysetSource{JwksURL: "https://test/jwks", Ttl: 5 * time.Minute, Deleted: false}
+	expectedKeysetSource := JwksSource{JwksURL: "https://test/jwks", Ttl: 5 * time.Minute, Deleted: false}
 	fetch := f.Schedule.Peek()
 	assert.NotNil(t, fetch)
 	assert.Equal(t, *fetch.keysetSource, expectedKeysetSource)

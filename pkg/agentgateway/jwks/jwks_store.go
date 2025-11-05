@@ -44,6 +44,10 @@ func (s *JwksStore) Start(ctx context.Context) {
 	s.jwksFetcher.Run(ctx)
 }
 
+func (s *JwksStore) UpdateJwksSources(ctx context.Context, jwks []JwksSource) error {
+	return s.jwksFetcher.UpdateJwksSources(ctx, jwks)
+}
+
 func (s *JwksStore) syncToConfigMap(ctx context.Context) {
 	log := log.FromContext(ctx)
 
