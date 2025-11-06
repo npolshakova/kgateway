@@ -1,34 +1,36 @@
-package agent_jwksstore
+package agent_jwks_store
 
 import (
 	"context"
 	"time"
 
 	"github.com/solo-io/go-utils/contextutils"
+	"k8s.io/utils/ptr"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/jwks"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const JwksStoreConfigMapName = "jwks-store"
 
 type JwksStoreController struct {
-	client       client.Client
-	podNamespace string
-	jwksStore    *jwks.JwksStore
+	client    client.Client
+	jwksStore *jwks.JwksStore
 }
 
-func NewJwksStoreController(mgr manager.Manager, podNamespace string) (*JwksStoreController, error) {
-	controller := &JwksStoreController{
-		client:       mgr.GetClient(),
-		podNamespace: podNamespace,
+func NewJwksStoreController(mgr manager.Manager, jwksStore *jwks.JwksStore) (*JwksStoreController, error) {
+	c := &JwksStoreController{
+		client:    mgr.GetClient(),
+		jwksStore: jwksStore,
 	}
 
 	err := ctrl.NewControllerManagedBy(mgr).
@@ -39,12 +41,16 @@ func NewJwksStoreController(mgr manager.Manager, podNamespace string) (*JwksStor
 			GenericFunc: func(e event.GenericEvent) bool { return false },
 		})).
 		Named("jwksstore").
-		Complete(controller)
+		WithOptions(controller.TypedOptions[reconcile.Request]{
+			NeedLeaderElection: ptr.To(true),
+		}).
+		Complete(c)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return controller, nil
+	return c, nil
 }
 
 func (r *JwksStoreController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

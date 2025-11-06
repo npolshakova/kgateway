@@ -2,12 +2,15 @@ package jwks
 
 import (
 	"context"
+	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 type JwksStore struct {
+	mgr             manager.Manager
 	jwksCache       *jwksCache
 	jwksFetcher     *JwksFetcher
 	configMapSyncer *ConfigMapSyncer
@@ -24,24 +27,32 @@ func BuildJwksStore(ctx context.Context, deploymentNamespace string, client clie
 		jwksFetcher:     NewJwksFetcher(jwksCache),
 		configMapSyncer: &ConfigMapSyncer{Client: client, DeploymentNamespace: deploymentNamespace},
 	}
-
-	storedJwks, err := jwksStore.configMapSyncer.LoadJwksFromConfigMap(ctx)
-	if err != nil {
-		log.Error(err, "error loading jwks store from a ConfigMap")
-	}
-	err = jwksCache.LoadfromJson(storedJwks)
-	if err != nil {
-		log.Error(err, "error deserializing jwks store state")
-	}
-
 	jwksStore.updates = jwksStore.jwksFetcher.SubscribeToUpdates()
 
 	return jwksStore
 }
 
-func (s *JwksStore) Start(ctx context.Context) {
+func (s *JwksStore) Start(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	if !s.mgr.GetCache().WaitForCacheSync(ctx) {
+		return fmt.Errorf("failed waiting for caches to sync")
+	}
+
+	storedJwks, err := s.configMapSyncer.LoadJwksFromConfigMap(ctx)
+	if err != nil {
+		log.Error(err, "error loading jwks store from a ConfigMap")
+	}
+	err = s.jwksCache.LoadfromJson(storedJwks)
+	if err != nil {
+		log.Error(err, "error deserializing jwks store state")
+	}
+
 	go s.syncToConfigMap(ctx)
-	s.jwksFetcher.Run(ctx)
+	go s.jwksFetcher.Run(ctx)
+
+	<-ctx.Done()
+	return nil
 }
 
 func (s *JwksStore) UpdateJwksSources(ctx context.Context, jwks []JwksSource) error {
@@ -62,4 +73,9 @@ func (s *JwksStore) syncToConfigMap(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// NeedLeaderElection returns true to ensure that the JwksStore runs only on the leader
+func (r *JwksStore) NeedLeaderElection() bool {
+	return true
 }

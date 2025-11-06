@@ -20,11 +20,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apisettings "github.com/kgateway-dev/kgateway/v2/api/settings"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agent_jwks_store"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/inferenceextension/endpointpicker"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/waypoint"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/registry"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/krtcollections/metrics"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/proxy_syncer"
@@ -225,6 +227,18 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 		)
 		if err := cfg.Manager.Add(agwStatusSyncer); err != nil {
 			setupLog.Error(err, "unable to add agentgateway StatusSyncer runnable")
+			return nil, err
+		}
+
+		jwksStore := jwks.BuildJwksStore(ctx, namespaces.GetPodNamespace(), cfg.Manager.GetClient())
+		if err := cfg.Manager.Add(jwksStore); err != nil {
+			setupLog.Error(err, "unable to add agentgateway StatusSyncer runnable")
+			return nil, err
+		}
+
+		_, err := agent_jwks_store.NewJwksStoreController(cfg.Manager, jwksStore)
+		if err != nil {
+			setupLog.Error(err, "error creating jwks store controller")
 			return nil, err
 		}
 	}

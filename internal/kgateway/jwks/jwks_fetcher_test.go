@@ -11,7 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/jwks/mocks"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks/mocks"
 )
 
 func TestRestoreCacheState(t *testing.T) {
