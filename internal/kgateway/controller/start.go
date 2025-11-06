@@ -230,7 +230,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			return nil, err
 		}
 
-		jwksStore := jwks.BuildJwksStore(ctx, namespaces.GetPodNamespace(), cfg.Manager.GetClient())
+		jwksStore := jwks.BuildJwksStore(ctx, cfg.Manager, namespaces.GetPodNamespace())
 		if err := cfg.Manager.Add(jwksStore); err != nil {
 			setupLog.Error(err, "unable to add agentgateway StatusSyncer runnable")
 			return nil, err

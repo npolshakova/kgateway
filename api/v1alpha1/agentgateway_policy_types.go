@@ -419,7 +419,6 @@ type AgentJWTProvider struct {
 }
 
 // +kubebuilder:validation:ExactlyOneOf=remote;inline
-// +kubebuilder:validation:XValidation:rule="!has(self.remote)",message="remote is not currently implemented"
 type AgentJWKS struct {
 	// remote specifies how to reach the JSON Web Key Set from a remote address.
 	Remote *AgentRemoteJWKS `json:"remote,omitempty"`

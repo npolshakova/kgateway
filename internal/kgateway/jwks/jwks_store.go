@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -17,15 +16,16 @@ type JwksStore struct {
 	updates         <-chan string
 }
 
-func BuildJwksStore(ctx context.Context, deploymentNamespace string, client client.Client) *JwksStore {
+func BuildJwksStore(ctx context.Context, mgr manager.Manager, deploymentNamespace string) *JwksStore {
 	log := log.Log.WithName("jwks store setup")
 	log.Info("creating jwks store")
 
 	jwksCache := NewJwksCache()
 	jwksStore := &JwksStore{
+		mgr:             mgr,
 		jwksCache:       jwksCache,
 		jwksFetcher:     NewJwksFetcher(jwksCache),
-		configMapSyncer: &ConfigMapSyncer{Client: client, DeploymentNamespace: deploymentNamespace},
+		configMapSyncer: &ConfigMapSyncer{Client: mgr.GetClient(), DeploymentNamespace: deploymentNamespace},
 	}
 	jwksStore.updates = jwksStore.jwksFetcher.SubscribeToUpdates()
 
@@ -67,6 +67,7 @@ func (s *JwksStore) syncToConfigMap(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case update := <-s.updates:
+			log.Info("received an update")
 			err := s.configMapSyncer.WriteJwksToConfigMap(ctx, update)
 			if err != nil {
 				log.Error(err, "error syncing jwks store state to ConfigMap")

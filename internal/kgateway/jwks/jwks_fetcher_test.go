@@ -36,7 +36,7 @@ func TestRestoreCacheState(t *testing.T) {
 
 func TestAddKeysetToFetcher(t *testing.T) {
 	f := NewJwksFetcher(NewJwksCache())
-	f.AddKeyset("https://test/jwks", 5*time.Minute)
+	f.addKeyset("https://test/jwks", 5*time.Minute)
 
 	expectedKeysetSource := JwksSource{JwksURL: "https://test/jwks", Ttl: 5 * time.Minute, Deleted: false}
 	fetch := f.Schedule.Peek()
@@ -49,12 +49,12 @@ func TestAddKeysetToFetcher(t *testing.T) {
 func TestRemoveKeysetFromFetcher(t *testing.T) {
 	f := NewJwksFetcher(NewJwksCache())
 
-	f.AddKeyset("https://test/jwks", 5*time.Minute)
+	f.addKeyset("https://test/jwks", 5*time.Minute)
 	keysetSource := f.KeysetSources["https://test/jwks"]
 	assert.NotNil(t, keysetSource)
 	f.Cache.Jwks["https://test/jwks"] = jose.JSONWebKeySet{}
 
-	f.RemoveKeyset("https://test/jwks")
+	f.removeKeyset("https://test/jwks")
 	assert.NotContains(t, f.KeysetSources, "https://test/jwks")
 	assert.NotContains(t, f.Cache.Jwks, "https://test/jwks")
 	assert.True(t, keysetSource.Deleted)
@@ -87,7 +87,7 @@ func TestSuccessfulJwksFetch(t *testing.T) {
 	jwksClient := mocks.NewMockJwksHttpClient(ctrl)
 	f.Client = jwksClient
 
-	f.AddKeyset("https://test/jwks", 5*time.Minute)
+	f.addKeyset("https://test/jwks", 5*time.Minute)
 	updates := f.SubscribeToUpdates()
 
 	expectedJwks := jose.JSONWebKeySet{}
@@ -126,7 +126,7 @@ func TestSuccessfulJwksFetchButNoUpdates(t *testing.T) {
 	jwksClient := mocks.NewMockJwksHttpClient(ctrl)
 	f.Client = jwksClient
 
-	f.AddKeyset("https://test/jwks", 5*time.Minute)
+	f.addKeyset("https://test/jwks", 5*time.Minute)
 	existingJwks := jose.JSONWebKeySet{}
 	err := json.Unmarshal(([]byte)(jwks), &existingJwks)
 	assert.NoError(t, err)
@@ -162,7 +162,7 @@ func TestFetchJwksWithError(t *testing.T) {
 	jwksClient := mocks.NewMockJwksHttpClient(ctrl)
 	f.Client = jwksClient
 
-	f.AddKeyset("https://test/jwks", 5*time.Minute)
+	f.addKeyset("https://test/jwks", 5*time.Minute)
 	updates := f.SubscribeToUpdates()
 
 	jwksClient.EXPECT().
