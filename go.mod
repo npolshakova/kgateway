@@ -130,7 +130,6 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
-	golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gotest.tools/gotestsum v1.13.0 // indirect
 	oras.land/oras-go/v2 v2.6.0 // indirect
@@ -184,7 +183,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -647,7 +646,6 @@ tool (
 	github.com/goreleaser/goreleaser/v2
 	github.com/onsi/ginkgo/v2/ginkgo
 	github.com/rhysd/actionlint/cmd/actionlint
-	golang.org/x/tools/cmd/goimports
 	gotest.tools/gotestsum
 	helm.sh/helm/v3/cmd/helm
 	k8s.io/code-generator/cmd/applyconfiguration-gen

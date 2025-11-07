@@ -64,6 +64,14 @@ func TestRenderHelmChart(t *testing.T) {
 			InputFile: "agentgateway-infrastructure",
 		},
 		{
+			Name:      "agentgateway-controller-but-custom-gatewayclass",
+			InputFile: "agentgateway-controller-but-custom-gatewayclass",
+		},
+		{
+			Name:      "envoy-controller-ignores-agentgateway-class-name",
+			InputFile: "envoy-controller-ignores-agentgateway-class-name",
+		},
+		{
 			Name:      "envoy-infrastructure",
 			InputFile: "envoy-infrastructure",
 		},
@@ -133,7 +141,8 @@ wIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQBtestcertdata
 
 	// ExtraGatewayParameters function that enables TLS. this is needed as TLS
 	// is injected by the control plane and not via the GWP API.
-	tlsExtraParams := func(cli client.Client, inputs *pkgdeployer.Inputs) pkgdeployer.HelmValuesGenerator {
+	//nolint:unparam // tlsExtra is the fifth parameter for tester.RunHelmChartTest which should follow its signature.
+	tlsExtraParams := func(_ client.Client, inputs *pkgdeployer.Inputs) pkgdeployer.HelmValuesGenerator {
 		inputs.ControlPlane.XdsTLS = true
 		inputs.ControlPlane.XdsTlsCaPath = caCertPath
 		return nil
