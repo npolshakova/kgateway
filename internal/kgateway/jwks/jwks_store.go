@@ -4,16 +4,21 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
+
+var JwksStoreNamespacedName = func() *types.NamespacedName {
+	return nil
+}
 
 type JwksStore struct {
 	mgr             manager.Manager
 	jwksCache       *jwksCache
 	jwksFetcher     *JwksFetcher
 	configMapSyncer *ConfigMapSyncer
-	updates         <-chan string
+	updates         <-chan map[string]string
 }
 
 func BuildJwksStore(ctx context.Context, mgr manager.Manager, deploymentNamespace string) *JwksStore {
@@ -28,7 +33,9 @@ func BuildJwksStore(ctx context.Context, mgr manager.Manager, deploymentNamespac
 		configMapSyncer: &ConfigMapSyncer{Client: mgr.GetClient(), DeploymentNamespace: deploymentNamespace},
 	}
 	jwksStore.updates = jwksStore.jwksFetcher.SubscribeToUpdates()
-
+	JwksStoreNamespacedName = func() *types.NamespacedName {
+		return &types.NamespacedName{Namespace: deploymentNamespace, Name: JwksStoreName}
+	}
 	return jwksStore
 }
 
@@ -43,10 +50,11 @@ func (s *JwksStore) Start(ctx context.Context) error {
 	if err != nil {
 		log.Error(err, "error loading jwks store from a ConfigMap")
 	}
-	err = s.jwksCache.LoadfromJson(storedJwks)
+	jwks, err := LoadJwksfromJson(storedJwks)
 	if err != nil {
 		log.Error(err, "error deserializing jwks store state")
 	}
+	s.jwksCache.Jwks = jwks
 
 	go s.syncToConfigMap(ctx)
 	go s.jwksFetcher.Run(ctx)

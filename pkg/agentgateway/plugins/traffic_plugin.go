@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/logging"
@@ -466,7 +468,7 @@ func translateTrafficPolicyToAgw(
 	}
 
 	if traffic.JWTAuthentication != nil {
-		jwtAuthenticationPolicies, err := processJWTAuthenticationPolicy(policy, policyName, policyTarget)
+		jwtAuthenticationPolicies, err := processJWTAuthenticationPolicy(ctx, policy, policyName, policyTarget)
 		if err != nil {
 			logger.Error("error processing jWTAuthentication policy", "error", err)
 			errs = append(errs, err)
@@ -528,7 +530,7 @@ func processRetriesPolicy(policy *v1alpha1.AgentgatewayPolicy, name string, targ
 	return []AgwPolicy{{Policy: retryPolicy}}, nil
 }
 
-func processJWTAuthenticationPolicy(policy *v1alpha1.AgentgatewayPolicy, name string, target *api.PolicyTarget) ([]AgwPolicy, error) {
+func processJWTAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, name string, target *api.PolicyTarget) ([]AgwPolicy, error) {
 	jwt := policy.Spec.Traffic.JWTAuthentication
 	p := &api.TrafficPolicySpec_JWT{
 		Mode: api.TrafficPolicySpec_JWT_OPTIONAL,
@@ -543,6 +545,7 @@ func processJWTAuthenticationPolicy(policy *v1alpha1.AgentgatewayPolicy, name st
 			p.Mode = api.TrafficPolicySpec_JWT_PERMISSIVE
 		}
 	}
+	var errs []error
 	for _, pp := range jwt.Providers {
 		jp := &api.TrafficPolicySpec_JWTProvider{
 			Issuer:    pp.Issuer,
@@ -554,7 +557,32 @@ func processJWTAuthenticationPolicy(policy *v1alpha1.AgentgatewayPolicy, name st
 			continue
 		}
 		if r := pp.JWKS.Remote; r != nil {
-			// TODO: this is not yet implemented and rejected by CEL
+			if _, err := url.Parse(pp.JWKS.Remote.JwksUri); err != nil {
+				errs = append(errs, fmt.Errorf("invalid jwks url in JWTAuthentication policy %w", err))
+				continue
+			}
+			jwksStoreName := jwks.JwksStoreNamespacedName()
+			if jwksStoreName == nil {
+				errs = append(errs, fmt.Errorf("jwks store hasn't been initialized"))
+				continue
+			}
+			jwksStore := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Collections.ConfigMaps, krt.FilterObjectName(*jwksStoreName)))
+			if jwksStore == nil {
+				errs = append(errs, fmt.Errorf("jwks store isn't available"))
+				continue
+			}
+			alljwks, err := jwks.JwksFromConfigMap(jwksStore)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("error deserializing jwks store %w", err))
+				continue
+			}
+			jwks, ok := alljwks[pp.JWKS.Remote.JwksUri]
+			if !ok {
+				errs = append(errs, fmt.Errorf("jwks %s is not available in the jwks store", pp.JWKS.Remote.JwksUri))
+				continue
+			}
+			jp.JwksSource = &api.TrafficPolicySpec_JWTProvider_Inline{Inline: jwks}
+			p.Providers = append(p.Providers, jp)
 		}
 	}
 
@@ -573,7 +601,7 @@ func processJWTAuthenticationPolicy(policy *v1alpha1.AgentgatewayPolicy, name st
 		"agentgateway_policy", jwtPolicy.Name,
 		"target", target)
 
-	return []AgwPolicy{{Policy: jwtPolicy}}, nil
+	return []AgwPolicy{{Policy: jwtPolicy}}, errors.Join(errs...)
 }
 
 func processBasicAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, name string, target *api.PolicyTarget) ([]AgwPolicy, error) {

@@ -17,20 +17,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type jwksCache struct {
-	Jwks map[string]jose.JSONWebKeySet
-}
-
-type FetchingSchedule []fetchAt
-
+// JwksFetcher is used for fetching and periodic updates of jwks
+// Internally fetched jwks are stored as key-values: jwks-url:jose.JSONWebKeySet
+// When a jwks is updated, registered subscribers are sent the current state of
+// jwks store.
 type JwksFetcher struct {
 	mu            sync.Mutex
 	Cache         *jwksCache
 	Client        JwksHttpClient
 	KeysetSources map[string]*JwksSource
 	Schedule      FetchingSchedule
-	Subscribers   []chan string
+	Subscribers   []chan map[string]string
 }
+
+type jwksCache struct {
+	Jwks map[string]jose.JSONWebKeySet
+}
+
+type FetchingSchedule []fetchAt
 
 //go:generate go tool mockgen -destination mocks/mock_jwks_http_client.go -package mocks -source ./jwks_fetcher.go
 type JwksHttpClient interface {
@@ -70,30 +74,39 @@ func NewJwksFetcher(cache *jwksCache) *JwksFetcher {
 			}}},
 		KeysetSources: make(map[string]*JwksSource),
 		Schedule:      make([]fetchAt, 0),
-		Subscribers:   make([]chan string, 0),
+		Subscribers:   make([]chan map[string]string, 0),
 	}
 	heap.Init(&toret.Schedule)
 
 	return toret
 }
 
-func (c *jwksCache) toJson() ([]byte, error) {
-	return json.Marshal(c.Jwks)
+// this function must be called when holding the `mu` lock
+func (c *jwksCache) toJson() (map[string]string, error) {
+	toret := make(map[string]string)
+	for k, v := range c.Jwks {
+		serializedJwks, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		toret[k] = string(serializedJwks)
+	}
+	return toret, nil
 }
 
-func (c *jwksCache) LoadfromJson(storedJwks string) error {
-	stored := make(map[string]jose.JSONWebKeySet)
+func LoadJwksfromJson(storedJwks map[string]string) (map[string]jose.JSONWebKeySet, error) {
+	toret := make(map[string]jose.JSONWebKeySet)
+	var errs []error
 
-	if storedJwks == "" {
-		return nil
+	for url, serializedJwks := range storedJwks {
+		jwks := jose.JSONWebKeySet{}
+		if err := json.Unmarshal([]byte(serializedJwks), &jwks); err != nil {
+			errs = append(errs, err)
+		}
+		toret[url] = jwks
 	}
 
-	if err := json.Unmarshal([]byte(storedJwks), &stored); err != nil {
-		return err
-	}
-	c.Jwks = stored
-
-	return nil
+	return toret, errors.Join(errs...)
 }
 
 // heap implementation
@@ -176,7 +189,7 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 			return
 		}
 		for _, s := range f.Subscribers {
-			s <- string(update)
+			s <- update
 		}
 	}
 }
@@ -184,7 +197,7 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates []JwksSource) error {
 	log := log.FromContext(ctx)
 
-	errs := make([]error, 0)
+	var errs []error
 	maybeUpdates := make(map[string]JwksSource)
 	for _, s := range updates {
 		maybeUpdates[s.JwksURL] = s
@@ -227,7 +240,7 @@ func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates []JwksSourc
 			return errors.Join(errs...)
 		}
 		for _, s := range f.Subscribers {
-			s <- string(update)
+			s <- update
 		}
 	}
 
@@ -261,11 +274,11 @@ func (f *JwksFetcher) updateKeyset(jwksUrl string, ttl time.Duration) error {
 	return f.addKeyset(jwksUrl, ttl)
 }
 
-func (f *JwksFetcher) SubscribeToUpdates() chan string {
+func (f *JwksFetcher) SubscribeToUpdates() chan map[string]string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	subscriber := make(chan string)
+	subscriber := make(chan map[string]string)
 	f.Subscribers = append(f.Subscribers, subscriber)
 
 	return subscriber
@@ -273,7 +286,7 @@ func (f *JwksFetcher) SubscribeToUpdates() chan string {
 
 func (c *jwksHttpClientImpl) FetchJwks(ctx context.Context, jwksURL string) (jose.JSONWebKeySet, error) {
 	log := log.FromContext(ctx)
-	log.Info("fetching jwks", jwksURL)
+	log.Info("fetching jwks", "url", jwksURL)
 
 	request, err := http.NewRequest(http.MethodGet, jwksURL, nil)
 	if err != nil {
