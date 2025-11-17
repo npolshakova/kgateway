@@ -20,10 +20,10 @@ type JwksStore struct {
 	jwksFetcher     *JwksFetcher
 	configMapSyncer *ConfigMapSyncer
 	updates         <-chan map[string]string
-	latestJwksQueue utils.AsyncQueue[[]JwksSource]
+	latestJwksQueue utils.AsyncQueue[JwksSources]
 }
 
-func BuildJwksStore(ctx context.Context, mgr manager.Manager, jwksQueue utils.AsyncQueue[[]JwksSource], deploymentNamespace string) *JwksStore {
+func BuildJwksStore(ctx context.Context, mgr manager.Manager, jwksQueue utils.AsyncQueue[JwksSources], deploymentNamespace string) *JwksStore {
 	log := log.Log.WithName("jwks store setup")
 	log.Info("creating jwks store")
 

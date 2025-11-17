@@ -18,8 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apisettings "github.com/kgateway-dev/kgateway/v2/api/settings"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agent_jwks_store"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentgatewaysyncer"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentjwksstore"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/inferenceextension/endpointpicker"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/waypoint"
@@ -229,11 +229,12 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			return nil, err
 		}
 
-		jwksStoreCtrl := agent_jwks_store.NewJwksStoreController(cfg.Manager, cfg.Client, cfg.AgwCollections)
+		jwksStoreCtrl := agentjwksstore.NewJwksStoreController(cfg.Manager, cfg.Client, cfg.AgwCollections)
 		if err := cfg.Manager.Add(jwksStoreCtrl); err != nil {
 			setupLog.Error(err, "unable to add agentgateway JwksStoreController runnable")
 			return nil, err
 		}
+		jwksStoreCtrl.Init(ctx)
 		jwksStore := jwks.BuildJwksStore(ctx, cfg.Manager, jwksStoreCtrl.JwksQueue(), namespaces.GetPodNamespace())
 		if err := cfg.Manager.Add(jwksStore); err != nil {
 			setupLog.Error(err, "unable to add agentgateway JwksStore runnable")

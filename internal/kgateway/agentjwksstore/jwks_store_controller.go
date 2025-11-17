@@ -1,4 +1,4 @@
-package agent_jwks_store
+package agentjwksstore
 
 import (
 	"context"
@@ -25,8 +25,8 @@ type JwksStoreController struct {
 	mgr         manager.Manager
 	agw         *plugins.AgwCollections
 	apiClient   apiclient.Client
-	jwks        krt.Singleton[[]jwks.JwksSource]
-	jwksQueue   utils.AsyncQueue[[]jwks.JwksSource]
+	jwks        krt.Singleton[jwks.JwksSources]
+	jwksQueue   utils.AsyncQueue[jwks.JwksSources]
 	waitForSync []cache.InformerSynced
 }
 
@@ -37,7 +37,7 @@ func NewJwksStoreController(mgr manager.Manager, apiClient apiclient.Client, agw
 		mgr:       mgr,
 		agw:       agw,
 		apiClient: apiClient,
-		jwksQueue: utils.NewAsyncQueue[[]jwks.JwksSource](),
+		jwksQueue: utils.NewAsyncQueue[jwks.JwksSources](),
 	}
 }
 
@@ -47,9 +47,9 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 		wellknown.AgentgatewayPolicyGVR,
 		kclient.Filter{ObjectFilter: j.agw.Client.ObjectFilter()},
 	), j.agw.KrtOpts.ToOptions("AgentgatewayPolicy")...)
-	j.jwks = krt.NewSingleton(func(kctx krt.HandlerContext) *[]jwks.JwksSource {
+	j.jwks = krt.NewSingleton(func(kctx krt.HandlerContext) *jwks.JwksSources {
 		pols := krt.Fetch(kctx, policyCol)
-		toret := make([]jwks.JwksSource, 0, len(pols))
+		toret := make(jwks.JwksSources, 0, len(pols))
 		for _, p := range pols {
 			if p.Spec.Traffic == nil || p.Spec.Traffic.JWTAuthentication == nil {
 				continue
@@ -74,7 +74,7 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 func (j *JwksStoreController) Start(ctx context.Context) error {
 	logger.Info("waiting for cache to sync")
 	j.apiClient.WaitForCacheSync(
-		"kube gw proxy syncer",
+		"kube AgentgatewayPolicy syncer",
 		ctx.Done(),
 		j.waitForSync...,
 	)
@@ -84,7 +84,7 @@ func (j *JwksStoreController) Start(ctx context.Context) error {
 	}
 	logger.Info("caches warm!")
 
-	j.jwks.Register(func(o krt.Event[[]jwks.JwksSource]) {
+	j.jwks.Register(func(o krt.Event[jwks.JwksSources]) {
 		j.jwksQueue.Enqueue(o.Latest())
 	})
 
@@ -101,6 +101,6 @@ func (j *JwksStoreController) NeedLeaderElection() bool {
 	return true
 }
 
-func (j *JwksStoreController) JwksQueue() utils.AsyncQueue[[]jwks.JwksSource] {
+func (j *JwksStoreController) JwksQueue() utils.AsyncQueue[jwks.JwksSources] {
 	return j.jwksQueue
 }

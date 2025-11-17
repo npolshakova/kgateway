@@ -47,6 +47,12 @@ type JwksSource struct {
 	Deleted bool
 }
 
+type JwksSources []JwksSource
+
+func (js JwksSources) ResourceName() string {
+	return "jwkssources"
+}
+
 type fetchAt struct {
 	at           time.Time
 	keysetSource *JwksSource
@@ -194,7 +200,7 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 	}
 }
 
-func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates []JwksSource) error {
+func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates JwksSources) error {
 	log := log.FromContext(ctx)
 
 	var errs []error
