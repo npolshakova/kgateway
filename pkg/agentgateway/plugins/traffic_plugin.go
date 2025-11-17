@@ -53,7 +53,7 @@ const (
 	timeoutPolicySuffix         = ":timeout"
 	jwtPolicySuffix             = ":jwt"
 	basicAuthPolicySuffix       = ":basicauth"
-	apiKeyPolicySuffix          = ":apikeyauth"
+	apiKeyPolicySuffix          = ":apikeyauth" //nolint:gosec
 )
 
 var logger = logging.New("agentgateway/plugins")
@@ -445,7 +445,7 @@ func translateTrafficPolicyToAgw(
 	if traffic.JWTAuthentication != nil {
 		jwtAuthenticationPolicies, err := processJWTAuthenticationPolicy(ctx, policy, policyName, policyTarget)
 		if err != nil {
-			logger.Error("error processing jWTAuthentication policy", "error", err)
+			logger.Error("error processing jwtAuthentication policy", "error", err)
 			errs = append(errs, err)
 		}
 		agwPolicies = append(agwPolicies, jwtAuthenticationPolicies...)
@@ -507,20 +507,18 @@ func processRetriesPolicy(policy *v1alpha1.AgentgatewayPolicy, name string, targ
 
 func processJWTAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, name string, target *api.PolicyTarget) ([]AgwPolicy, error) {
 	jwt := policy.Spec.Traffic.JWTAuthentication
-	p := &api.TrafficPolicySpec_JWT{
-		Mode: api.TrafficPolicySpec_JWT_OPTIONAL,
+	p := &api.TrafficPolicySpec_JWT{}
+
+	switch jwt.Mode {
+	case v1alpha1.JWTAuthenticationModeOptional:
+		p.Mode = api.TrafficPolicySpec_JWT_OPTIONAL
+	case v1alpha1.JWTAuthenticationModeStrict:
+		p.Mode = api.TrafficPolicySpec_JWT_STRICT
+	case v1alpha1.JWTAuthenticationModePermissive:
+		p.Mode = api.TrafficPolicySpec_JWT_PERMISSIVE
 	}
-	if m := jwt.Mode; m != nil {
-		switch *m {
-		case v1alpha1.JWTAuthenticationModeOptional:
-			p.Mode = api.TrafficPolicySpec_JWT_OPTIONAL
-		case v1alpha1.JWTAuthenticationModeStrict:
-			p.Mode = api.TrafficPolicySpec_JWT_STRICT
-		case v1alpha1.JWTAuthenticationModePermissive:
-			p.Mode = api.TrafficPolicySpec_JWT_PERMISSIVE
-		}
-	}
-	var errs []error
+
+	errs := make([]error, 0)
 	for _, pp := range jwt.Providers {
 		jp := &api.TrafficPolicySpec_JWTProvider{
 			Issuer:    pp.Issuer,
@@ -581,20 +579,18 @@ func processJWTAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.Agentgateway
 
 func processBasicAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, name string, target *api.PolicyTarget) ([]AgwPolicy, error) {
 	ba := policy.Spec.Traffic.BasicAuthentication
-	p := &api.TrafficPolicySpec_BasicAuthentication{
-		Mode: api.TrafficPolicySpec_BasicAuthentication_OPTIONAL,
-	}
+	p := &api.TrafficPolicySpec_BasicAuthentication{}
 	if ba.Realm != nil {
 		p.Realm = wrapperspb.String(*ba.Realm)
 	}
-	if ba.Mode != nil {
-		switch *ba.Mode {
-		case v1alpha1.BasicAuthenticationModeOptional:
-			p.Mode = api.TrafficPolicySpec_BasicAuthentication_OPTIONAL
-		case v1alpha1.BasicAuthenticationModeStrict:
-			p.Mode = api.TrafficPolicySpec_BasicAuthentication_STRICT
-		}
+
+	switch ba.Mode {
+	case v1alpha1.BasicAuthenticationModeOptional:
+		p.Mode = api.TrafficPolicySpec_BasicAuthentication_OPTIONAL
+	case v1alpha1.BasicAuthenticationModeStrict:
+		p.Mode = api.TrafficPolicySpec_BasicAuthentication_STRICT
 	}
+
 	if s := ba.SecretRef; s != nil {
 		scrt := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Collections.Secrets, krt.FilterKey(policy.Namespace+"/"+s.Name)))
 		if scrt == nil {
@@ -634,16 +630,13 @@ type APIKeyEntry struct {
 
 func processAPIKeyAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, name string, target *api.PolicyTarget) ([]AgwPolicy, error) {
 	ak := policy.Spec.Traffic.APIKeyAuthentication
-	p := &api.TrafficPolicySpec_APIKey{
-		Mode: api.TrafficPolicySpec_APIKey_OPTIONAL,
-	}
-	if ak.Mode != nil {
-		switch *ak.Mode {
-		case v1alpha1.APIKeyAuthenticationModeOptional:
-			p.Mode = api.TrafficPolicySpec_APIKey_OPTIONAL
-		case v1alpha1.APIKeyAuthenticationModeStrict:
-			p.Mode = api.TrafficPolicySpec_APIKey_STRICT
-		}
+	p := &api.TrafficPolicySpec_APIKey{}
+
+	switch ak.Mode {
+	case v1alpha1.APIKeyAuthenticationModeOptional:
+		p.Mode = api.TrafficPolicySpec_APIKey_OPTIONAL
+	case v1alpha1.APIKeyAuthenticationModeStrict:
+		p.Mode = api.TrafficPolicySpec_APIKey_STRICT
 	}
 
 	var secrets []*corev1.Secret
@@ -657,26 +650,29 @@ func processAPIKeyAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.Agentgate
 	if s := ak.SecretSelector; s != nil {
 		secrets = krt.Fetch(ctx.Krt, ctx.Collections.Secrets, krt.FilterLabel(s.MatchLabels), krt.FilterIndex(ctx.Collections.SecretsByNamespace, policy.Namespace))
 	}
-	var errors []error
+	var errs []error
 	for _, s := range secrets {
 		for k, v := range s.Data {
 			var ke APIKeyEntry
-			if err := json.Unmarshal(v, &ke); err != nil {
-				if bytes.TrimSpace(v)[0] == '{' {
-					errors = append(errors, fmt.Errorf("secret %v contains invalid key: %v", s.Name, k))
-					continue
-				} else {
-					// A raw key entry without metadata
-					ke = APIKeyEntry{
-						Key:      string(v),
-						Metadata: nil,
-					}
+			if bytes.TrimSpace(v)[0] != '{' {
+				// A raw key entry without metadata
+				ke = APIKeyEntry{
+					Key:      string(v),
+					Metadata: nil,
 				}
+			} else if err := json.Unmarshal(v, &ke); err != nil {
+				errs = append(errs, fmt.Errorf("secret %v contains invalid key %v: %w", s.Name, k, err))
+				continue
 			}
 
+			pbs, err := toStruct(ke.Metadata)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("secret %v contains invalid key %v: %w", s.Name, k, err))
+				continue
+			}
 			p.ApiKeys = append(p.ApiKeys, &api.TrafficPolicySpec_APIKey_User{
 				Key:      ke.Key,
-				Metadata: toStruct(ke.Metadata),
+				Metadata: pbs,
 			})
 		}
 	}
@@ -695,7 +691,7 @@ func processAPIKeyAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.Agentgate
 		"agentgateway_policy", apiKeyPolicy.Name,
 		"target", target)
 
-	return []AgwPolicy{{Policy: apiKeyPolicy}}, nil
+	return []AgwPolicy{{Policy: apiKeyPolicy}}, errors.Join(errs...)
 }
 
 func processTimeoutPolicy(policy *v1alpha1.AgentgatewayPolicy, name string, target *api.PolicyTarget) []AgwPolicy {
@@ -886,9 +882,9 @@ func phase(policy *v1alpha1.AgentgatewayPolicy) api.TrafficPolicySpec_PolicyPhas
 	if policy.Spec.Traffic.Phase != nil {
 		switch *policy.Spec.Traffic.Phase {
 		case v1alpha1.PolicyPhasePreRouting:
-			phase = api.TrafficPolicySpec_ROUTE
-		case v1alpha1.PolicyPhasePostRouting:
 			phase = api.TrafficPolicySpec_GATEWAY
+		case v1alpha1.PolicyPhasePostRouting:
+			phase = api.TrafficPolicySpec_ROUTE
 		}
 	}
 	return phase
@@ -1322,16 +1318,16 @@ func headerListToAgw(hl []gwv1.HTTPHeader) []*api.Header {
 	})
 }
 
-func toStruct(rm json.RawMessage) *structpb.Struct {
+func toStruct(rm json.RawMessage) (*structpb.Struct, error) {
 	j, err := json.Marshal(rm)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	pbs := &structpb.Struct{}
 	if err := protomarshal.Unmarshal(j, pbs); err != nil {
-		return nil
+		return nil, err
 	}
 
-	return pbs
+	return pbs, nil
 }

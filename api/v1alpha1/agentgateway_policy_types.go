@@ -375,11 +375,14 @@ type AgentgatewayPolicyTraffic struct {
 	Authorization *Authorization `json:"authorization,omitempty"`
 
 	// jwtAuthentication authenticates users based on JWT tokens.
+	// +optional
 	JWTAuthentication *AgentJWTAuthentication `json:"jwtAuthentication,omitempty"`
 	// basicAuthentication authenticates users based on the "Basic" authentication scheme (RFC 7617), where a username and password
 	// are encoded in the request.
+	// +optional
 	BasicAuthentication *AgentBasicAuthentication `json:"basicAuthentication,omitempty"`
 	// apiKeyAuthentication authenticates users based on a configured API Key.
+	// +optional
 	APIKeyAuthentication *AgentAPIKeyAuthentication `json:"apiKeyAuthentication,omitempty"`
 }
 
@@ -388,9 +391,9 @@ type JWTAuthenticationMode string
 
 const (
 	// A valid token, issued by a configured issuer, must be present.
+	// This is the default option.
 	JWTAuthenticationModeStrict JWTAuthenticationMode = "Strict"
 	// If a token exists, validate it.
-	// This is the default option.
 	// Warning: this allows requests without a JWT token!
 	JWTAuthenticationModeOptional JWTAuthenticationMode = "Optional"
 	// Requests are never rejected. This is useful for usage of claims in later steps (authorization, logging, etc).
@@ -399,15 +402,17 @@ const (
 )
 
 type AgentJWTAuthentication struct {
-	// mode controls how to handle requests that do successfully authenticate.
-	Mode *JWTAuthenticationMode `json:"mode,omitempty"`
+	// validation mode for JWT authentication.
+	// +kubebuilder:default=Strict
+	Mode JWTAuthenticationMode `json:"mode"`
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=64
 	Providers []AgentJWTProvider `json:"providers"`
 }
 
 type AgentJWTProvider struct {
-	// issue identifies the issuer that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
+	// issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
+	// +kubebuilder:validation:MinLength=1
 	Issuer ShortString `json:"issuer,omitempty"`
 	// audiences specifies the list of allowed audiences that are allowed access. This corresponds to the 'aud' claim (https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3).
 	// If unset, any audience is allowed.
@@ -419,6 +424,7 @@ type AgentJWTProvider struct {
 }
 
 // +kubebuilder:validation:ExactlyOneOf=remote;inline
+// +kubebuilder:validation:XValidation:rule="!has(self.remote)",message="remote is not currently implemented"
 type AgentJWKS struct {
 	// remote specifies how to reach the JSON Web Key Set from a remote address.
 	Remote *AgentRemoteJWKS `json:"remote,omitempty"`
@@ -458,8 +464,9 @@ const (
 
 // +kubebuilder:validation:ExactlyOneOf=users;secretRef
 type AgentBasicAuthentication struct {
-	// mode controls how to handle requests that do not successfully authenticate.
-	Mode *BasicAuthenticationMode `json:"mode,omitempty"`
+	// validation mode for basic auth authentication.
+	// +kubebuilder:default=Strict
+	Mode BasicAuthenticationMode `json:"mode"`
 
 	// realm specifies the 'realm' to return in the WWW-Authenticate header for failed authentication requests.
 	// If unset, "Restricted" will be used.
@@ -513,8 +520,9 @@ const (
 
 // +kubebuilder:validation:ExactlyOneOf=secretRef;secretSelector
 type AgentAPIKeyAuthentication struct {
-	// mode controls how to handle requests that do not successfully authenticate.
-	Mode *APIKeyAuthenticationMode `json:"mode,omitempty"`
+	// Validation mode for api key authentication.
+	// +kubebuilder:default=Strict
+	Mode APIKeyAuthenticationMode `json:"mode"`
 
 	// secretRef references a Kubernetes secret storing a set of API Keys. If there are many keys, 'secretSelector' can be
 	// used instead.
