@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kgateway-dev/kgateway/v2/pkg/apiclient"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +18,7 @@ const JwksStoreName = "jwks-store"
 // The format used to store jwks data is key-values of jwks-url:serialized jwks
 // This is done to skip an additional serialization step during policy translation
 type ConfigMapSyncer struct {
-	Client              client.Client
+	Client              apiclient.Client
 	DeploymentNamespace string
 }
 
@@ -40,8 +41,7 @@ func (cs *ConfigMapSyncer) WriteJwksToConfigMap(ctx context.Context, updated map
 		return err
 	}
 
-	existing := &corev1.ConfigMap{}
-	err = cs.Client.Get(ctx, client.ObjectKey{Namespace: cs.DeploymentNamespace, Name: JwksStoreName}, existing)
+	existing, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Get(ctx, JwksStoreName, metav1.GetOptions{})
 	if client.IgnoreNotFound(err) != nil {
 		log.Error(err, "error retrieving jwks ConfigMap store")
 		return err
@@ -50,7 +50,7 @@ func (cs *ConfigMapSyncer) WriteJwksToConfigMap(ctx context.Context, updated map
 	if err != nil { // not found
 		cm := cs.newJwksStoreConfigMap()
 		cm.Data[JwksStoreName] = string(serializedUpdate)
-		err = cs.Client.Create(ctx, cm, &client.CreateOptions{})
+		cm, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Create(ctx, cm, metav1.CreateOptions{})
 		if err != nil {
 			log.Error(err, "error creating jwks ConfigMap store")
 			return err
@@ -59,7 +59,7 @@ func (cs *ConfigMapSyncer) WriteJwksToConfigMap(ctx context.Context, updated map
 	}
 
 	existing.Data[JwksStoreName] = string(serializedUpdate)
-	err = cs.Client.Update(ctx, existing, &client.UpdateOptions{})
+	_, err = cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Update(ctx, existing, metav1.UpdateOptions{})
 	if err != nil {
 		log.Error(err, "error updating jwks ConfigMap store")
 		return err
@@ -71,8 +71,7 @@ func (cs *ConfigMapSyncer) WriteJwksToConfigMap(ctx context.Context, updated map
 func (cs *ConfigMapSyncer) LoadJwksFromConfigMap(ctx context.Context) (map[string]string, error) {
 	log := log.FromContext(ctx)
 
-	jwksStoreConfigMap := &corev1.ConfigMap{}
-	err := cs.Client.Get(ctx, client.ObjectKey{Namespace: cs.DeploymentNamespace, Name: JwksStoreName}, jwksStoreConfigMap)
+	jwksStoreConfigMap, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Get(ctx, JwksStoreName, metav1.GetOptions{})
 
 	if apierrors.IsNotFound(err) {
 		return nil, nil

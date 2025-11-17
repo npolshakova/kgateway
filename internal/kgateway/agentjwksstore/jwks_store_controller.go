@@ -31,7 +31,7 @@ type JwksStoreController struct {
 
 var logger = logging.New("jwks_store")
 
-func NewJwksStoreController(mgr manager.Manager, apiClient apiclient.Client, agw *plugins.AgwCollections) *JwksStoreController {
+func NewJWKSStoreController(mgr manager.Manager, apiClient apiclient.Client, agw *plugins.AgwCollections) *JwksStoreController {
 	return &JwksStoreController{
 		mgr:       mgr,
 		agw:       agw,
@@ -72,7 +72,7 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 
 func (j *JwksStoreController) Start(ctx context.Context) error {
 	logger.Info("waiting for cache to sync")
-	j.apiClient.WaitForCacheSync(
+	j.apiClient.Core().WaitForCacheSync(
 		"kube AgentgatewayPolicy syncer",
 		ctx.Done(),
 		j.waitForSync...,

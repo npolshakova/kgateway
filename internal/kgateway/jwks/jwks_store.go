@@ -2,13 +2,13 @@ package jwks
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
+	"github.com/kgateway-dev/kgateway/v2/pkg/apiclient"
 )
 
 var JwksStoreNamespacedName = func() *types.NamespacedName {
@@ -24,17 +24,16 @@ type JwksStore struct {
 	latestJwksQueue utils.AsyncQueue[JwksSources]
 }
 
-func BuildJwksStore(ctx context.Context, mgr manager.Manager, jwksQueue utils.AsyncQueue[JwksSources], deploymentNamespace string) *JwksStore {
+func BuildJwksStore(ctx context.Context, cli apiclient.Client, jwksQueue utils.AsyncQueue[JwksSources], deploymentNamespace string) *JwksStore {
 	log := log.Log.WithName("jwks store setup")
 	log.Info("creating jwks store")
 
 	jwksCache := NewJwksCache()
 	jwksStore := &JwksStore{
-		mgr:             mgr,
 		jwksCache:       jwksCache,
 		latestJwksQueue: jwksQueue,
 		jwksFetcher:     NewJwksFetcher(jwksCache),
-		configMapSyncer: &ConfigMapSyncer{Client: mgr.GetClient(), DeploymentNamespace: deploymentNamespace},
+		configMapSyncer: &ConfigMapSyncer{Client: cli, DeploymentNamespace: deploymentNamespace},
 	}
 	jwksStore.updates = jwksStore.jwksFetcher.SubscribeToUpdates()
 	JwksStoreNamespacedName = func() *types.NamespacedName {
@@ -45,10 +44,6 @@ func BuildJwksStore(ctx context.Context, mgr manager.Manager, jwksQueue utils.As
 
 func (s *JwksStore) Start(ctx context.Context) error {
 	log := log.FromContext(ctx)
-
-	if !s.mgr.GetCache().WaitForCacheSync(ctx) {
-		return fmt.Errorf("failed waiting for caches to sync")
-	}
 
 	storedJwks, err := s.configMapSyncer.LoadJwksFromConfigMap(ctx)
 	if err != nil {
