@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 )
 
 var JwksStoreNamespacedName = func() *types.NamespacedName {
