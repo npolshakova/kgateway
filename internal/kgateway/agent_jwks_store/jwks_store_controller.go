@@ -1,4 +1,4 @@
-package agentjwks
+package agent_jwks_store
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/agentgateway/plugins"
@@ -24,8 +25,8 @@ type JwksStoreController struct {
 	mgr         manager.Manager
 	agw         *plugins.AgwCollections
 	apiClient   apiclient.Client
-	jwks        krt.Singleton[[]JwksSource]
-	jwksQueue   utils.AsyncQueue[[]JwksSource]
+	jwks        krt.Singleton[[]jwks.JwksSource]
+	jwksQueue   utils.AsyncQueue[[]jwks.JwksSource]
 	waitForSync []cache.InformerSynced
 }
 
@@ -36,7 +37,7 @@ func NewJwksStoreController(mgr manager.Manager, apiClient apiclient.Client, agw
 		mgr:       mgr,
 		agw:       agw,
 		apiClient: apiClient,
-		jwksQueue: utils.NewAsyncQueue[[]JwksSource](),
+		jwksQueue: utils.NewAsyncQueue[[]jwks.JwksSource](),
 	}
 }
 
@@ -46,9 +47,9 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 		wellknown.AgentgatewayPolicyGVR,
 		kclient.Filter{ObjectFilter: j.agw.Client.ObjectFilter()},
 	), j.agw.KrtOpts.ToOptions("AgentgatewayPolicy")...)
-	j.jwks = krt.NewSingleton(func(kctx krt.HandlerContext) *[]JwksSource {
+	j.jwks = krt.NewSingleton(func(kctx krt.HandlerContext) *[]jwks.JwksSource {
 		pols := krt.Fetch(kctx, policyCol)
-		toret := make([]JwksSource, 0, len(pols))
+		toret := make([]jwks.JwksSource, 0, len(pols))
 		for _, p := range pols {
 			if p.Spec.Traffic == nil || p.Spec.Traffic.JWTAuthentication == nil {
 				continue
@@ -58,7 +59,7 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 				if provider.JWKS.Remote == nil {
 					continue
 				}
-				toret = append(toret, JwksSource{JwksURL: provider.JWKS.Remote.JwksUri, Ttl: provider.JWKS.Remote.CacheDuration.Duration})
+				toret = append(toret, jwks.JwksSource{JwksURL: provider.JWKS.Remote.JwksUri, Ttl: provider.JWKS.Remote.CacheDuration.Duration})
 			}
 		}
 
@@ -83,7 +84,7 @@ func (j *JwksStoreController) Start(ctx context.Context) error {
 	}
 	logger.Info("caches warm!")
 
-	j.jwks.Register(func(o krt.Event[[]JwksSource]) {
+	j.jwks.Register(func(o krt.Event[[]jwks.JwksSource]) {
 		j.jwksQueue.Enqueue(o.Latest())
 	})
 
@@ -100,6 +101,6 @@ func (j *JwksStoreController) NeedLeaderElection() bool {
 	return true
 }
 
-func (j *JwksStoreController) JwksQueue() utils.AsyncQueue[[]JwksSource] {
+func (j *JwksStoreController) JwksQueue() utils.AsyncQueue[[]jwks.JwksSource] {
 	return j.jwksQueue
 }

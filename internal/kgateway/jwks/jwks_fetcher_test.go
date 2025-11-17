@@ -1,4 +1,4 @@
-package agentjwks
+package jwks
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/agentjwks/mocks"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks/mocks"
 )
 
 func TestRestoreCacheState(t *testing.T) {
@@ -28,7 +28,7 @@ func TestRestoreCacheState(t *testing.T) {
 	assert.NoError(t, err)
 
 	anotherCache := NewJwksCache()
-	err = LoadJwksfromJson((string)(serializedKeyset))
+	err = anotherCache.LoadfromJson((string)(serializedKeyset))
 	assert.NoError(t, err)
 
 	assert.Equal(t, jwksCache, anotherCache)

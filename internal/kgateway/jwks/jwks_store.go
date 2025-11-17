@@ -1,4 +1,4 @@
-package agentjwks
+package jwks
 
 import (
 	"context"
