@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/utils"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -19,9 +20,10 @@ type JwksStore struct {
 	jwksFetcher     *JwksFetcher
 	configMapSyncer *ConfigMapSyncer
 	updates         <-chan map[string]string
+	latestJwksQueue utils.AsyncQueue[[]JwksSource]
 }
 
-func BuildJwksStore(ctx context.Context, mgr manager.Manager, deploymentNamespace string) *JwksStore {
+func BuildJwksStore(ctx context.Context, mgr manager.Manager, jwksQueue utils.AsyncQueue[[]JwksSource], deploymentNamespace string) *JwksStore {
 	log := log.Log.WithName("jwks store setup")
 	log.Info("creating jwks store")
 
@@ -29,6 +31,7 @@ func BuildJwksStore(ctx context.Context, mgr manager.Manager, deploymentNamespac
 	jwksStore := &JwksStore{
 		mgr:             mgr,
 		jwksCache:       jwksCache,
+		latestJwksQueue: jwksQueue,
 		jwksFetcher:     NewJwksFetcher(jwksCache),
 		configMapSyncer: &ConfigMapSyncer{Client: mgr.GetClient(), DeploymentNamespace: deploymentNamespace},
 	}
@@ -58,13 +61,22 @@ func (s *JwksStore) Start(ctx context.Context) error {
 
 	go s.syncToConfigMap(ctx)
 	go s.jwksFetcher.Run(ctx)
+	go s.updateJwksSources(ctx)
 
 	<-ctx.Done()
 	return nil
 }
 
-func (s *JwksStore) UpdateJwksSources(ctx context.Context, jwks []JwksSource) error {
-	return s.jwksFetcher.UpdateJwksSources(ctx, jwks)
+func (s *JwksStore) updateJwksSources(ctx context.Context) {
+	log := log.FromContext(ctx)
+	for {
+		latestJwks, err := s.latestJwksQueue.Dequeue(ctx)
+		if err != nil {
+			log.Error(err, "error dequeuing jwks update")
+			return
+		}
+		s.jwksFetcher.UpdateJwksSources(ctx, latestJwks)
+	}
 }
 
 func (s *JwksStore) syncToConfigMap(ctx context.Context) {
@@ -84,7 +96,7 @@ func (s *JwksStore) syncToConfigMap(ctx context.Context) {
 	}
 }
 
-// NeedLeaderElection returns true to ensure that the JwksStore runs only on the leader
+// JwksStore runs only on the leader
 func (r *JwksStore) NeedLeaderElection() bool {
 	return true
 }

@@ -229,15 +229,14 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 			return nil, err
 		}
 
-		jwksStore := jwks.BuildJwksStore(ctx, cfg.Manager, namespaces.GetPodNamespace())
-		if err := cfg.Manager.Add(jwksStore); err != nil {
-			setupLog.Error(err, "unable to add agentgateway JwksStore runnable")
+		jwksStoreCtrl := agent_jwks_store.NewJwksStoreController(cfg.Manager, cfg.Client, cfg.AgwCollections)
+		if err := cfg.Manager.Add(jwksStoreCtrl); err != nil {
+			setupLog.Error(err, "unable to add agentgateway JwksStoreController runnable")
 			return nil, err
 		}
-
-		_, err := agent_jwks_store.NewJwksStoreController(cfg.Manager, jwksStore)
-		if err != nil {
-			setupLog.Error(err, "error creating jwks store controller")
+		jwksStore := jwks.BuildJwksStore(ctx, cfg.Manager, jwksStoreCtrl.JwksQueue(), namespaces.GetPodNamespace())
+		if err := cfg.Manager.Add(jwksStore); err != nil {
+			setupLog.Error(err, "unable to add agentgateway JwksStore runnable")
 			return nil, err
 		}
 	}
