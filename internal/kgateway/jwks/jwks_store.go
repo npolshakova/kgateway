@@ -54,7 +54,7 @@ func (s *JwksStore) Start(ctx context.Context) error {
 		log.Error(err, "error loading jwks store state")
 	}
 
-	go s.syncToConfigMap(ctx)
+	go s.syncToConfigMaps(ctx)
 	go s.jwksFetcher.Run(ctx)
 	go s.updateJwksSources(ctx)
 
@@ -75,7 +75,7 @@ func (s *JwksStore) updateJwksSources(ctx context.Context) {
 	}
 }
 
-func (s *JwksStore) syncToConfigMap(ctx context.Context) {
+func (s *JwksStore) syncToConfigMaps(ctx context.Context) {
 	log := log.FromContext(ctx)
 
 	for {

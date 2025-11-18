@@ -22,11 +22,11 @@ import (
 // jwks store.
 type JwksFetcher struct {
 	mu            sync.Mutex
-	Cache         *jwksCache
-	Client        JwksHttpClient
-	KeysetSources map[string]*JwksSource
-	Schedule      FetchingSchedule
-	Subscribers   []chan []map[string]string
+	cache         *jwksCache
+	jwksClient    JwksHttpClient
+	keysetSources map[string]*JwksSource
+	schedule      FetchingSchedule
+	subscribers   []chan []map[string]string
 }
 
 type FetchingSchedule []fetchAt
@@ -60,18 +60,18 @@ type jwksHttpClientImpl struct {
 
 func NewJwksFetcher(cache *jwksCache) *JwksFetcher {
 	toret := &JwksFetcher{
-		Cache: cache,
-		Client: &jwksHttpClientImpl{
+		cache: cache,
+		jwksClient: &jwksHttpClientImpl{
 			Client: &http.Client{Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
 				},
 			}}},
-		KeysetSources: make(map[string]*JwksSource),
-		Schedule:      make([]fetchAt, 0),
-		Subscribers:   make([]chan []map[string]string, 0),
+		keysetSources: make(map[string]*JwksSource),
+		schedule:      make([]fetchAt, 0),
+		subscribers:   make([]chan []map[string]string, 0),
 	}
-	heap.Init(&toret.Schedule)
+	heap.Init(&toret.schedule)
 
 	return toret
 }
@@ -120,45 +120,45 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 
 	now := time.Now()
 	for {
-		maybeFetch := f.Schedule.Peek()
+		maybeFetch := f.schedule.Peek()
 		if maybeFetch == nil || maybeFetch.at.After(now) {
 			break
 		}
 
-		fetch := heap.Pop(&f.Schedule).(fetchAt)
+		fetch := heap.Pop(&f.schedule).(fetchAt)
 		if fetch.keysetSource.Deleted {
 			continue
 		}
-		jwks, err := f.Client.FetchJwks(ctx, fetch.keysetSource.JwksURL)
+		jwks, err := f.jwksClient.FetchJwks(ctx, fetch.keysetSource.JwksURL)
 		if err != nil {
 			log.Error(err, "error fetching jwks from ", fetch.keysetSource.JwksURL)
 			if fetch.retryAttempt < 5 { // backoff by 5s * retry attempt number
-				heap.Push(&f.Schedule, fetchAt{at: now.Add(time.Duration(5*(fetch.retryAttempt+1)) * time.Second), keysetSource: fetch.keysetSource, retryAttempt: fetch.retryAttempt + 1})
+				heap.Push(&f.schedule, fetchAt{at: now.Add(time.Duration(5*(fetch.retryAttempt+1)) * time.Second), keysetSource: fetch.keysetSource, retryAttempt: fetch.retryAttempt + 1})
 			} else {
 				// give up retrying and schedule an update at a later time
-				heap.Push(&f.Schedule, fetchAt{at: now.Add(fetch.keysetSource.Ttl), keysetSource: fetch.keysetSource})
+				heap.Push(&f.schedule, fetchAt{at: now.Add(fetch.keysetSource.Ttl), keysetSource: fetch.keysetSource})
 			}
 			continue
 		}
 
-		haveUpdates, err = f.Cache.compareAndAddJwks(fetch.keysetSource.JwksURL, jwks)
+		haveUpdates, err = f.cache.compareAndAddJwks(fetch.keysetSource.JwksURL, jwks)
 		// error serializing jwks, shouldn't happen, retry, haveUpdates is false
 		if err != nil {
 			log.Error(err, "error adding jwks")
-			heap.Push(&f.Schedule, fetchAt{at: now.Add(time.Duration(5*(fetch.retryAttempt+1)) * time.Second), keysetSource: fetch.keysetSource, retryAttempt: fetch.retryAttempt + 1})
+			heap.Push(&f.schedule, fetchAt{at: now.Add(time.Duration(5*(fetch.retryAttempt+1)) * time.Second), keysetSource: fetch.keysetSource, retryAttempt: fetch.retryAttempt + 1})
 			continue
 		}
 
-		heap.Push(&f.Schedule, fetchAt{at: now.Add(fetch.keysetSource.Ttl), keysetSource: fetch.keysetSource})
+		heap.Push(&f.schedule, fetchAt{at: now.Add(fetch.keysetSource.Ttl), keysetSource: fetch.keysetSource})
 	}
 
 	if haveUpdates {
-		for _, s := range f.Cache.stores {
+		for _, s := range f.cache.stores {
 			log.Info("1111111111111111111111111111111", "size", s.size)
 		}
 
-		update := f.Cache.toJson()
-		for _, s := range f.Subscribers {
+		update := f.cache.toJson()
+		for _, s := range f.subscribers {
 			s <- update
 		}
 	}
@@ -175,20 +175,20 @@ func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates JwksSources
 	defer f.mu.Unlock()
 
 	todelete := make([]string, 0)
-	for s := range f.KeysetSources {
+	for s := range f.keysetSources {
 		if _, ok := maybeUpdates[s]; !ok {
 			todelete = append(todelete, s)
 		}
 	}
 
 	for _, s := range updates {
-		if _, ok := f.KeysetSources[s.JwksURL]; !ok {
+		if _, ok := f.keysetSources[s.JwksURL]; !ok {
 			if err := f.addKeyset(s.JwksURL, s.Ttl); err != nil {
 				errs = append(errs, err)
 			}
 			continue
 		}
-		if *f.KeysetSources[s.JwksURL] != s {
+		if *f.keysetSources[s.JwksURL] != s {
 			if err := f.updateKeyset(s.JwksURL, s.Ttl); err != nil {
 				errs = append(errs, err)
 			}
@@ -201,8 +201,8 @@ func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates JwksSources
 	}
 
 	if haveUpdates {
-		update := f.Cache.toJson()
-		for _, s := range f.Subscribers {
+		update := f.cache.toJson()
+		for _, s := range f.subscribers {
 			s <- update
 		}
 	}
@@ -216,16 +216,16 @@ func (f *JwksFetcher) addKeyset(jwksUrl string, ttl time.Duration) error {
 	}
 
 	keysetSource := &JwksSource{JwksURL: jwksUrl, Ttl: ttl, Deleted: false}
-	f.KeysetSources[jwksUrl] = keysetSource
-	heap.Push(&f.Schedule, fetchAt{at: time.Now(), keysetSource: keysetSource}) // schedule an immediate fetch
+	f.keysetSources[jwksUrl] = keysetSource
+	heap.Push(&f.schedule, fetchAt{at: time.Now(), keysetSource: keysetSource}) // schedule an immediate fetch
 
 	return nil
 }
 
 func (f *JwksFetcher) removeKeyset(jwksUrl string) bool {
-	if keysetSource, ok := f.KeysetSources[jwksUrl]; ok {
-		delete(f.KeysetSources, jwksUrl)
-		f.Cache.deleteJwks(jwksUrl)
+	if keysetSource, ok := f.keysetSources[jwksUrl]; ok {
+		delete(f.keysetSources, jwksUrl)
+		f.cache.deleteJwks(jwksUrl)
 		keysetSource.Deleted = true
 		return true
 	}
@@ -233,8 +233,8 @@ func (f *JwksFetcher) removeKeyset(jwksUrl string) bool {
 }
 
 func (f *JwksFetcher) updateKeyset(jwksUrl string, ttl time.Duration) error {
-	if keysetSource, ok := f.KeysetSources[jwksUrl]; ok {
-		delete(f.KeysetSources, jwksUrl)
+	if keysetSource, ok := f.keysetSources[jwksUrl]; ok {
+		delete(f.keysetSources, jwksUrl)
 		keysetSource.Deleted = true
 	}
 	return f.addKeyset(jwksUrl, ttl)
@@ -245,7 +245,7 @@ func (f *JwksFetcher) SubscribeToUpdates() chan []map[string]string {
 	defer f.mu.Unlock()
 
 	subscriber := make(chan []map[string]string)
-	f.Subscribers = append(f.Subscribers, subscriber)
+	f.subscribers = append(f.subscribers, subscriber)
 
 	return subscriber
 }
