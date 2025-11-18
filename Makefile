@@ -111,7 +111,7 @@ fmt:  ## Format the code with golangci-lint
 
 .PHONY: fmt-changed
 fmt-changed: ## Format only the changed code with golangci-lint
-	git status -s -uno | awk '{print $$2}' | grep '.*.go$$' | xargs -r $(CUSTOM_GOLANGCI_LINT_FMT)
+	( git diff --name-only --diff-filter=ACMR; git diff --name-only --cached --diff-filter=ACMR ) | grep '.*\.go$$' | sort -u | xargs -r $(CUSTOM_GOLANGCI_LINT_FMT)
 
 # must be a separate target so that make waits for it to complete before moving on
 .PHONY: mod-download

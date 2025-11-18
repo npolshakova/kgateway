@@ -72,7 +72,7 @@ func translateBackendPolicyToAgw(
 	if s := backend.AI; s != nil {
 		pol, err := translateBackendAI(ctx, policy, policyName, policyTarget)
 		if err != nil {
-			logger.Error("error processing backend Tracing", "err", err)
+			logger.Error("error processing backend AI", "err", err)
 			errs = append(errs, err)
 		}
 		agwPolicies = append(agwPolicies, pol...)
@@ -81,7 +81,7 @@ func translateBackendPolicyToAgw(
 	if s := backend.Auth; s != nil {
 		pol, err := translateBackendAuth(ctx, policy, policyName, policyTarget)
 		if err != nil {
-			logger.Error("error processing backend Tracing", "err", err)
+			logger.Error("error processing backend Auth", "err", err)
 			errs = append(errs, err)
 		}
 		agwPolicies = append(agwPolicies, pol...)
@@ -99,7 +99,8 @@ func translateBackendTLS(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, tar
 
 	// Build CA bundle from referenced ConfigMaps, if provided
 	var caCert *wrapperspb.BytesValue
-	if tls := policy.Spec.Backend.TLS; tls != nil && len(tls.CACertificateRefs) > 0 {
+	tls := policy.Spec.Backend.TLS
+	if tls != nil && len(tls.CACertificateRefs) > 0 {
 		var sb strings.Builder
 		for _, ref := range tls.CACertificateRefs {
 			nn := types.NamespacedName{Namespace: policy.Namespace, Name: ref.Name}
@@ -125,18 +126,22 @@ func translateBackendTLS(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, tar
 
 	// Map verify SANs to Hostname if provided (use first entry only)
 	var hostname *wrapperspb.StringValue
-	if tls := policy.Spec.Backend.TLS; tls != nil && len(tls.VerifySubjectAltNames) > 0 {
+	if tls != nil && len(tls.VerifySubjectAltNames) > 0 {
+		if len(tls.VerifySubjectAltNames) > 1 {
+			logger.Warn("multiple verify SANs provided; using first only", "policy", policy.Name, "sans", tls.VerifySubjectAltNames)
+		}
 		hostname = wrapperspb.String(tls.VerifySubjectAltNames[0])
 	}
 
 	// Map insecure modes
 	var insecure *wrapperspb.BoolValue
-	if tls := policy.Spec.Backend.TLS; tls != nil && tls.InsecureSkipVerify != nil {
+	if tls != nil && tls.InsecureSkipVerify != nil {
 		switch *tls.InsecureSkipVerify {
 		case v1alpha1.InsecureTLSModeAll:
 			insecure = wrapperspb.Bool(true)
 		case v1alpha1.InsecureTLSModeHostname:
 			// Not directly supported in agentgateway API; fall back to default verification
+			logger.Warn("insecure hostname-only verification is not supported; ignoring", "policy", policy.Name)
 		}
 	}
 
