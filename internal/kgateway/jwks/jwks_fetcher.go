@@ -164,6 +164,16 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 	}
 }
 
+func (f *JwksFetcher) SubscribeToUpdates() chan []map[string]string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	subscriber := make(chan []map[string]string)
+	f.subscribers = append(f.subscribers, subscriber)
+
+	return subscriber
+}
+
 func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates JwksSources) error {
 	var errs []error
 	maybeUpdates := make(map[string]JwksSource)
@@ -238,16 +248,6 @@ func (f *JwksFetcher) updateKeyset(jwksUrl string, ttl time.Duration) error {
 		keysetSource.Deleted = true
 	}
 	return f.addKeyset(jwksUrl, ttl)
-}
-
-func (f *JwksFetcher) SubscribeToUpdates() chan []map[string]string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	subscriber := make(chan []map[string]string)
-	f.subscribers = append(f.subscribers, subscriber)
-
-	return subscriber
 }
 
 func (c *jwksHttpClientImpl) FetchJwks(ctx context.Context, jwksURL string) (jose.JSONWebKeySet, error) {

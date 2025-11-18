@@ -10,13 +10,17 @@ import (
 
 const MAX_JWKS_STORE_SIZE = 35 * 1024 // 1024*1024 + 400*1024 // 1.4MiB
 
-type jwksStore struct {
-	jwks map[string]string
-	size int // this is an approximate size, see `jwksStore.Size()``
-}
-
+// jwks cache is an ordered collection of stores, each containing jwks whose
+// total size doesn't exceed MAX_JWKS_STORE_SIZE
+// a consistent jwks uri hash (see `UriHash()`) is used to determine the store
+// for a given jwks
 type jwksCache struct {
 	stores []jwksStore
+}
+
+type jwksStore struct {
+	jwks map[string]string // jwks uri -> jwks
+	size int               // this is an approximate size, see `jwksStore.Size()``
 }
 
 func NewJwksCache() *jwksCache {
@@ -31,6 +35,7 @@ func newJwksStore() jwksStore {
 	}
 }
 
+// Re-create jwks cache from state persisted in ConfigMaps
 func (c *jwksCache) LoadJwksFromStores(storedJwks []map[string]string) error {
 	newCache := NewJwksCache()
 
@@ -48,6 +53,9 @@ func (c *jwksCache) LoadJwksFromStores(storedJwks []map[string]string) error {
 	return nil
 }
 
+// Add a jwks to cache. If an exact same jwks is already present in the cache, the result is a nop.
+// If the store size exceeds `MAX_JWKS_STORE_SIZE` as a result of adding a jwks, a new store is added
+// and all jwks are re-balanced between all stores.
 func (c *jwksCache) compareAndAddJwks(uri string, jwks jose.JSONWebKeySet) (bool, error) {
 	serializedJwks, err := json.Marshal(jwks)
 	if err != nil {
@@ -68,13 +76,17 @@ func (c *jwksCache) compareAndAddJwks(uri string, jwks jose.JSONWebKeySet) (bool
 	c.stores[idx].jwks[uri] = string(serializedJwks)
 	c.stores[idx].size += len(uri) + len(c.stores[idx].jwks[uri])
 
-	if c.stores[idx].size > MAX_JWKS_STORE_SIZE {
+	if c.stores[idx].serializedStoreSize() > MAX_JWKS_STORE_SIZE {
 		c.addStore()
 	}
 
 	return true, nil
 }
 
+// Remove jwks from cache. If store size is reduced to zero as a result of jwks removal
+// the store is deleted, and all jwks are re-balanced between remaining stores.
+// If the last store size is reduced to zero, that store is not deleted.
+// TODO (dmitri-d maybe we should delete it?)
 func (c *jwksCache) deleteJwks(uri string) {
 	idx := 0
 	if l := len(c.stores); l > 1 {
@@ -91,15 +103,6 @@ func (c *jwksCache) deleteJwks(uri string) {
 	}
 }
 
-func (c *jwksCache) copyJwks(uri string, jwks string) {
-	idx := 0
-	if l := len(c.stores); l > 1 {
-		idx = int(UriHash(uri) % uint64(l))
-	}
-	c.stores[idx].jwks[uri] = string(jwks)
-	c.stores[idx].size += len(uri) + len(c.stores[idx].jwks[uri])
-}
-
 func (c *jwksCache) toJson() []map[string]string {
 	copy := make([]map[string]string, len(c.stores))
 	for i, store := range c.stores {
@@ -108,6 +111,7 @@ func (c *jwksCache) toJson() []map[string]string {
 	return copy
 }
 
+// add another store, rebalance keysets
 func (c *jwksCache) addStore() {
 	newCache := jwksCache{
 		stores: make([]jwksStore, len(c.stores)+1),
@@ -125,6 +129,7 @@ func (c *jwksCache) addStore() {
 	c.stores = newCache.stores
 }
 
+// delete an empty store, rebalance keysets
 func (c *jwksCache) deleteStore() {
 	if len(c.stores) == 1 {
 		return
@@ -147,10 +152,19 @@ func (c *jwksCache) deleteStore() {
 	c.stores = newCache.stores
 }
 
+func (c *jwksCache) copyJwks(uri string, jwks string) {
+	idx := 0
+	if l := len(c.stores); l > 1 {
+		idx = int(UriHash(uri) % uint64(l))
+	}
+	c.stores[idx].jwks[uri] = string(jwks)
+	c.stores[idx].size += len(uri) + len(c.stores[idx].jwks[uri])
+}
+
 // returns the size of serialized store (as it's stored in a ConfigMap)
 // weird formula is based on comparison of differences in sizes between
 // the internal store representation and store state persisted in a ConfigMap
-func (s jwksStore) Size() int {
+func (s jwksStore) serializedStoreSize() int {
 	return s.size + 7*len(s.jwks) + 2
 }
 
