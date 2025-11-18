@@ -3,17 +3,19 @@ package jwks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/apiclient"
 )
 
 const JwksStoreName = "jwks-store"
+const JwksStoreComponent = "app.kubernetes.io/component"
+
+var JwksStoreLabel = map[string]string{JwksStoreComponent: JwksStoreName}
 
 // ConfigMapSyncer is used for writing to/reading from a backing ConfigMap of jwks store data
 // The format used to store jwks data is key-values of jwks-url:serialized jwks
@@ -33,64 +35,118 @@ func JwksFromConfigMap(cm *corev1.ConfigMap) (map[string]string, error) {
 	return allJwks, nil
 }
 
-func (cs *ConfigMapSyncer) WriteJwksToConfigMap(ctx context.Context, updated map[string]string) error {
+func (cs *ConfigMapSyncer) WriteJwksToConfigMap(ctx context.Context, updated []map[string]string) error {
 	log := log.FromContext(ctx)
 
-	serializedUpdate, err := json.Marshal(updated)
-	if err != nil {
-		log.Error(err, "error serialiazing jwks store update")
-		return err
-	}
-
-	existing, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Get(ctx, JwksStoreName, metav1.GetOptions{})
-	if client.IgnoreNotFound(err) != nil {
-		log.Error(err, "error retrieving jwks ConfigMap store")
-		return err
-	}
-
-	if err != nil { // not found
-		cm := cs.newJwksStoreConfigMap()
-		cm.Data[JwksStoreName] = string(serializedUpdate)
-		cm, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Create(ctx, cm, metav1.CreateOptions{})
+	serializedUpdates := make([]string, len(updated))
+	for i, m := range updated {
+		serializedUpdate, err := json.Marshal(m)
 		if err != nil {
-			log.Error(err, "error creating jwks ConfigMap store")
+			log.Error(err, "error serialiazing jwks store update")
 			return err
 		}
-		return nil
+		serializedUpdates[i] = string(serializedUpdate)
 	}
 
-	existing.Data[JwksStoreName] = string(serializedUpdate)
-	_, err = cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Update(ctx, existing, metav1.UpdateOptions{})
+	allExistingStores, err := cs.fetchExistingStores(ctx)
 	if err != nil {
-		log.Error(err, "error updating jwks ConfigMap store")
+		log.Error(err, "error retrieving jwks ConfigMap stores")
 		return err
+	}
+
+	for i, u := range serializedUpdates {
+		existing, ok := allExistingStores[jwksStoreName(i)]
+		if !ok {
+			cm := cs.newJwksStoreConfigMap(jwksStoreName(i))
+			cm.Data[JwksStoreName] = u
+			cm, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Create(ctx, cm, metav1.CreateOptions{})
+			if err != nil {
+				log.Error(err, "error creating jwks ConfigMap store")
+				return err
+			}
+		} else {
+			existing.Data[JwksStoreName] = u
+			_, err = cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Update(ctx, existing, metav1.UpdateOptions{})
+			if err != nil {
+				log.Error(err, "error updating jwks ConfigMap store")
+				return err
+			}
+		}
+	}
+
+	// do gc
+	if len(allExistingStores) > len(updated) {
+		for i := len(updated); i < len(allExistingStores); i++ {
+			err = cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Delete(ctx, jwksStoreName(i), metav1.DeleteOptions{})
+			if err != nil {
+				log.Error(err, "error deleting unused jwks ConfigMap store")
+				return err
+			}
+		}
 	}
 
 	return nil
 }
 
-func (cs *ConfigMapSyncer) LoadJwksFromConfigMap(ctx context.Context) (map[string]string, error) {
+func (cs *ConfigMapSyncer) LoadJwksFromConfigMaps(ctx context.Context) ([]map[string]string, error) {
 	log := log.FromContext(ctx)
 
-	jwksStoreConfigMap, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Get(ctx, JwksStoreName, metav1.GetOptions{})
-
-	if apierrors.IsNotFound(err) {
-		return nil, nil
-	}
+	allExistingStores, err := cs.fetchExistingStores(ctx)
 	if err != nil {
-		log.Error(err, "error retrieving jwks ConfigMap store")
+		log.Error(err, "error retrieving jwks ConfigMap stores")
 		return nil, err
 	}
 
-	return JwksFromConfigMap(jwksStoreConfigMap)
+	if len(allExistingStores) == 0 {
+		return nil, nil
+	}
+
+	toret := make([]map[string]string, len(allExistingStores))
+	for i := range len(allExistingStores) {
+		cm, ok := allExistingStores[jwksStoreName(i)]
+		if !ok {
+			return nil, fmt.Errorf("error loading jwks stores, store '%s' doesn't exist", jwksStoreName(i))
+		}
+
+		jwks, err := JwksFromConfigMap(cm)
+		if err != nil {
+			log.Error(err, "error deserializing jwks ConfigMap store", "store", jwksStoreName(i))
+			return nil, err
+		}
+
+		toret[i] = jwks
+	}
+
+	return toret, nil
 }
 
-func (cs *ConfigMapSyncer) newJwksStoreConfigMap() *corev1.ConfigMap {
+func (cs *ConfigMapSyncer) newJwksStoreConfigMap(name string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      JwksStoreName,
+			Name:      name,
 			Namespace: cs.DeploymentNamespace,
+			Labels:    JwksStoreLabel,
 		},
 		Data: make(map[string]string),
 	}
+}
+
+func (cs *ConfigMapSyncer) fetchExistingStores(ctx context.Context) (map[string]*corev1.ConfigMap, error) {
+	allExistingStores, err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: JwksStoreComponent + "=" + JwksStoreName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	toret := make(map[string]*corev1.ConfigMap)
+	for _, s := range allExistingStores.Items {
+		toret[s.Name] = &s
+	}
+
+	return toret, nil
+}
+
+func jwksStoreName(i int) string {
+	return fmt.Sprintf("%s-%d", JwksStoreName, i)
 }

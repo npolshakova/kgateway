@@ -20,7 +20,7 @@ type JwksStore struct {
 	jwksCache       *jwksCache
 	jwksFetcher     *JwksFetcher
 	configMapSyncer *ConfigMapSyncer
-	updates         <-chan map[string]string
+	updates         <-chan []map[string]string
 	latestJwksQueue utils.AsyncQueue[JwksSources]
 }
 
@@ -45,15 +45,14 @@ func BuildJwksStore(ctx context.Context, cli apiclient.Client, jwksQueue utils.A
 func (s *JwksStore) Start(ctx context.Context) error {
 	log := log.FromContext(ctx)
 
-	storedJwks, err := s.configMapSyncer.LoadJwksFromConfigMap(ctx)
+	storedJwks, err := s.configMapSyncer.LoadJwksFromConfigMaps(ctx)
 	if err != nil {
 		log.Error(err, "error loading jwks store from a ConfigMap")
 	}
-	jwks, err := LoadJwksfromJson(storedJwks)
+	err = s.jwksCache.LoadJwksFromStores(storedJwks)
 	if err != nil {
-		log.Error(err, "error deserializing jwks store state")
+		log.Error(err, "error loading jwks store state")
 	}
-	s.jwksCache.Jwks = jwks
 
 	go s.syncToConfigMap(ctx)
 	go s.jwksFetcher.Run(ctx)
@@ -66,6 +65,7 @@ func (s *JwksStore) Start(ctx context.Context) error {
 func (s *JwksStore) updateJwksSources(ctx context.Context) {
 	log := log.FromContext(ctx)
 	for {
+		log.Info("dequeuing jwks update")
 		latestJwks, err := s.latestJwksQueue.Dequeue(ctx)
 		if err != nil {
 			log.Error(err, "error dequeuing jwks update")

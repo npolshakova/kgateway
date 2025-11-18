@@ -2,7 +2,6 @@ package agentjwksstore
 
 import (
 	"context"
-	"errors"
 
 	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
@@ -78,21 +77,12 @@ func (j *JwksStoreController) Start(ctx context.Context) error {
 		j.waitForSync...,
 	)
 
-	if !j.mgr.GetCache().WaitForCacheSync(ctx) {
-		return errors.New("kube gateway proxy syncer sync loop waiting for all caches to sync failed")
-	}
-	logger.Info("caches warm!")
-
 	j.jwks.Register(func(o krt.Event[jwks.JwksSources]) {
 		j.jwksQueue.Enqueue(o.Latest())
 	})
 
 	<-ctx.Done()
 	return nil
-}
-
-func (j *JwksStoreController) CacheSyncs() []cache.InformerSynced {
-	return j.waitForSync
 }
 
 // runs on the leader only
