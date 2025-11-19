@@ -46,10 +46,9 @@ func (cs *ConfigMapSyncer) WriteJwksToConfigMaps(ctx context.Context, updates ma
 		switch jwks {
 		case "": // empty jwks == remove the underlying ConfigMap
 			err := cs.Client.Kube().CoreV1().ConfigMaps(cs.DeploymentNamespace).Delete(ctx, JwksConfigMapName(uri), metav1.DeleteOptions{})
-			if err != nil {
+			if client.IgnoreNotFound(err) != nil {
 				log.Error(err, "error deleting jwks ConfigMap")
 				errs = append(errs, err)
-				continue
 			}
 		default:
 			existing, err := cs.fetchPersistedJwks(ctx, uri)
@@ -146,9 +145,9 @@ func (cs *ConfigMapSyncer) fetchAllPersistedJwks(ctx context.Context) ([]*corev1
 		return nil, err
 	}
 
-	toret := make([]*corev1.ConfigMap, 0)
-	for _, s := range allExistingStores.Items {
-		toret = append(toret, &s)
+	toret := make([]*corev1.ConfigMap, len(allExistingStores.Items))
+	for idx, s := range allExistingStores.Items {
+		toret[idx] = &s
 	}
 
 	return toret, nil

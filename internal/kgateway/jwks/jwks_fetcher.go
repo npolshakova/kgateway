@@ -144,7 +144,7 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 		maybeUpdatedJwks, err := f.cache.compareAndAddJwks(fetch.keysetSource.JwksURL, jwks)
 		// error serializing jwks, shouldn't happen, retry, haveUpdates is false
 		if err != nil {
-			log.Error(err, "error adding jwks")
+			log.Error(err, "error adding jwks", "uri", fetch.keysetSource.JwksURL)
 			heap.Push(&f.schedule, fetchAt{at: now.Add(time.Duration(5*(fetch.retryAttempt+1)) * time.Second), keysetSource: fetch.keysetSource, retryAttempt: fetch.retryAttempt + 1})
 			continue
 		}
