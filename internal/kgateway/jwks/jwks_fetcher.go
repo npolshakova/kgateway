@@ -16,10 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// JwksFetcher is used for fetching and periodic updates of jwks
-// Fetched jwks are stored in jwksCache. All access to jwksCache is synchronized via `mu` mutex.
-// When a jwks is updated, registered subscribers are sent the current state of
-// jwks store.
+// JwksFetcher is used for fetching and periodic updates of jwks.
+// Fetched jwks are stored in jwksCache. All access to jwksCache is synchronized via mu mutex.
+// When a jwks is updated, registered subscribers are sent the update.
 type JwksFetcher struct {
 	mu            sync.Mutex
 	cache         *jwksCache
@@ -142,7 +141,7 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 		}
 
 		maybeUpdatedJwks, err := f.cache.compareAndAddJwks(fetch.keysetSource.JwksURL, jwks)
-		// error serializing jwks, shouldn't happen, retry, haveUpdates is false
+		// error serializing jwks, shouldn't happen, retry
 		if err != nil {
 			log.Error(err, "error adding jwks", "uri", fetch.keysetSource.JwksURL)
 			heap.Push(&f.schedule, fetchAt{at: now.Add(time.Duration(5*(fetch.retryAttempt+1)) * time.Second), keysetSource: fetch.keysetSource, retryAttempt: fetch.retryAttempt + 1})

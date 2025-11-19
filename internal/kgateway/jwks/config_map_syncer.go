@@ -22,12 +22,14 @@ const JwksStoreComponent = "app.kubernetes.io/component"
 
 var JwksStoreLabel = map[string]string{JwksStoreComponent: jwksStorePrefix}
 
-// ConfigMapSyncer is used for writing to/reading from backing ConfigMaps
+// ConfigMapSyncer is used for writing/reading jwks' to/from ConfigMaps.
 type ConfigMapSyncer struct {
 	Client              apiclient.Client
 	DeploymentNamespace string
 }
 
+// Load jwks from a ConfigMap.
+// Returns a map of jwks-uri -> jwks (currently one jwks-uri per ConfigMap).
 func JwksFromConfigMap(cm *corev1.ConfigMap) (map[string]string, error) {
 	jwksStore := cm.Data[jwksStorePrefix]
 	jwks := make(map[string]string)
@@ -38,6 +40,15 @@ func JwksFromConfigMap(cm *corev1.ConfigMap) (map[string]string, error) {
 	return jwks, nil
 }
 
+// Generates ConfigMap name based on jwks uri. Resulting name is a concatenation of "jwks-store-" prefix and an MD5 hash of the jwks uri.
+// The length of the name is a constant 32 chars (hash) + legth of the prefix.
+func JwksConfigMapName(jwksUri string) string {
+	hash := md5.Sum([]byte(jwksUri))
+	return fmt.Sprintf("%s-%s", jwksStorePrefix, hex.EncodeToString(hash[:]))
+}
+
+// Write out jwks' in updates to ConfigMaps, one jwks uri per ConfigMap. updates contains a map of jwks-uri to serialized jwks.
+// Each ConfigMap is labelled with "app.kubernetes.io/component":"jwks-store" to support bulk loading of jwks' handled by LoadJwksFromConfigMaps().
 func (cs *ConfigMapSyncer) WriteJwksToConfigMaps(ctx context.Context, updates map[string]string) error {
 	log := log.FromContext(ctx)
 	errs := make([]error, 0)
@@ -88,6 +99,7 @@ func (cs *ConfigMapSyncer) WriteJwksToConfigMaps(ctx context.Context, updates ma
 	return errors.Join(errs...)
 }
 
+// Loads all jwks persisted in ConfigMaps. The result is a map of jwks-uri to serialized jwks.
 func (cs *ConfigMapSyncer) LoadJwksFromConfigMaps(ctx context.Context) (map[string]string, error) {
 	log := log.FromContext(ctx)
 
@@ -151,9 +163,4 @@ func (cs *ConfigMapSyncer) fetchAllPersistedJwks(ctx context.Context) ([]*corev1
 	}
 
 	return toret, nil
-}
-
-func JwksConfigMapName(jwksUri string) string {
-	hash := md5.Sum([]byte(jwksUri))
-	return fmt.Sprintf("%s-%s", jwksStorePrefix, hex.EncodeToString(hash[:]))
 }

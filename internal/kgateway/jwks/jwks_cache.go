@@ -8,8 +8,6 @@ import (
 	"github.com/go-jose/go-jose/v4"
 )
 
-const MAX_JWKS_STORE_SIZE = 35 * 1024 // 1024*1024 + 400*1024 // 1.4MiB
-
 type jwksCache struct {
 	jwks map[string]string // jwks uri -> jwks
 }
@@ -20,7 +18,7 @@ func NewJwksCache() *jwksCache {
 	}
 }
 
-// Re-create jwks cache from the state persisted in ConfigMaps
+// Re-create jwks cache from the state persisted in ConfigMaps.
 func (c *jwksCache) LoadJwksFromStores(storedJwks map[string]string) error {
 	newCache := NewJwksCache()
 	errs := make([]error, 0)

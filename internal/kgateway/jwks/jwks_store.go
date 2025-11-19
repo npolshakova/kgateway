@@ -15,6 +15,9 @@ var JwksConfigMapNamespacedName = func(jwksUri string) *types.NamespacedName {
 	return nil
 }
 
+// JwksStore handles initial fetching and periodic updates of jwks. Jwks are persisted
+// in ConfigMaps, a jwks per ConfigMap. The ConfigMaps are used to re-create internal
+// JwksStore state on startup and by traffic-plugins as source of remote jwks.
 type JwksStore struct {
 	mgr             manager.Manager
 	jwksCache       *jwksCache
@@ -92,7 +95,7 @@ func (s *JwksStore) syncToConfigMaps(ctx context.Context) {
 	}
 }
 
-// JwksStore runs only on the leader
+// JwksStore runs on the leader only
 func (r *JwksStore) NeedLeaderElection() bool {
 	return true
 }
