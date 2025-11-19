@@ -17,7 +17,7 @@ import (
 )
 
 // JwksFetcher is used for fetching and periodic updates of jwks
-// Internally fetched jwks are stored as key-values: jwks-url:jose.JSONWebKeySet
+// Fetched jwks are stored in jwksCache. All access to jwksCache is synchronized via `mu` mutex.
 // When a jwks is updated, registered subscribers are sent the current state of
 // jwks store.
 type JwksFetcher struct {
@@ -26,7 +26,7 @@ type JwksFetcher struct {
 	jwksClient    JwksHttpClient
 	keysetSources map[string]*JwksSource
 	schedule      FetchingSchedule
-	subscribers   []chan []map[string]string
+	subscribers   []chan map[string]string
 }
 
 type FetchingSchedule []fetchAt
@@ -69,7 +69,7 @@ func NewJwksFetcher(cache *jwksCache) *JwksFetcher {
 			}}},
 		keysetSources: make(map[string]*JwksSource),
 		schedule:      make([]fetchAt, 0),
-		subscribers:   make([]chan []map[string]string, 0),
+		subscribers:   make([]chan map[string]string, 0),
 	}
 	heap.Init(&toret.schedule)
 
@@ -113,7 +113,7 @@ func (f *JwksFetcher) Run(ctx context.Context) {
 
 func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 	log := log.FromContext(ctx)
-	haveUpdates := false
+	updates := make(map[string]string)
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -141,7 +141,7 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 			continue
 		}
 
-		haveUpdates, err = f.cache.compareAndAddJwks(fetch.keysetSource.JwksURL, jwks)
+		maybeUpdatedJwks, err := f.cache.compareAndAddJwks(fetch.keysetSource.JwksURL, jwks)
 		// error serializing jwks, shouldn't happen, retry, haveUpdates is false
 		if err != nil {
 			log.Error(err, "error adding jwks")
@@ -150,25 +150,23 @@ func (f *JwksFetcher) maybeFetchJwks(ctx context.Context) {
 		}
 
 		heap.Push(&f.schedule, fetchAt{at: now.Add(fetch.keysetSource.Ttl), keysetSource: fetch.keysetSource})
+		if maybeUpdatedJwks != "" {
+			updates[fetch.keysetSource.JwksURL] = maybeUpdatedJwks
+		}
 	}
 
-	if haveUpdates {
-		for _, s := range f.cache.stores {
-			log.Info("1111111111111111111111111111111", "size", s.size)
-		}
-
-		update := f.cache.toJson()
+	if len(updates) > 0 {
 		for _, s := range f.subscribers {
-			s <- update
+			s <- updates
 		}
 	}
 }
 
-func (f *JwksFetcher) SubscribeToUpdates() chan []map[string]string {
+func (f *JwksFetcher) SubscribeToUpdates() chan map[string]string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	subscriber := make(chan []map[string]string)
+	subscriber := make(chan map[string]string)
 	f.subscribers = append(f.subscribers, subscriber)
 
 	return subscriber
@@ -205,15 +203,16 @@ func (f *JwksFetcher) UpdateJwksSources(ctx context.Context, updates JwksSources
 		}
 	}
 
-	haveUpdates := false
-	for _, s := range todelete {
-		haveUpdates = haveUpdates || f.removeKeyset(s)
+	removals := make(map[string]string)
+	for _, jwksUri := range todelete {
+		if f.removeKeyset(jwksUri) {
+			removals[jwksUri] = ""
+		}
 	}
 
-	if haveUpdates {
-		update := f.cache.toJson()
+	if len(removals) > 0 {
 		for _, s := range f.subscribers {
-			s <- update
+			s <- removals
 		}
 	}
 

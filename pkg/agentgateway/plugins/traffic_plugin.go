@@ -534,24 +534,24 @@ func processJWTAuthenticationPolicy(ctx PolicyCtx, policy *v1alpha1.Agentgateway
 				errs = append(errs, fmt.Errorf("invalid jwks url in JWTAuthentication policy %w", err))
 				continue
 			}
-			jwksStoreName := jwks.JwksStoreNamespacedName()
+			jwksStoreName := jwks.JwksConfigMapNamespacedName(pp.JWKS.Remote.JwksUri)
 			if jwksStoreName == nil {
 				errs = append(errs, fmt.Errorf("jwks store hasn't been initialized"))
 				continue
 			}
-			jwksStore := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Collections.ConfigMaps, krt.FilterObjectName(*jwksStoreName)))
-			if jwksStore == nil {
-				errs = append(errs, fmt.Errorf("jwks store isn't available"))
+			jwksCM := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Collections.ConfigMaps, krt.FilterObjectName(*jwksStoreName)))
+			if jwksCM == nil {
+				errs = append(errs, fmt.Errorf("jwks ConfigMap isn't available"))
 				continue
 			}
-			alljwks, err := jwks.JwksFromConfigMap(jwksStore)
+			jwksForUri, err := jwks.JwksFromConfigMap(jwksCM)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("error deserializing jwks store %w", err))
+				errs = append(errs, fmt.Errorf("error deserializing jwks ConfigMap %w", err))
 				continue
 			}
-			jwks, ok := alljwks[pp.JWKS.Remote.JwksUri]
+			jwks, ok := jwksForUri[pp.JWKS.Remote.JwksUri]
 			if !ok {
-				errs = append(errs, fmt.Errorf("jwks %s is not available in the jwks store", pp.JWKS.Remote.JwksUri))
+				errs = append(errs, fmt.Errorf("jwks %s is not available in the jwks ConfigMap", pp.JWKS.Remote.JwksUri))
 				continue
 			}
 			jp.JwksSource = &api.TrafficPolicySpec_JWTProvider_Inline{Inline: jwks}

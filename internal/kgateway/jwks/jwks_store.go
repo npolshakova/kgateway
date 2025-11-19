@@ -11,7 +11,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/apiclient"
 )
 
-var JwksStoreNamespacedName = func() *types.NamespacedName {
+var JwksConfigMapNamespacedName = func(jwksUri string) *types.NamespacedName {
 	return nil
 }
 
@@ -20,7 +20,7 @@ type JwksStore struct {
 	jwksCache       *jwksCache
 	jwksFetcher     *JwksFetcher
 	configMapSyncer *ConfigMapSyncer
-	updates         <-chan []map[string]string
+	updates         <-chan map[string]string
 	latestJwksQueue utils.AsyncQueue[JwksSources]
 }
 
@@ -36,8 +36,8 @@ func BuildJwksStore(ctx context.Context, cli apiclient.Client, jwksQueue utils.A
 		configMapSyncer: &ConfigMapSyncer{Client: cli, DeploymentNamespace: deploymentNamespace},
 	}
 	jwksStore.updates = jwksStore.jwksFetcher.SubscribeToUpdates()
-	JwksStoreNamespacedName = func() *types.NamespacedName {
-		return &types.NamespacedName{Namespace: deploymentNamespace, Name: JwksStoreName}
+	JwksConfigMapNamespacedName = func(jwksUri string) *types.NamespacedName {
+		return &types.NamespacedName{Namespace: deploymentNamespace, Name: JwksConfigMapName(jwksUri)}
 	}
 	return jwksStore
 }
@@ -84,9 +84,9 @@ func (s *JwksStore) syncToConfigMaps(ctx context.Context) {
 			return
 		case update := <-s.updates:
 			log.Info("received an update")
-			err := s.configMapSyncer.WriteJwksToConfigMap(ctx, update)
+			err := s.configMapSyncer.WriteJwksToConfigMaps(ctx, update)
 			if err != nil {
-				log.Error(err, "error syncing jwks store state to ConfigMap")
+				log.Error(err, "error(s) syncing jwks cache to ConfigMaps")
 			}
 		}
 	}
