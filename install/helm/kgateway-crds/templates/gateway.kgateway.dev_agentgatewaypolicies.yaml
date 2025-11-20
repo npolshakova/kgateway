@@ -778,7 +778,7 @@ spec:
                               backendRef:
                                 description: |-
                                   backendRef references the remote JWKS server to reach.
-
+                                  Not implemented yet, only jwksUri is currently supported.
                                   Supported types: Service and Backend.
                                 properties:
                                   group:

@@ -67,9 +67,7 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 
 			// enqueue Backend MCP authentication JWKS (if present)
 			if p.Spec.Backend.MCP.Authentication != nil {
-				if remote := p.Spec.Backend.MCP.Authentication.JWKS.Remote; remote != nil {
-					toret = append(toret, jwks.JwksSource{JwksURL: remote.JwksUri, Ttl: remote.CacheDuration.Duration})
-				}
+				toret = append(toret, jwks.JwksSource{JwksURL: p.Spec.Backend.MCP.Authentication.JWKS.JwksUri, Ttl: p.Spec.Backend.MCP.Authentication.JWKS.CacheDuration.Duration})
 			}
 		}
 
