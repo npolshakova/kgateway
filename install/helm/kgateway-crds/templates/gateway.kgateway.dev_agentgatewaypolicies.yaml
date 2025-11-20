@@ -2522,7 +2522,7 @@ spec:
                                     jwksUri:
                                       description: IdP jwks endpoint. Default tls
                                         settings are used to connect to this url.
-                                      pattern: ^https:\/\/[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\d+)?\/.*$
+                                      pattern: ^(https|http):\/\/[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\d+)?\/.*$
                                       type: string
                                   type: object
                                   x-kubernetes-validations:
