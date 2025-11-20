@@ -737,8 +737,8 @@ type MCPAuthentication struct {
 	// +kubebuilder:validation:MaxItems=64
 	Audiences []string `json:"audiences,omitempty"`
 
-	// jwks defines the JSON Web Key Set used to validate the signature of the JWT.
-	JWKS AgentJWKS `json:"jwks"`
+	// jwks defines the remote JSON Web Key used to validate the signature of the JWT.
+	JWKS AgentRemoteJWKS `json:"jwks"`
 }
 
 type McpIDP string

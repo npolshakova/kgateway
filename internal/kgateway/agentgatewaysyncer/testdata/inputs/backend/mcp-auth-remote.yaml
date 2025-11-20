@@ -1,0 +1,142 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: example-gateway
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: example-route
+spec:
+  parentRefs:
+    - name: example-gateway
+  hostnames:
+    - "example.com"
+  rules:
+    - backendRefs:
+        - group: gateway.kgateway.dev
+          kind: Backend
+          name: mcp-backend-static
+      rule:
+        matches:
+        - path:
+            type: Prefix
+            value: /static
+    - backendRefs:
+        - group: gateway.kgateway.dev
+          kind: Backend
+          name: mcp-backend-selector
+      rule:
+        matches:
+        - path:
+            type: Prefix
+            value: /selector
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-svc
+  labels:
+    app: mcp-app
+spec:
+  selector:
+    test: test
+  ports:
+    - protocol: TCP
+      appProtocol: kgateway.dev/mcp
+      port: 80
+      targetPort: test
+    - protocol: TCP
+      appProtocol: kgateway.dev/mcp-sse
+      port: 90
+      targetPort: test-2
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: mcp-backend-selector
+spec:
+  type: MCP
+  mcp:
+    targets:
+      - name: mcp-app
+        selector:
+          service:
+            matchLabels:
+              app: mcp-app
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: mcp-backend-static
+spec:
+  type: MCP
+  mcp:
+    targets:
+      - name: mcp-target
+        static:
+          host: mcp-app.default.svc.cluster.local
+          port: 8000
+          protocol: StreamableHTTP
+          path: override-sse
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: keycloak-mcp-authn-policy
+spec:
+  targetRefs:
+    - name: mcp-backend-static
+      kind: Backend
+      group: gateway.kgateway.dev
+    - name: mcp-backend-selector
+      kind: Backend
+      group: gateway.kgateway.dev
+  backend:
+    mcp:
+      authentication:
+        issuer: http://keycloak:7080/realms/mcp
+        jwks:
+          jwksUri: http://keycloak.default.svc.cluster.local:7080/realms/mcp/protocol/openid-connect/certs
+        audiences:
+          - "account"
+        mcpIDP: KEYCLOAK
+        resourceMetadata:
+          resource: http://mcp-website-fetcher.default.svc.cluster.local/mcp
+          scopesSupported: '["tools/call/fetch"]'
+          bearerMethodsSupported: '["header"]'
+          resourceDocumentation: http://mcp-website-fetcher.default.svc.cluster.local/docs
+          resourcePolicyUri: http://mcp-website-fetcher.default.svc.cluster.local/policies
+---
+apiVersion: v1
+data:
+  mcp-realm.json: |
+    {
+      "realm": "mcp",
+      "enabled": true,
+      "clients": [
+        {
+          "clientId": "mcp_proxy",
+          "publicClient": false,
+          "publicClient": false,
+          "serviceAccountsEnabled": true,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "supersecret",
+          "directAccessGrantsEnabled": true,
+          "redirectUris": ["*"]
+        }
+      ]
+    }
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"mcp-realm.json":"{\n  \"realm\": \"mcp\",\n  \"enabled\": true,\n  \"clients\": [\n    {\n      \"clientId\": \"mcp_proxy\",\n      \"publicClient\": false,\n      \"publicClient\": false,\n      \"serviceAccountsEnabled\": true,\n      \"clientAuthenticatorType\": \"client-secret\",\n      \"secret\": \"supersecret\",\n      \"directAccessGrantsEnabled\": true,\n      \"redirectUris\": [\"*\"]\n    }\n  ]\n}\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"keycloak-realm","namespace":"default"}}
+  name: keycloak-realm
+  namespace: default

@@ -409,17 +409,6 @@ func TestBasic(t *testing.T) {
 		})
 	})
 
-	t.Run("Backend policy with mcp authn", func(t *testing.T) {
-		test(t, translatorTestCase{
-			inputFile:  "backend/mcp-authentication.yaml",
-			outputFile: "backend/mcp-authentication.yaml",
-			gwNN: types.NamespacedName{
-				Namespace: "default",
-				Name:      "example-gateway",
-			},
-		})
-	})
-
 	t.Run("Backend policy with mcp authn remote", func(t *testing.T) {
 		test(t, translatorTestCase{
 			inputFile:  "backend/mcp-auth-remote.yaml",

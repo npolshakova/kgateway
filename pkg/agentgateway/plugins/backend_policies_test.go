@@ -147,7 +147,9 @@ func TestTranslateBackendMCPAuthorization(t *testing.T) {
 	}
 
 	var ctx krt.HandlerContext
-	agw := &AgwCollections{}
+	agw := &AgwCollections{
+		ConfigMaps: nil,
+	}
 	pctx := PolicyCtx{Krt: ctx, Collections: agw}
 
 	for _, tt := range tests {
