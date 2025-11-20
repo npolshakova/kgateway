@@ -1,0 +1,71 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: example-gateway
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: example-route
+spec:
+  parentRefs:
+    - name: example-gateway
+  hostnames:
+    - "example.com"
+  rules:
+    - backendRefs:
+        - group: gateway.kgateway.dev
+          kind: Backend
+          name: mcp-backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-svc
+  labels:
+    app: mcp-app
+spec:
+  selector:
+    test: test
+  ports:
+    - protocol: TCP
+      appProtocol: kgateway.dev/mcp
+      port: 80
+      targetPort: test
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: mcp-backend
+spec:
+  type: MCP
+  mcp:
+    targets:
+      - name: mcp-app
+        selector:
+          service:
+            matchLabels:
+              app: mcp-app
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mcp-authn-policy
+spec:
+  targetRefs:
+    - name: mcp-backend
+      kind: Backend
+      group: gateway.networking.k8s.io
+  backend:
+    mcp:
+      authentication:
+        mcpIDP: AUTH0
+        issuer: https://kgateway.dev
+        jwks:
+          inline: '{"keys":[{"use":"sig","kty":"RSA","kid":"5333780687551038659","n":"1ovFhi3vyvF6DsbWanZrUUVgQVIUULNRczlyu1dJw8SoqSz5HRtfQUSVq_yuprKrpSz6oam8gAsXtpp570f8P3zm3kXBRzBq6-DAjx-4V5l0x7O89a35FkDjaiS4ci1r6_Z0nWjlIw-WY4w1kf1OwuDYjYJCgHgcRhMXblhVvcpq74de_0aezXNHVaA9sqqa78wciQc1ho2T2jkJ5-5OdfPw6YrkUwHrQIP37fH4wJCVmdyxPgwqNphQInmOrlbeisS2ih-s7ZJcC8eXaZrNZopHyrw2rhWM4eCwogFVuYpF6-coMXyEGk_SzYUaX5XMgZcZW1-SmTNtxtEKqFDSlw","e":"AQAB","x5c":["MIIC3jCCAcagAwIBAgIBQzANBgkqhkiG9w0BAQsFADAXMRUwEwYDVQQKEwxrZ2F0ZXdheS5kZXYwHhcNMjUxMTE0MTc1MjA4WhcNMjUxMTE0MTk1MjA4WjAXMRUwEwYDVQQKEwxrZ2F0ZXdheS5kZXYwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDWi8WGLe/K8XoOxtZqdmtRRWBBUhRQs1FzOXK7V0nDxKipLPkdG19BRJWr/K6msqulLPqhqbyACxe2mnnvR/w/fObeRcFHMGrr4MCPH7hXmXTHs7z1rfkWQONqJLhyLWvr9nSdaOUjD5ZjjDWR/U7C4NiNgkKAeBxGExduWFW9ymrvh17/Rp7Nc0dVoD2yqprvzByJBzWGjZPaOQnn7k518/DpiuRTAetAg/ft8fjAkJWZ3LE+DCo2mFAieY6uVt6KxLaKH6ztklwLx5dpms1mikfKvDauFYzh4LCiAVW5ikXr5ygxfIQaT9LNhRpflcyBlxlbX5KZM23G0QqoUNKXAgMBAAGjNTAzMA4GA1UdDwEB/wQEAwIFoDATBgNVHSUEDDAKBggrBgEFBQcDATAMBgNVHRMBAf8EAjAAMA0GCSqGSIb3DQEBCwUAA4IBAQCC71YGcmJvrmjSOd33nPsRpTO+arEex2Se5f0nSrglTfubYl4Bb8L/MnF87yHkc+50/dvCbXB9lJwblfsO/HjWAwBnM94ePqIurLRn0tflsW+22PR/2lcnru74HDN+p8/9ZtedchYWetcD4k1boMhUOgolte1WrHNvAsm2divBsWrO6Fg3kKjgTItARFyrmhjFz+QYBuFKw6b16dB9n4kSbCiFVJ49GqU9T+7cs7cL8SCC69jMgcSK8ythN693rYDU5Cz/xTqNx+3Tk+yKFCg+vr4rIxV1ACrE61plnY8qGph64FEZpAPU6xL3K0V/Y+TXsfpjL9jhi+9bvOdNr3Vy"]}]}'
