@@ -463,7 +463,7 @@ func (tc TestCase) Run(
 	extraConfig ExtraConfig,
 	settingsOpts ...SettingsOpts,
 ) (ActualTestResult, error) {
-	// TODO: maybe move?
+	// initialize the jwks config map store so remote jwks tests can mock fetch with configmap
 	jwks.BuildJwksConfigMapNamespacedNameFunc("kgateway-system")
 
 	gvkToStructuralSchema, err := testutils.GetStructuralSchemas(

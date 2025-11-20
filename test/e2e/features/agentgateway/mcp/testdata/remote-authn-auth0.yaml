@@ -1,0 +1,52 @@
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: mcp-backend
+spec:
+  type: MCP
+  mcp:
+    targets:
+      - name: mcp-target
+        static:
+          host: mcp-website-fetcher.default.svc.cluster.local
+          port: 80
+          protocol: SSE
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp-route
+spec:
+  parentRefs:
+    - name: gw
+  rules:
+    - backendRefs:
+        - name: mcp-backend
+          group: gateway.kgateway.dev
+          kind: Backend
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: auth0-mcp-authn-policy
+spec:
+  targetRefs:
+    - name: mcp-backend
+      kind: Backend
+      group: gateway.kgateway.dev
+  backend:
+    mcp:
+      authentication:
+        issuer: https://kgateway.dev
+        jwks:
+          jwksUri: http://auth0-mock.default.svc.cluster.local:9000/.well-known/jwks.json
+        mcpIDP: AUTH0
+        audiences:
+          - "account"
+        resourceMetadata:
+          resource: http://mcp-website-fetcher.default.svc.cluster.local/mcp
+          scopesSupported: '["tools/call/fetch"]'
+          bearerMethodsSupported: '["header"]'
+          resourceDocumentation: http://mcp-website-fetcher.default.svc.cluster.local/docs
+          resourcePolicyUri: http://mcp-website-fetcher.default.svc.cluster.local/policies
