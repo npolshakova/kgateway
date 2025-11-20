@@ -17,25 +17,26 @@ import (
 // +kubebuilder:resource:categories=kgateway
 // +kubebuilder:subresource:status
 type GatewayExtension struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   GatewayExtensionSpec   `json:"spec,omitempty"`
+	// +required
+	Spec GatewayExtensionSpec `json:"spec"`
+	// +optional
 	Status GatewayExtensionStatus `json:"status,omitempty"`
 }
 
 // GatewayExtensionSpec defines the desired state of GatewayExtension.
-// +kubebuilder:validation:XValidation:message="ExtAuth must be set when type is ExtAuth",rule="self.type != 'ExtAuth' || has(self.extAuth)"
-// +kubebuilder:validation:XValidation:message="ExtProc must be set when type is ExtProc",rule="self.type != 'ExtProc' || has(self.extProc)"
-// +kubebuilder:validation:XValidation:message="RateLimit must be set when type is RateLimit",rule="self.type != 'RateLimit' || has(self.rateLimit)"
-// +kubebuilder:validation:XValidation:message="ExtAuth must not be set when type is not ExtAuth",rule="self.type == 'ExtAuth' || !has(self.extAuth)"
-// +kubebuilder:validation:XValidation:message="ExtProc must not be set when type is not ExtProc",rule="self.type == 'ExtProc' || !has(self.extProc)"
-// +kubebuilder:validation:XValidation:message="RateLimit must not be set when type is not RateLimit",rule="self.type == 'RateLimit' || !has(self.rateLimit)"
+// +kubebuilder:validation:ExactlyOneOf=extAuth;extProc;rateLimit
+// +kubebuilder:validation:XValidation:message="extAuth must be set when type is ExtAuth",rule="has(self.type) && self.type == 'ExtAuth' ? has(self.extAuth) : true"
+// +kubebuilder:validation:XValidation:message="extProc must be set when type is ExtProc",rule="has(self.type) && self.type == 'ExtProc' ? has(self.extProc) : true"
+// +kubebuilder:validation:XValidation:message="rateLimit must be set when type is RateLimit",rule="has(self.type) && self.type == 'RateLimit' ? has(self.rateLimit) : true"
 type GatewayExtensionSpec struct {
+	// DEPRECATED: Setting this field has no effect.
 	// Type indicates the type of the GatewayExtension to be used.
 	// +kubebuilder:validation:Enum=ExtAuth;ExtProc;RateLimit
-	// +required
-	Type GatewayExtensionType `json:"type"`
+	// +optional
+	Type *GatewayExtensionType `json:"type,omitempty"`
 
 	// ExtAuth configuration for ExtAuth extension type.
 	// +optional
@@ -88,7 +89,6 @@ type GRPCRetryPolicy struct {
 	// Defaults to 1 attempt if not set.
 	// A value of 0 effectively disables retries.
 	// +optional
-	//
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	Attempts int32 `json:"attempts,omitempty"`
@@ -104,11 +104,13 @@ type GRPCRetryBackoff struct {
 	// BaseInterval specifies the base interval used with a fully jittered exponential back-off between retries.
 	// +kubebuilder:validation:XValidation:rule="matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')",message="invalid duration value"
 	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('1ms')",message="retry.BaseInterval must be at least 1ms."
+	// +required
 	BaseInterval metav1.Duration `json:"baseInterval"`
 
 	// MaxInterval specifies the maximum interval between retry attempts.
 	// Defaults to 10 times the BaseInterval if not set.
 	// +kubebuilder:validation:XValidation:rule="matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')",message="invalid duration value"
+	// +optional
 	MaxInterval *metav1.Duration `json:"maxInterval,omitempty"`
 }
 
@@ -143,6 +145,7 @@ type RateLimitProvider struct {
 	// Disabled by default.
 	// +kubebuilder:validation:Enum=Off;DraftVersion03
 	// +kubebuilder:default="Off"
+	// +optional
 	XRateLimitHeaders XRateLimitHeadersStandard `json:"xRateLimitHeaders,omitempty"`
 }
 
