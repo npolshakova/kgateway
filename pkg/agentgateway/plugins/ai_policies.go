@@ -20,9 +20,9 @@ func processRequestGuard(krtctx krt.HandlerContext, secrets krt.Collection[*core
 	}
 
 	pgReq := &api.BackendPolicySpec_Ai_RequestGuard{
-		Webhook:          processWebhook(req.Webhook),
-		Regex:            processRegex(req.Regex, req.CustomResponse),
-		OpenaiModeration: processModeration(krtctx, secrets, namespace, req.Moderation),
+		//Webhook:          processWebhook(req.Webhook),
+		//Regex:            processRegex(req.Regex, req.CustomResponse),
+		//OpenaiModeration: processModeration(krtctx, secrets, namespace, req.Moderation),
 	}
 
 	if req.CustomResponse != nil {
@@ -37,8 +37,8 @@ func processRequestGuard(krtctx krt.HandlerContext, secrets krt.Collection[*core
 
 func processResponseGuard(resp *v1alpha1.PromptguardResponse) *api.BackendPolicySpec_Ai_ResponseGuard {
 	return &api.BackendPolicySpec_Ai_ResponseGuard{
-		Webhook: processWebhook(resp.Webhook),
-		Regex:   processRegex(resp.Regex, nil),
+		//Webhook: processWebhook(resp.Webhook),
+		//Regex:   processRegex(resp.Regex, nil),
 	}
 }
 
@@ -70,8 +70,8 @@ func processWebhook(webhook *v1alpha1.Webhook) *api.BackendPolicySpec_Ai_Webhook
 	}
 
 	w := &api.BackendPolicySpec_Ai_Webhook{
-		Host: webhook.Host.Host,
-		Port: uint32(webhook.Host.Port), //nolint:gosec // G115: webhook port is validated to be valid port range
+		//Host: webhook.Host.Host,
+		//Port: uint32(webhook.Host.Port), //nolint:gosec // G115: webhook port is validated to be valid port range
 	}
 
 	if len(webhook.ForwardHeaderMatches) > 0 {
@@ -113,10 +113,10 @@ func processBuiltinRegexRule(builtin v1alpha1.BuiltIn, logger *slog.Logger) *api
 func processNamedRegexRule(pattern, name string) *api.BackendPolicySpec_Ai_RegexRule {
 	return &api.BackendPolicySpec_Ai_RegexRule{
 		Kind: &api.BackendPolicySpec_Ai_RegexRule_Regex{
-			Regex: &api.BackendPolicySpec_Ai_NamedRegex{
-				Pattern: pattern,
-				Name:    name,
-			},
+			//Regex: &api.BackendPolicySpec_Ai_NamedRegex{
+			//	Pattern: pattern,
+			//	Name:    name,
+			//},
 		},
 	}
 }
@@ -127,23 +127,23 @@ func processRegex(regex *v1alpha1.Regex, customResponse *v1alpha1.CustomResponse
 	}
 
 	rules := &api.BackendPolicySpec_Ai_RegexRules{}
-	if regex.Action != nil {
-		rules.Action = &api.BackendPolicySpec_Ai_Action{}
-		switch *regex.Action {
-		case v1alpha1.MASK:
-			rules.Action.Kind = api.BackendPolicySpec_Ai_MASK
-		case v1alpha1.REJECT:
-			rules.Action.Kind = api.BackendPolicySpec_Ai_REJECT
-			rules.Action.RejectResponse = &api.BackendPolicySpec_Ai_RequestRejection{}
-			if customResponse != nil {
-				rules.Action.RejectResponse.Body = []byte(customResponse.Message)
-				rules.Action.RejectResponse.Status = uint32(customResponse.StatusCode) // nolint:gosec // G115: kubebuilder validation ensures safe for uint32
-			}
-		default:
-			logger.Warn("unsupported regex action", "action", *regex.Action)
-			rules.Action.Kind = api.BackendPolicySpec_Ai_ACTION_UNSPECIFIED
-		}
-	}
+	//if regex.Action != nil {
+	//	rules.Action = &api.BackendPolicySpec_Ai_Action{}
+	//	switch *regex.Action {
+	//	case v1alpha1.MASK:
+	//		rules.Action.Kind = api.BackendPolicySpec_Ai_MASK
+	//	case v1alpha1.REJECT:
+	//		rules.Action.Kind = api.BackendPolicySpec_Ai_REJECT
+	//		rules.Action.RejectResponse = &api.BackendPolicySpec_Ai_RequestRejection{}
+	//		if customResponse != nil {
+	//			rules.Action.RejectResponse.Body = []byte(customResponse.Message)
+	//			rules.Action.RejectResponse.Status = uint32(customResponse.StatusCode) // nolint:gosec // G115: kubebuilder validation ensures safe for uint32
+	//		}
+	//	default:
+	//		logger.Warn("unsupported regex action", "action", *regex.Action)
+	//		rules.Action.Kind = api.BackendPolicySpec_Ai_ACTION_UNSPECIFIED
+	//	}
+	//}
 
 	for _, match := range regex.Matches {
 		// TODO(jmcguire98): should we really allow empty patterns on regex matches?
@@ -188,10 +188,16 @@ func processModeration(krtctx krt.HandlerContext, secrets krt.Collection[*corev1
 	switch moderation.OpenAIModeration.AuthToken.Kind {
 	case v1alpha1.Inline:
 		if moderation.OpenAIModeration.AuthToken.Inline != nil {
-			pgModeration.Auth = &api.BackendAuthPolicy{
-				Kind: &api.BackendAuthPolicy_Key{
-					Key: &api.Key{
-						Secret: *moderation.OpenAIModeration.AuthToken.Inline,
+			pgModeration.InlinePolicies = []*api.BackendPolicySpec{
+				{
+					Kind: &api.BackendPolicySpec_Auth{
+						Auth: &api.BackendAuthPolicy{
+							Kind: &api.BackendAuthPolicy_Key{
+								Key: &api.Key{
+									Secret: *moderation.OpenAIModeration.AuthToken.Inline,
+								},
+							},
+						},
 					},
 				},
 			}
@@ -211,18 +217,30 @@ func processModeration(krtctx krt.HandlerContext, secrets krt.Collection[*corev1
 				return nil
 			}
 
-			pgModeration.Auth = &api.BackendAuthPolicy{
-				Kind: &api.BackendAuthPolicy_Key{
-					Key: &api.Key{
-						Secret: authKey,
+			pgModeration.InlinePolicies = []*api.BackendPolicySpec{
+				{
+					Kind: &api.BackendPolicySpec_Auth{
+						Auth: &api.BackendAuthPolicy{
+							Kind: &api.BackendAuthPolicy_Key{
+								Key: &api.Key{
+									Secret: authKey,
+								},
+							},
+						},
 					},
 				},
 			}
 		}
 	case v1alpha1.Passthrough:
-		pgModeration.Auth = &api.BackendAuthPolicy{
-			Kind: &api.BackendAuthPolicy_Passthrough{
-				Passthrough: &api.Passthrough{},
+		pgModeration.InlinePolicies = []*api.BackendPolicySpec{
+			{
+				Kind: &api.BackendPolicySpec_Auth{
+					Auth: &api.BackendAuthPolicy{
+						Kind: &api.BackendAuthPolicy_Passthrough{
+							Passthrough: &api.Passthrough{},
+						},
+					},
+				},
 			},
 		}
 	}

@@ -7,13 +7,73 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
+	"github.com/kgateway-dev/kgateway/v2/test/e2e/defaults"
+	testmatchers "github.com/kgateway-dev/kgateway/v2/test/gomega/matchers"
 )
+
+// fetchKeycloakTokenWithRetry retrieves an access token from Keycloak with simple retries/backoff.
+func (s *testingSuite) fetchKeycloakTokenWithRetry() string {
+	type tokenResp struct {
+		AccessToken string `json:"access_token"`
+	}
+	// Use the shared curl execution/assertion utilities to avoid raw kubectl execs.
+	resp := s.TestInstallation.Assertions.AssertEventualCurlReturnResponse(
+		s.Ctx,
+		defaults.CurlPodExecOpt,
+		[]curl.Option{
+			curl.WithScheme("http"),
+			curl.WithHost("keycloak.default"),
+			curl.WithPort(7080),
+			curl.WithPath("/realms/mcp/protocol/openid-connect/token"),
+			curl.WithMethod("POST"),
+			curl.WithContentType("application/x-www-form-urlencoded"),
+			curl.WithBody("grant_type=client_credentials&client_id=mcp_proxy&client_secret=supersecret"),
+			// optional retries could be set here via curl.WithRetries if needed
+		},
+		&testmatchers.HttpResponse{
+			StatusCode: 200,
+		},
+	)
+	defer resp.Body.Close()
+
+	var tr tokenResp
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(bodyBytes, &tr)
+	if strings.TrimSpace(tr.AccessToken) != "" {
+		return strings.TrimSpace(tr.AccessToken)
+	}
+	// Fallback: attempt lenient extraction if unexpected whitespace or prefix occurs
+	raw := string(bodyBytes)
+	start := strings.Index(raw, `"access_token"`)
+	if start >= 0 {
+		colon := strings.Index(raw[start:], ":")
+		if colon > 0 {
+			rest := raw[start+colon+1:]
+			first := strings.Index(rest, `"`)
+			if first >= 0 {
+				rest2 := rest[first+1:]
+				second := strings.Index(rest2, `"`)
+				if second > 0 {
+					token := strings.TrimSpace(rest2[:second])
+					if token != "" && token != "null" {
+						return token
+					}
+				}
+			}
+		}
+	}
+	s.Require().Failf("keycloak token", "unable to parse access_token from response: %s", string(bodyBytes))
+	return ""
+}
 
 // buildInitializeRequest is a helper function to build the initialize request for the MCP server
 func buildInitializeRequest(clientName string, id int) string {
@@ -44,13 +104,18 @@ func buildNotifyInitializedRequest() string {
 }
 
 // mcpHeaders returns a base set of headers for MCP requests.
-// Accept includes both JSON and SSE to support initialize responses and streaming.
-func mcpHeaders() map[string]string {
-	return map[string]string{
+// Accept includes both JSON and SSE to support initializing responses and streaming.
+// Extra headers can be provided to include auth headers, etc.
+func mcpHeaders(extraHeaders map[string]string) map[string]string {
+	baseHeaders := map[string]string{
 		"Content-Type":         "application/json",
 		"Accept":               "application/json, text/event-stream",
 		"MCP-Protocol-Version": mcpProto,
 	}
+	for k, v := range extraHeaders {
+		baseHeaders[k] = v
+	}
+	return baseHeaders
 }
 
 // withSessionID returns a copy of headers including mcp-session-id.
@@ -74,21 +139,21 @@ func withRouteHeaders(headers map[string]string, extras map[string]string) map[s
 	return cp
 }
 
-func (s *testingSuite) initializeAndGetSessionID() string {
+func (s *testingSuite) initializeAndGetSessionID(extraHeaders map[string]string) string {
 	// Delegate to initializeSession, then warm the session to avoid races
 	initBody := buildInitializeRequest("test-client", 1)
-	headers := mcpHeaders()
+	headers := mcpHeaders(extraHeaders)
 	sid := s.initializeSession(initBody, headers, "workflow")
 	s.notifyInitialized(sid)
 	return sid
 }
 
-func (s *testingSuite) testToolsListWithSession(sessionID string) {
+func (s *testingSuite) testToolsListWithSession(sessionID string, extraHeaders map[string]string) {
 	s.T().Log("Testing tools/list with session ID")
 
 	mcpRequest := buildToolsListRequest(3)
 
-	headers := withSessionID(mcpHeaders(), sessionID)
+	headers := withSessionID(mcpHeaders(extraHeaders), sessionID)
 	out, err := s.execCurlMCP(headers, mcpRequest, "-N", "--max-time", "10")
 	s.Require().NoError(err, "tools/list curl failed")
 
@@ -114,8 +179,8 @@ func (s *testingSuite) testToolsListWithSession(sessionID string) {
 	if resp.Error != nil && strings.Contains(resp.Error.Message, "Session not found") {
 		// Re-init and retry once
 		s.T().Log("Session expired; re-initializing and retrying tools/list")
-		newID := s.initializeAndGetSessionID()
-		s.testToolsListWithSession(newID)
+		newID := s.initializeAndGetSessionID(nil)
+		s.testToolsListWithSession(newID, extraHeaders)
 		return
 	}
 
@@ -127,9 +192,9 @@ func (s *testingSuite) testToolsListWithSession(sessionID string) {
 }
 
 // notifyInitialized sends the "notifications/initialized" message once for a session.
-func (s *testingSuite) notifyInitialized(sessionID string) {
+func (s *testingSuite) notifyInitialized(sessionID string, extraHeaders map[string]string) {
 	mcpRequest := buildNotifyInitializedRequest()
-	headers := withSessionID(mcpHeaders(), sessionID)
+	headers := withSessionID(mcpHeaders(extraHeaders), sessionID)
 	// We don't care about the body; just make sure it doesn't 401.
 	out, _ := s.execCurlMCP(headers, mcpRequest, "-N", "--max-time", "2")
 	if strings.Contains(out, "401 Unauthorized") {
@@ -285,7 +350,7 @@ func updateProtocolVersion(payload string) {
 // picks the same backend as the initialize call.
 func (s *testingSuite) mustListTools(sessionID, label string, routeHeaders map[string]string) []string {
 	mcpRequest := buildToolsListRequest(999)
-	headers := withRouteHeaders(withSessionID(mcpHeaders(), sessionID), routeHeaders)
+	headers := withRouteHeaders(withSessionID(mcpHeaders(nil), sessionID), routeHeaders)
 	out, err := s.execCurlMCP(headers, mcpRequest, "-N", "--max-time", "10")
 	s.Require().NoError(err, "%s curl failed", label)
 	s.requireHTTPStatus(out, httpOKCode)
@@ -324,7 +389,7 @@ func (s *testingSuite) mustListTools(sessionID, label string, routeHeaders map[s
 
 func (s *testingSuite) notifyInitializedWithHeaders(sessionID string, routeHeaders map[string]string) {
 	mcpRequest := buildNotifyInitializedRequest()
-	headers := withRouteHeaders(withSessionID(mcpHeaders(), sessionID), routeHeaders)
+	headers := withRouteHeaders(withSessionID(mcpHeaders(nil), sessionID), routeHeaders)
 	_, _ = s.execCurlMCP(headers, mcpRequest, "-N", "--max-time", "5")
 	// Allow the gateway to register the session before the first RPC.
 	time.Sleep(warmupTime)

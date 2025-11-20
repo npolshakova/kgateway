@@ -1,0 +1,55 @@
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: mcp-backend
+spec:
+  type: MCP
+  mcp:
+    targets:
+      - name: mcp-target
+        static:
+          host: mcp-website-fetcher.default.svc.cluster.local
+          port: 80
+          protocol: SSE
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp-route
+spec:
+  parentRefs:
+    - name: gw
+  rules:
+    - backendRefs:
+        - name: mcp-backend
+          group: gateway.kgateway.dev
+          kind: Backend
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: keycloak-mcp-authn-policy
+spec:
+  targetRefs:
+    - name: mcp-backend
+      kind: Backend
+      group: gateway.kgateway.dev
+  backend:
+    mcp:
+      authentication:
+        issuer: http://keycloak:7080/realms/mcp
+        jwks:
+          remote:
+            jwksUri: http://keycloak.default.svc.cluster.local:7080/realms/mcp/protocol/openid-connect/certs
+        audiences:
+        - "account"
+        mcpIDP: KEYCLOAK
+        resourceMetadata:
+          resource: http://mcp-website-fetcher.default.svc.cluster.local/mcp
+          scopesSupported: '["tools/call/fetch"]'
+          bearerMethodsSupported: '["header"]'
+          resourceDocumentation: http://mcp-website-fetcher.default.svc.cluster.local/docs
+          resourcePolicyUri: http://mcp-website-fetcher.default.svc.cluster.local/policies
+
+

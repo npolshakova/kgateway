@@ -700,7 +700,7 @@ type BackendAI struct {
 	PromptCaching *PromptCachingConfig `json:"promptCaching,omitempty"`
 }
 
-// +kubebuilder:validation:AtLeastOneOf=authorization
+// +kubebuilder:validation:AtLeastOneOf=authorization;authentication
 type BackendMCP struct {
 	// authorization defines MCP level authorization. Unlike authorization at the HTTP level, which will reject
 	// unauthorized requests with a 403 error, this policy works at the MCP level.
@@ -713,12 +713,35 @@ type BackendMCP struct {
 	// authentication defines MCP specific authentication rules.
 	// TODO: this is problematic sort of. In agentgateway local mode, this setting is on route and backend, but we have
 	// some hiding of this to make it set once but apply both.
-	//Authentication *MCPAuthentication `json:"authentication,omitempty"`
+	// authentication defines MCP specific authentication rules.
+	Authentication *MCPAuthentication `json:"authentication,omitempty"`
 }
 
 type MCPAuthentication struct {
-	// TODO: implement
+	// ResourceMetadata defines the metadata to use for MCP resources.
+	// +optional
+	ResourceMetadata map[string]string `json:"resourceMetadata"`
+
+	// McpIDP specifies the identity provider to use for authentication
+	// +kubebuilder:validation:Enum=AUTH0;KEYCLOAK
+	// +kubebuilder:default=AUTH0
+	McpIDP McpIDP `json:"mcpIDP"`
+
+	// issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
+	// +kubebuilder:validation:MinLength=1
+	Issuer ShortString `json:"issuer,omitempty"`
+
+	// audiences specify the list of allowed audiences that are allowed access. This corresponds to the 'aud' claim (https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3).
+	// If unset, any audience is allowed.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
+	Audiences []string `json:"audiences,omitempty"`
+
+	// jwks defines the JSON Web Key Set used to validate the signature of the JWT.
+	JWKS AgentJWKS `json:"jwks"`
 }
+
+type McpIDP string
 
 // TODO: implement
 type BackendHTTP struct {

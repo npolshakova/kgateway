@@ -29,8 +29,29 @@ func NewTestingSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.
 			"TestDynamicMCPUserRouting":      &dynamicSetup,
 			"TestDynamicMCPDefaultRouting":   &dynamicSetup,
 			"TestDynamicMCPAdminVsUserTools": &dynamicSetup,
+			// Authn tests
+			"TestMCPAuthnKeycloak": &authnSetup,
 		}),
 	}
+}
+
+func (s *testingSuite) TestMCPAuthnKeycloak() {
+	// Single test that does the full workflow with session management
+	s.T().Log("Testing complete MCP workflow with session management")
+
+	// Ensure static components are ready
+	s.waitStaticReady()
+	// Ensure keycloak is ready
+	s.waitKeycloakReady()
+
+	// Step 1: Initialize and get session ID
+	token := s.fetchKeycloakTokenWithRetry()
+	keycloakHeaders := map[string]string{"Authorization": "Bearer " + token}
+	sessionID := s.initializeAndGetSessionID(keycloakHeaders)
+	s.Require().NotEmpty(sessionID, "Failed to get session ID from initialize")
+
+	// Step 2: Test tools/list with session ID
+	s.testToolsListWithSession(sessionID, keycloakHeaders)
 }
 
 func (s *testingSuite) TestMCPWorkflow() {
@@ -41,11 +62,11 @@ func (s *testingSuite) TestMCPWorkflow() {
 	s.waitStaticReady()
 
 	// Step 1: Initialize and get session ID
-	sessionID := s.initializeAndGetSessionID()
+	sessionID := s.initializeAndGetSessionID(nil)
 	s.Require().NotEmpty(sessionID, "Failed to get session ID from initialize")
 
 	// Step 2: Test tools/list with session ID
-	s.testToolsListWithSession(sessionID)
+	s.testToolsListWithSession(sessionID, nil)
 }
 
 func (s *testingSuite) TestSSEEndpoint() {
@@ -54,7 +75,7 @@ func (s *testingSuite) TestSSEEndpoint() {
 
 	initBody := buildInitializeRequest("sse-client", 0)
 
-	headers := mcpHeaders()
+	headers := mcpHeaders(nil)
 
 	out, err := s.execCurlMCP(headers, initBody, "--max-time", "8")
 	s.Require().NoError(err, "SSE initialize curl failed")
@@ -141,7 +162,7 @@ func (s *testingSuite) TestDynamicMCPAdminVsUserTools() {
 // initialize response correctness, warms the session, and returns the tool names.
 func (s *testingSuite) runDynamicRoutingCase(clientName string, routeHeaders map[string]string, label string) []string {
 	initBody := buildInitializeRequest(clientName, 0)
-	headers := withRouteHeaders(mcpHeaders(), routeHeaders)
+	headers := withRouteHeaders(mcpHeaders(nil), routeHeaders)
 
 	// Deterministic 200 with retry/backoff
 	s.waitForMCP200(8080, headers, initBody, label,
@@ -203,10 +224,21 @@ func (s *testingSuite) waitStaticReady() {
 		metav1.ListOptions{LabelSelector: "app=mcp-website-fetcher"},
 	)
 	s.TestInstallation.Assertions.EventuallyPodsRunning(
+		s.Ctx, "default",
+		metav1.ListOptions{LabelSelector: "app=keycloak"},
+	)
+	s.TestInstallation.Assertions.EventuallyPodsRunning(
 		s.Ctx, "curl",
 		metav1.ListOptions{LabelSelector: defaults.WellKnownAppLabel + "=curl"},
 	)
 	s.TestInstallation.Assertions.EventuallyGatewayCondition(s.Ctx, gatewayName, gatewayNamespace, gwv1.GatewayConditionProgrammed, metav1.ConditionTrue)
 	s.TestInstallation.Assertions.EventuallyBackendCondition(s.Ctx, "mcp-backend", "default", "Accepted", metav1.ConditionTrue)
 	s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(s.Ctx, "mcp-route", "default", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
+}
+
+func (s *testingSuite) waitKeycloakReady() {
+	s.TestInstallation.Assertions.EventuallyPodsRunning(
+		s.Ctx, "default",
+		metav1.ListOptions{LabelSelector: "app=keycloak"},
+	)
 }

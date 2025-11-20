@@ -6,6 +6,7 @@ import (
 	"github.com/agentgateway/agentgateway/go/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"istio.io/istio/pkg/kube/krt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
@@ -145,9 +146,13 @@ func TestTranslateBackendMCPAuthorization(t *testing.T) {
 		},
 	}
 
+	var ctx krt.HandlerContext
+	agw := &AgwCollections{}
+	pctx := PolicyCtx{Krt: ctx, Collections: agw}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			policies := translateBackendMCPAuthorization(tt.pol, tt.target)
+			policies := translateBackendMCP(pctx, tt.pol, tt.target)
 			if tt.validate != nil {
 				tt.validate(t, policies)
 			}

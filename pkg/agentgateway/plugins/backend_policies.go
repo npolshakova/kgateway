@@ -3,6 +3,7 @@ package plugins
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
@@ -12,15 +13,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/sslutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 const (
-	aiPolicySuffix               = ":ai"
-	backendauthPolicySuffix      = ":backend-auth"
-	tlsPolicySuffix              = ":tls"
-	mcpAuthorizationPolicySuffix = ":mcp-authorization"
+	aiPolicySuffix                = ":ai"
+	backendauthPolicySuffix       = ":backend-auth"
+	tlsPolicySuffix               = ":tls"
+	mcpAuthorizationPolicySuffix  = ":mcp-authorization"
+	mcpAuthenticationPolicySuffix = ":mcp-authentication"
 )
 
 func translateBackendPolicyToAgw(
@@ -65,7 +68,7 @@ func translateBackendPolicyToAgw(
 	}
 
 	if s := backend.MCP; s != nil {
-		pol := translateBackendMCPAuthorization(policy, policyTarget)
+		pol := translateBackendMCP(ctx, policy, policyTarget)
 		agwPolicies = append(agwPolicies, pol...)
 	}
 
@@ -168,38 +171,137 @@ func translateBackendHTTP(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, na
 	return nil, nil
 }
 
-func translateBackendMCPAuthorization(policy *v1alpha1.AgentgatewayPolicy, target *api.PolicyTarget) []AgwPolicy {
+func translateBackendMCP(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, target *api.PolicyTarget) []AgwPolicy {
 	backend := policy.Spec.Backend
-	if backend == nil || backend.MCP == nil || backend.MCP.Authorization == nil {
+	if backend == nil || backend.MCP == nil {
 		return nil
 	}
-	auth := backend.MCP.Authorization
-	var allowPolicies, denyPolicies []string
-	if auth.Action == v1alpha1.AuthorizationPolicyActionDeny {
-		denyPolicies = append(denyPolicies, cast(auth.Policy.MatchExpressions)...)
-	} else {
-		allowPolicies = append(allowPolicies, cast(auth.Policy.MatchExpressions)...)
+
+	var mcpPolicies []AgwPolicy
+
+	if backend.MCP.Authorization != nil {
+		mcpPolicies = append(mcpPolicies, translateMCPAuthzPolicy(backend, policy.Name, policy.Namespace, target)...)
 	}
 
-	mcpPolicy := &api.Policy{
-		Name:   policy.Namespace + "/" + policy.Name + mcpAuthorizationPolicySuffix + attachmentName(target),
+	if backend.MCP.Authentication != nil {
+		mcpPolicies = append(mcpPolicies, translateMCPAuthnPolicy(ctx, backend, policy.Name, policy.Namespace, target)...)
+	}
+
+	return mcpPolicies
+}
+
+func translateMCPAuthzPolicy(backend *v1alpha1.AgentgatewayPolicyBackend, policyName, policyNs string, target *api.PolicyTarget) []AgwPolicy {
+	authzPolicy := backend.MCP.Authorization
+	if authzPolicy == nil {
+		return nil
+	}
+	var allowPolicies, denyPolicies []string
+	if authzPolicy.Action == v1alpha1.AuthorizationPolicyActionDeny {
+		denyPolicies = append(denyPolicies, cast(authzPolicy.Policy.MatchExpressions)...)
+	} else {
+		allowPolicies = append(allowPolicies, cast(authzPolicy.Policy.MatchExpressions)...)
+	}
+	mcpAuthorization := &api.BackendPolicySpec_McpAuthorization{
+		Allow: allowPolicies,
+		Deny:  denyPolicies,
+	}
+
+	mcpAuthorizationPolicy := &api.Policy{
+		Name:   policyNs + "/" + policyName + mcpAuthorizationPolicySuffix + attachmentName(target),
 		Target: target,
 		Kind: &api.Policy_Backend{
 			Backend: &api.BackendPolicySpec{
 				Kind: &api.BackendPolicySpec_McpAuthorization_{
-					McpAuthorization: &api.BackendPolicySpec_McpAuthorization{
-						Allow: allowPolicies,
-						Deny:  denyPolicies,
-					},
+					McpAuthorization: mcpAuthorization,
 				},
 			}},
 	}
 
-	logger.Debug("generated MCP policy",
-		"policy", policy.Name,
-		"agentgateway_policy", mcpPolicy.Name)
+	logger.Debug("generated MCP authorization policy",
+		"policy", policyName,
+		"agentgateway_policy", mcpAuthorizationPolicy.Name)
 
-	return []AgwPolicy{{Policy: mcpPolicy}}
+	return []AgwPolicy{{Policy: mcpAuthorizationPolicy}}
+}
+
+func translateMCPAuthnPolicy(ctx PolicyCtx, backend *v1alpha1.AgentgatewayPolicyBackend, policyName, policyNs string, target *api.PolicyTarget) []AgwPolicy {
+	authnPolicy := backend.MCP.Authentication
+	if authnPolicy == nil {
+		return nil
+	}
+
+	var errs []error
+	var idp api.BackendPolicySpec_McpAuthentication_McpIDP
+	if authnPolicy.McpIDP == "AUTH0" {
+		idp = api.BackendPolicySpec_McpAuthentication_AUTH0
+	} else if authnPolicy.McpIDP == "KEYCLOAK" {
+		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
+	}
+
+	// TODO: share logic with jwt translation
+	var translatedInlineJwks string
+	if i := authnPolicy.JWKS.Inline; i != "" {
+		translatedInlineJwks = i
+	}
+	if r := authnPolicy.JWKS.Remote; r != nil {
+		if _, err := url.Parse(authnPolicy.JWKS.Remote.JwksUri); err != nil {
+			logger.Error("invalid jwks url in JWTAuthentication policy", "jwks_uri", authnPolicy.JWKS.Remote.JwksUri)
+			errs = append(errs, fmt.Errorf("invalid jwks url in JWTAuthentication policy %w", err))
+			return nil
+		}
+		jwksStoreName := jwks.JwksConfigMapNamespacedName(authnPolicy.JWKS.Remote.JwksUri)
+		if jwksStoreName == nil {
+			logger.Error("jwks store name not found", "jwks_uri", authnPolicy.JWKS.Remote.JwksUri)
+			errs = append(errs, fmt.Errorf("jwks store hasn't been initialized"))
+			return nil
+		}
+		jwksCM := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Collections.ConfigMaps, krt.FilterObjectName(*jwksStoreName)))
+		if jwksCM == nil {
+			logger.Error("jwks ConfigMap not found", "name", jwksStoreName.Name, "namespace", jwksStoreName.Namespace)
+			errs = append(errs, fmt.Errorf("jwks ConfigMap isn't available"))
+			return nil
+		}
+		jwksForUri, err := jwks.JwksFromConfigMap(jwksCM)
+		if err != nil {
+			logger.Error("error deserializing jwks ConfigMap", "name", jwksStoreName.Name, "namespace", jwksStoreName.Namespace, "error", err)
+			errs = append(errs, fmt.Errorf("error deserializing jwks ConfigMap %w", err))
+			return nil
+		}
+		jwks, ok := jwksForUri[authnPolicy.JWKS.Remote.JwksUri]
+		if !ok {
+			logger.Error("jwks %s is not available in the jwks ConfigMap", authnPolicy.JWKS.Remote.JwksUri)
+			errs = append(errs, fmt.Errorf("jwks %s is not available in the jwks ConfigMap", authnPolicy.JWKS.Remote.JwksUri))
+			return nil
+		}
+		translatedInlineJwks = jwks
+	}
+
+	mcpAuthn := &api.BackendPolicySpec_McpAuthentication{
+		Issuer:    authnPolicy.Issuer,
+		Audiences: authnPolicy.Audiences,
+		Provider:  idp,
+		ResourceMetadata: &api.BackendPolicySpec_McpAuthentication_ResourceMetadata{
+			Extra: authnPolicy.ResourceMetadata,
+		},
+		JwksInline: translatedInlineJwks,
+	}
+
+	mcpAuthnPolicy := &api.Policy{
+		Name:   policyNs + "/" + policyName + mcpAuthenticationPolicySuffix + attachmentName(target),
+		Target: target,
+		Kind: &api.Policy_Backend{
+			Backend: &api.BackendPolicySpec{
+				Kind: &api.BackendPolicySpec_McpAuthentication_{
+					McpAuthentication: mcpAuthn,
+				},
+			}},
+	}
+
+	logger.Debug("generated MCP authentication policy",
+		"policy", policyName,
+		"agentgateway_policy", mcpAuthnPolicy.Name)
+
+	return []AgwPolicy{{Policy: mcpAuthnPolicy}}
 }
 
 // translateBackendAI processes AI configuration and creates corresponding Agw policies
@@ -236,13 +338,13 @@ func translateBackendAI(ctx PolicyCtx, agwPolicy *v1alpha1.AgentgatewayPolicy, n
 		if translatedAIPolicy.PromptGuard == nil {
 			translatedAIPolicy.PromptGuard = &api.BackendPolicySpec_Ai_PromptGuard{}
 		}
-		if aiSpec.PromptGuard.Request != nil {
-			translatedAIPolicy.PromptGuard.Request = processRequestGuard(ctx.Krt, ctx.Collections.Secrets, agwPolicy.Namespace, aiSpec.PromptGuard.Request)
-		}
-
-		if aiSpec.PromptGuard.Response != nil {
-			translatedAIPolicy.PromptGuard.Response = processResponseGuard(aiSpec.PromptGuard.Response)
-		}
+		//if aiSpec.PromptGuard.Request != nil {
+		//	translatedAIPolicy.PromptGuard.Request = processRequestGuard(ctx.Krt, ctx.Collections.Secrets, agwPolicy.Namespace, aiSpec.PromptGuard.Request)
+		//}
+		//
+		//if aiSpec.PromptGuard.Response != nil {
+		//	translatedAIPolicy.PromptGuard.Response = processResponseGuard(aiSpec.PromptGuard.Response)
+		//}
 	}
 
 	if aiSpec.ModelAliases != nil {

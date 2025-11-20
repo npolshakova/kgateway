@@ -4,7 +4,7 @@ go 1.25.3
 
 require (
 	// Also update AgentgatewayDefaultTag in pkg/deployer/wellknown.go and test/deployer/testdata/*
-	github.com/agentgateway/agentgateway v0.10.6-0.20251108001651-54763bfe02e1
+	//github.com/agentgateway/agentgateway v0.10.6-0.20251108001651-54763bfe02e1
 	github.com/avast/retry-go/v4 v4.3.3
 	github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443
 	github.com/envoyproxy/go-control-plane v0.13.5-0.20251015221300-4138018a492b
@@ -55,7 +55,10 @@ require (
 
 require sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 
+replace github.com/agentgateway/agentgateway => ../agentgateway
+
 require (
+	github.com/agentgateway/agentgateway v0.0.0-00010101000000-000000000000
 	github.com/anthropics/anthropic-sdk-go v1.13.0
 	github.com/golang/protobuf v1.5.4
 	github.com/kagent-dev/mockllm v0.0.2-0.20251008144831-c6105837f767

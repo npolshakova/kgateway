@@ -40,6 +40,12 @@ func NewJWKSStoreController(mgr manager.Manager, apiClient apiclient.Client, agw
 }
 
 func (j *JwksStoreController) Init(ctx context.Context) {
+	// TODO: switch to agw backend
+	backendCol := krt.WrapClient(kclient.NewFilteredDelayed[*v1alpha1.Backend](
+		j.apiClient,
+		wellknown.BackendGVR,
+		kclient.Filter{ObjectFilter: j.agw.Client.ObjectFilter()},
+	), j.agw.KrtOpts.ToOptions("AgentgatewayBackend")...)
 	policyCol := krt.WrapClient(kclient.NewFilteredDelayed[*v1alpha1.AgentgatewayPolicy](
 		j.apiClient,
 		wellknown.AgentgatewayPolicyGVR,
@@ -49,16 +55,31 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 		pols := krt.Fetch(kctx, policyCol)
 		toret := make(jwks.JwksSources, 0, len(pols))
 		for _, p := range pols {
-			if p.Spec.Traffic == nil || p.Spec.Traffic.JWTAuthentication == nil {
-				continue
+			// enqueue Traffic JWT providers (if present)
+			if p.Spec.Traffic != nil && p.Spec.Traffic.JWTAuthentication != nil {
+				for _, provider := range p.Spec.Traffic.JWTAuthentication.Providers {
+					if provider.JWKS.Remote == nil {
+						continue
+					}
+					toret = append(toret, jwks.JwksSource{JwksURL: provider.JWKS.Remote.JwksUri, Ttl: provider.JWKS.Remote.CacheDuration.Duration})
+				}
 			}
 
-			for _, provider := range p.Spec.Traffic.JWTAuthentication.Providers {
-				if provider.JWKS.Remote == nil {
-					continue
+			// enqueue Backend MCP authentication JWKS (if present)
+			if p.Spec.Backend.MCP.Authentication != nil {
+				if remote := p.Spec.Backend.MCP.Authentication.JWKS.Remote; remote != nil {
+					toret = append(toret, jwks.JwksSource{JwksURL: remote.JwksUri, Ttl: remote.CacheDuration.Duration})
 				}
-				toret = append(toret, jwks.JwksSource{JwksURL: provider.JWKS.Remote.JwksUri, Ttl: provider.JWKS.Remote.CacheDuration.Duration})
 			}
+		}
+
+		backends := krt.Fetch(kctx, backendCol)
+		for _, b := range backends {
+			if b.Spec.MCP == nil {
+				// ignore non-mcp backend types
+				continue
+			}
+			// TODO: support inline policies
 		}
 
 		return &toret

@@ -39,55 +39,7 @@ Policies:
       overrides:
         max_tokens: "2000"
         temperature: "0.5"
-      promptGuard:
-        request:
-          openaiModeration:
-            auth:
-              key:
-                secret: mysecretkey
-            model: text-moderation-latest
-          regex:
-            action:
-              kind: REJECT
-              rejectResponse:
-                body: WW91ciByZXF1ZXN0IHdhcyByZWplY3RlZCBkdWUgdG8gaW5hcHByb3ByaWF0ZSBjb250ZW50
-                status: 403
-            rules:
-            - regex:
-                name: harmful-content
-                pattern: (?i)(hate|kill|harm)
-            - regex:
-                name: profanity
-                pattern: (?i)(bad|words)
-            - builtin: CREDIT_CARD
-            - builtin: SSN
-          rejection:
-            body: WW91ciByZXF1ZXN0IHdhcyByZWplY3RlZCBkdWUgdG8gaW5hcHByb3ByaWF0ZSBjb250ZW50
-            status: 403
-          webhook:
-            forwardHeaderMatches:
-            - exact: bar
-              name: x-foo
-            - name: x-baz
-              regex: ^baz-.*
-            host: prompt-guard.example.com
-            port: 8443
-        response:
-          regex:
-            action:
-              kind: MASK
-            rules:
-            - regex:
-                name: mask-numbers
-                pattern: \b\d{4}\b
-            - regex:
-                name: mask-sensitive
-                pattern: (?i)(password|secret)
-            - builtin: EMAIL
-            - builtin: PHONE_NUMBER
-          webhook:
-            host: response-guard.example.com
-            port: 8444
+      promptGuard: {}
       prompts:
         append:
         - content: Please provide a concise response.
