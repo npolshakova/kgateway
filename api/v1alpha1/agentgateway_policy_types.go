@@ -495,7 +495,7 @@ type AgentRemoteJWKS struct {
 	// +kubebuilder:default="5m"
 	CacheDuration *metav1.Duration `json:"cacheDuration,omitempty"`
 	// backendRef references the remote JWKS server to reach.
-	//
+	// Not implemented yet, only jwksUri is currently supported.
 	// Supported types: Service and Backend.
 	BackendRef gwv1.BackendObjectReference `json:"backendRef,omitempty"`
 }
