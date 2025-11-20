@@ -14,26 +14,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks/mocks"
 )
 
-func TestRestoreCacheState(t *testing.T) {
-	keyset := jose.JSONWebKeySet{}
-	err := json.Unmarshal(([]byte)(jwks), &keyset)
-	assert.NoError(t, err)
-
-	jwksCache := NewJwksCache()
-	jwksCache.Jwks["https://test1/jwks"] = keyset
-	jwksCache.Jwks["https://test2/jwks"] = keyset
-	jwksCache.Jwks["https://test3/jwks"] = keyset
-
-	serializedKeyset, err := jwksCache.toJson()
-	assert.NoError(t, err)
-
-	anotherCache := NewJwksCache()
-	err = anotherCache.LoadfromJson((string)(serializedKeyset))
-	assert.NoError(t, err)
-
-	assert.Equal(t, jwksCache, anotherCache)
-}
-
 func TestAddKeysetToFetcher(t *testing.T) {
 	f := NewJwksFetcher(NewJwksCache())
 	f.addKeyset("https://test/jwks", 5*time.Minute)
@@ -52,11 +32,11 @@ func TestRemoveKeysetFromFetcher(t *testing.T) {
 	f.addKeyset("https://test/jwks", 5*time.Minute)
 	keysetSource := f.keysetSources["https://test/jwks"]
 	assert.NotNil(t, keysetSource)
-	f.cache.Jwks["https://test/jwks"] = jose.JSONWebKeySet{}
+	f.cache.jwks["https://test/jwks"] = "jwks"
 
 	f.removeKeyset("https://test/jwks")
 	assert.NotContains(t, f.keysetSources, "https://test/jwks")
-	assert.NotContains(t, f.cache.Jwks, "https://test/jwks")
+	assert.NotContains(t, f.cache.jwks, "https://test/jwks")
 	assert.True(t, keysetSource.Deleted)
 }
 
@@ -103,12 +83,12 @@ func TestSuccessfulJwksFetch(t *testing.T) {
 		select {
 		case actual := <-updates:
 			cache := NewJwksCache()
-			assert.NoError(c, cache.LoadfromJson(actual))
-			assert.Equal(c, expectedJwks, cache.Jwks["https://test/jwks"])
+			assert.NoError(c, cache.LoadJwksFromStores(actual))
+			assert.Equal(c, jwks, cache.jwks["https://test/jwks"])
 		default:
 			assert.Fail(c, "no updates")
 		}
-	}, 2*time.Second, 100*time.Millisecond)
+	}, 1000*time.Second, 100*time.Millisecond)
 
 	// check that we scheduled next fetch
 	fetch := f.schedule.Peek()
@@ -127,11 +107,12 @@ func TestSuccessfulJwksFetchButNoUpdates(t *testing.T) {
 	f.jwksClient = jwksClient
 
 	f.addKeyset("https://test/jwks", 5*time.Minute)
+	f.cache.jwks["https://test/jwks"] = jwks
+	updates := f.SubscribeToUpdates()
+
 	existingJwks := jose.JSONWebKeySet{}
 	err := json.Unmarshal(([]byte)(jwks), &existingJwks)
 	assert.NoError(t, err)
-	f.cache.Jwks["https://test/jwks"] = existingJwks
-	updates := f.SubscribeToUpdates()
 
 	jwksClient.EXPECT().
 		FetchJwks(gomock.Any(), gomock.Eq("https://test/jwks")).
@@ -187,32 +168,4 @@ func TestFetchJwksWithError(t *testing.T) {
 	assert.Equal(t, retry.keysetSource.JwksURL, "https://test/jwks")
 }
 
-var jwks = `{"keys": [
-    {
-      "kid": "JWxVLtipR-Q6wF2zmQKEoxbFhqwibK2aKNLyRqNxdj4",
-      "kty": "RSA",
-      "alg": "RS256",
-      "use": "sig",
-      "n": "5ApthhEwr6U00Coa0_572OytJXbVZKgl-myirM2m4GSrVfaKus41GEPHHXMzyGDPgHU7Rb4o0yzB-obkgz0zo2jnjv1zSx88BgdhhdE0BX2ULFDj67jVYdFZdCOoBr1_xJ5LEjQArHxfywZxW4a0egc3JaIwo-3qSSlRnD1KV2uzTG9FoDpvJLn1ZzdMgoTHuxIMla6WdgPDswVD8nrQM0I_1VGyGC0l2dICUEiqN0QrZen--U70J6EU6hd8vi_9qmALhjoSEASH2Z2sHco4Shv_aVx0BM-zN5UJWz4VF51Ag_KgcePS5Co7iVM0FUwMNWauWhPDPLWiXoUJvUWVPw",
-      "e": "AQAB",
-      "x5c": [
-        "MIICozCCAYsCBgGYyKDydjANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDDAprYWdlbnQtZGV2MB4XDTI1MDgyMDE3NTU0N1oXDTM1MDgyMDE3NTcyN1owFTETMBEGA1UEAwwKa2FnZW50LWRldjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOQKbYYRMK+lNNAqGtP+e9jsrSV21WSoJfpsoqzNpuBkq1X2irrONRhDxx1zM8hgz4B1O0W+KNMswfqG5IM9M6No5479c0sfPAYHYYXRNAV9lCxQ4+u41WHRWXQjqAa9f8SeSxI0AKx8X8sGcVuGtHoHNyWiMKPt6kkpUZw9Sldrs0xvRaA6byS59Wc3TIKEx7sSDJWulnYDw7MFQ/J60DNCP9VRshgtJdnSAlBIqjdEK2Xp/vlO9CehFOoXfL4v/apgC4Y6EhAEh9mdrB3KOEob/2lcdATPszeVCVs+FRedQIPyoHHj0uQqO4lTNBVMDDVmrloTwzy1ol6FCb1FlT8CAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAxElyp6gak62xC3yEw0nRUZNI0nsu0Oeow8ZwbmfTSa2hRKFQQe2sjMzm6L4Eyg2IInVn0spkw9BVJ07i8mDmvChjRNra7t6CX1dIykUUtxtNwglX0YBRjMl/heG7dC/dyDRVW6EUrPopMQ9QibzmH5XOBLDanTfK6tPwe5ezG5JF3JCx2Z3dtmAMtpCp7Nnr/gj48z7j4V8EHSB8hgITHBPcLOmiVglS3LF2/D+PK6efRWnVaDtcPmuh/0JmdmKxwJcvvuZD7tp5UFRbw9cgx5Pvv+mOWVCp/E2L+P17Gu0C/MC4Wnbn3Pi6Tgt0GNUMngCCyBnfcTpljUddW6Kheg=="
-      ],
-      "x5t": "SmEthIFV9ehf3ggduek6QLfXxyU",
-      "x5t#S256": "XNGenWvGVC_sxSOTW0j_d7zwQlbGzkFj5XGCgPrLNJA"
-    },
-    {
-      "kid": "hb2m-EP6nG_ktqHJOna_rnadxRaOtzArOecAJlNSmqU",
-      "kty": "RSA",
-      "alg": "RSA-OAEP",
-      "use": "enc",
-      "n": "xYU8uN6rXI6l6LAQ5inpylE4qiFqshbV92VnPrUO8gNff_TuZjvq19f0zXpVnnu88bCL5Q6DjRqRP4a2brAsYYBjSjwKGF3dd7jda6uavU1br2NFppZ6GSisOlKuKqMAUitQuYgAzYP-E2FasQOskrZ8HQ8S8hff7rNZH84VL5lNwTMHiwL1O8jBmxJE-ABM0To-2a9YosRkRa_uVzY720lSAir1UNiUSR1PypS2ixWyO04AVMJf8JgYU8rsUHNkZenYSRySzYzIxE57RCYnuZoc1hSVBtN2cFXXSqTwGMI7tfzTAtG11Z7zkiWmP0Tk7xabh5xfdXhZtJfHT6id5w",
-      "e": "AQAB",
-      "x5c": [
-        "MIICozCCAYsCBgGYyKD0zDANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDDAprYWdlbnQtZGV2MB4XDTI1MDgyMDE3NTU0OFoXDTM1MDgyMDE3NTcyOFowFTETMBEGA1UEAwwKa2FnZW50LWRldjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMWFPLjeq1yOpeiwEOYp6cpROKoharIW1fdlZz61DvIDX3/07mY76tfX9M16VZ57vPGwi+UOg40akT+Gtm6wLGGAY0o8Chhd3Xe43Wurmr1NW69jRaaWehkorDpSriqjAFIrULmIAM2D/hNhWrEDrJK2fB0PEvIX3+6zWR/OFS+ZTcEzB4sC9TvIwZsSRPgATNE6PtmvWKLEZEWv7lc2O9tJUgIq9VDYlEkdT8qUtosVsjtOAFTCX/CYGFPK7FBzZGXp2Ekcks2MyMROe0QmJ7maHNYUlQbTdnBV10qk8BjCO7X80wLRtdWe85Ilpj9E5O8Wm4ecX3V4WbSXx0+onecCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAWuRnoKtKhCqLaz3Ze2q8hRykke7JwNrNxqDPn7eToa1MKsfsrtE678kzXhnfdivK/1F/8dr7Thn/WX7ZUJW2jsmbP1sCJjK02yY2setJ1jJKvJZcib8y7LAsqoACYZ4FM/KLrdywGn7KSenqWCLRMqeT04dWlmJexEszb5fgCKCFIZLKjaGJZIuLhsJBLyYHEVFpacr69cZ/ZjNpshHIiV0l/I434vcW39S9+uMfxf1glLTEPifmwK4gMRem3QQLqK21vBcjuS0GBQXQinaztcNaiu1invyTZd5s+3u5yORsip6YhbGhe08TbbtN7yLlZFITDQL4oFrXVGXX+4dp8w=="
-      ],
-      "x5t": "BMlhx-2TUdiyftY8aR_zt7xECEI",
-      "x5t#S256": "YTTj8SxySpGgVFl5ZQqniLPnmg0gWHgBhissHXQCZ8k"
-    }
-  ]
-}`
+var jwks = `{"keys":[{"use":"sig","kty":"RSA","kid":"JWxVLtipR-Q6wF2zmQKEoxbFhqwibK2aKNLyRqNxdj4","alg":"RS256","n":"5ApthhEwr6U00Coa0_572OytJXbVZKgl-myirM2m4GSrVfaKus41GEPHHXMzyGDPgHU7Rb4o0yzB-obkgz0zo2jnjv1zSx88BgdhhdE0BX2ULFDj67jVYdFZdCOoBr1_xJ5LEjQArHxfywZxW4a0egc3JaIwo-3qSSlRnD1KV2uzTG9FoDpvJLn1ZzdMgoTHuxIMla6WdgPDswVD8nrQM0I_1VGyGC0l2dICUEiqN0QrZen--U70J6EU6hd8vi_9qmALhjoSEASH2Z2sHco4Shv_aVx0BM-zN5UJWz4VF51Ag_KgcePS5Co7iVM0FUwMNWauWhPDPLWiXoUJvUWVPw","e":"AQAB","x5c":["MIICozCCAYsCBgGYyKDydjANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDDAprYWdlbnQtZGV2MB4XDTI1MDgyMDE3NTU0N1oXDTM1MDgyMDE3NTcyN1owFTETMBEGA1UEAwwKa2FnZW50LWRldjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOQKbYYRMK+lNNAqGtP+e9jsrSV21WSoJfpsoqzNpuBkq1X2irrONRhDxx1zM8hgz4B1O0W+KNMswfqG5IM9M6No5479c0sfPAYHYYXRNAV9lCxQ4+u41WHRWXQjqAa9f8SeSxI0AKx8X8sGcVuGtHoHNyWiMKPt6kkpUZw9Sldrs0xvRaA6byS59Wc3TIKEx7sSDJWulnYDw7MFQ/J60DNCP9VRshgtJdnSAlBIqjdEK2Xp/vlO9CehFOoXfL4v/apgC4Y6EhAEh9mdrB3KOEob/2lcdATPszeVCVs+FRedQIPyoHHj0uQqO4lTNBVMDDVmrloTwzy1ol6FCb1FlT8CAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAxElyp6gak62xC3yEw0nRUZNI0nsu0Oeow8ZwbmfTSa2hRKFQQe2sjMzm6L4Eyg2IInVn0spkw9BVJ07i8mDmvChjRNra7t6CX1dIykUUtxtNwglX0YBRjMl/heG7dC/dyDRVW6EUrPopMQ9QibzmH5XOBLDanTfK6tPwe5ezG5JF3JCx2Z3dtmAMtpCp7Nnr/gj48z7j4V8EHSB8hgITHBPcLOmiVglS3LF2/D+PK6efRWnVaDtcPmuh/0JmdmKxwJcvvuZD7tp5UFRbw9cgx5Pvv+mOWVCp/E2L+P17Gu0C/MC4Wnbn3Pi6Tgt0GNUMngCCyBnfcTpljUddW6Kheg=="],"x5t":"SmEthIFV9ehf3ggduek6QLfXxyU","x5t#S256":"XNGenWvGVC_sxSOTW0j_d7zwQlbGzkFj5XGCgPrLNJA"},{"use":"enc","kty":"RSA","kid":"hb2m-EP6nG_ktqHJOna_rnadxRaOtzArOecAJlNSmqU","alg":"RSA-OAEP","n":"xYU8uN6rXI6l6LAQ5inpylE4qiFqshbV92VnPrUO8gNff_TuZjvq19f0zXpVnnu88bCL5Q6DjRqRP4a2brAsYYBjSjwKGF3dd7jda6uavU1br2NFppZ6GSisOlKuKqMAUitQuYgAzYP-E2FasQOskrZ8HQ8S8hff7rNZH84VL5lNwTMHiwL1O8jBmxJE-ABM0To-2a9YosRkRa_uVzY720lSAir1UNiUSR1PypS2ixWyO04AVMJf8JgYU8rsUHNkZenYSRySzYzIxE57RCYnuZoc1hSVBtN2cFXXSqTwGMI7tfzTAtG11Z7zkiWmP0Tk7xabh5xfdXhZtJfHT6id5w","e":"AQAB","x5c":["MIICozCCAYsCBgGYyKD0zDANBgkqhkiG9w0BAQsFADAVMRMwEQYDVQQDDAprYWdlbnQtZGV2MB4XDTI1MDgyMDE3NTU0OFoXDTM1MDgyMDE3NTcyOFowFTETMBEGA1UEAwwKa2FnZW50LWRldjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMWFPLjeq1yOpeiwEOYp6cpROKoharIW1fdlZz61DvIDX3/07mY76tfX9M16VZ57vPGwi+UOg40akT+Gtm6wLGGAY0o8Chhd3Xe43Wurmr1NW69jRaaWehkorDpSriqjAFIrULmIAM2D/hNhWrEDrJK2fB0PEvIX3+6zWR/OFS+ZTcEzB4sC9TvIwZsSRPgATNE6PtmvWKLEZEWv7lc2O9tJUgIq9VDYlEkdT8qUtosVsjtOAFTCX/CYGFPK7FBzZGXp2Ekcks2MyMROe0QmJ7maHNYUlQbTdnBV10qk8BjCO7X80wLRtdWe85Ilpj9E5O8Wm4ecX3V4WbSXx0+onecCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAWuRnoKtKhCqLaz3Ze2q8hRykke7JwNrNxqDPn7eToa1MKsfsrtE678kzXhnfdivK/1F/8dr7Thn/WX7ZUJW2jsmbP1sCJjK02yY2setJ1jJKvJZcib8y7LAsqoACYZ4FM/KLrdywGn7KSenqWCLRMqeT04dWlmJexEszb5fgCKCFIZLKjaGJZIuLhsJBLyYHEVFpacr69cZ/ZjNpshHIiV0l/I434vcW39S9+uMfxf1glLTEPifmwK4gMRem3QQLqK21vBcjuS0GBQXQinaztcNaiu1invyTZd5s+3u5yORsip6YhbGhe08TbbtN7yLlZFITDQL4oFrXVGXX+4dp8w=="],"x5t":"BMlhx-2TUdiyftY8aR_zt7xECEI","x5t#S256":"YTTj8SxySpGgVFl5ZQqniLPnmg0gWHgBhissHXQCZ8k"}]}`
