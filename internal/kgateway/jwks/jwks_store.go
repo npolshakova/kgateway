@@ -40,12 +40,12 @@ func BuildJwksStore(ctx context.Context, cli apiclient.Client, krtOptions krtuti
 		configMapSyncer: NewConfigMapSyncer(cli, deploymentNamespace, krtOptions),
 	}
 	jwksStore.updates = jwksStore.jwksFetcher.SubscribeToUpdates()
-	JwksConfigMapNamespacedName = BuildJwksConfigMapNamespacedNameFunc(deploymentNamespace)
+	BuildJwksConfigMapNamespacedNameFunc(deploymentNamespace)
 	return jwksStore
 }
 
-func BuildJwksConfigMapNamespacedNameFunc(deploymentNamespace string) func(jwksUri string) *types.NamespacedName {
-	return func(jwksUri string) *types.NamespacedName {
+func BuildJwksConfigMapNamespacedNameFunc(deploymentNamespace string) {
+	JwksConfigMapNamespacedName = func(jwksUri string) *types.NamespacedName {
 		return &types.NamespacedName{Namespace: deploymentNamespace, Name: JwksConfigMapName(jwksUri)}
 	}
 }
