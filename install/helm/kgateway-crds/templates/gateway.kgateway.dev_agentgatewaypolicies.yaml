@@ -868,12 +868,12 @@ spec:
                               rule: '[has(self.jwksUri),has(self.backendRef)].filter(x,x==true).size()
                                 == 1'
                           mcpIDP:
-                            default: AUTH0
+                            default: Auth0
                             description: McpIDP specifies the identity provider to
                               use for authentication
                             enum:
-                            - AUTH0
-                            - KEYCLOAK
+                            - Auth0
+                            - Keycloak
                             type: string
                           mode:
                             default: Optional

@@ -106,7 +106,7 @@ spec:
           jwksUri: http://keycloak.default.svc.cluster.local:7080/realms/mcp/protocol/openid-connect/certs
         audiences:
           - "account"
-        mcpIDP: KEYCLOAK
+        mcpIDP: Keycloak
         resourceMetadata:
           resource: http://mcp-website-fetcher.default.svc.cluster.local/mcp
           scopesSupported: '["tools/call/fetch"]'

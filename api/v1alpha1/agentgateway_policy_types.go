@@ -723,8 +723,8 @@ type MCPAuthentication struct {
 	ResourceMetadata map[string]string `json:"resourceMetadata"`
 
 	// McpIDP specifies the identity provider to use for authentication
-	// +kubebuilder:validation:Enum=AUTH0;KEYCLOAK
-	// +kubebuilder:default=AUTH0
+	// +kubebuilder:validation:Enum=Auth0;Keycloak
+	// +kubebuilder:default=Auth0
 	McpIDP McpIDP `json:"mcpIDP"`
 
 	// issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
@@ -747,6 +747,11 @@ type MCPAuthentication struct {
 }
 
 type McpIDP string
+
+const (
+	Auth0    = "Auth0"
+	Keycloak = "Keycloak"
+)
 
 // TODO: implement
 type BackendHTTP struct {

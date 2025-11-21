@@ -232,9 +232,9 @@ func translateMCPAuthnPolicy(ctx PolicyCtx, backend *v1alpha1.AgentgatewayPolicy
 
 	var errs []error
 	var idp api.BackendPolicySpec_McpAuthentication_McpIDP
-	if authnPolicy.McpIDP == "AUTH0" {
+	if authnPolicy.McpIDP == v1alpha1.Auth0 {
 		idp = api.BackendPolicySpec_McpAuthentication_AUTH0
-	} else if authnPolicy.McpIDP == "KEYCLOAK" {
+	} else if authnPolicy.McpIDP == v1alpha1.Keycloak {
 		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
 	}
 

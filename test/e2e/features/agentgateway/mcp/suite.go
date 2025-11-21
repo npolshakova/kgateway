@@ -30,28 +30,29 @@ func NewTestingSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.
 			"TestDynamicMCPDefaultRouting":   &dynamicSetup,
 			"TestDynamicMCPAdminVsUserTools": &dynamicSetup,
 			// Authn tests
-			"TestMCPAuthnKeycloak": &authnSetup,
+			"TestMCPAuthn": &authnSetup,
 		}),
 	}
 }
 
-func (s *testingSuite) TestMCPAuthnKeycloak() {
+func (s *testingSuite) TestMCPAuthn() {
 	// Single test that does the full workflow with session management
 	s.T().Log("Testing complete MCP workflow with session management")
 
 	// Ensure static components are ready
 	s.waitStaticReady()
-	// Ensure keycloak is ready
-	s.waitKeycloakReady()
+	// Ensure auth0-mock is ready
+	s.waitAuth0MockReady()
 
 	// Step 1: Initialize and get session ID
-	token := s.fetchKeycloakTokenWithRetry()
-	keycloakHeaders := map[string]string{"Authorization": "Bearer " + token}
-	sessionID := s.initializeAndGetSessionID(keycloakHeaders)
+	// The token is hard coded in the mock auth0 server
+	token := "eyJhbGciOiJSUzI1NiIsImtpZCI6IjUzMzM3ODA2ODc1NTEwMzg2NTkifQ.eyJhdWQiOiJhY2NvdW50IiwiZXhwIjoyMDc5MTA1MTE0LCJpYXQiOjE3NjM3NDUxMTQsImlzcyI6Imh0dHBzOi8va2dhdGV3YXkuZGV2Iiwic3ViIjoidXNlckBrZ2F0ZXdheS5kZXYifQ.W0n1xEPD6dl5CYLi_TEMzqn9REGgN7-MIaivvmHHzUAqsD-Gox2NQ79KFEGMqlZwbfc0p34xloR2dJ616nU9NxqSyBssFgDhRDGnasSwHM6AvbpEEPEK7J_lCbfnaxqEQm8_AhXPgFEY4zbQq3WQ7OE7wQpSPjcAL1PB01SRE5UZsYW_bXqup_2MqVzahCFagrQtOPHN3sCUeLz8dm5DAPgat9WQmiDaUP-_yT_tk4J7MH6SolHBnxRwrP8nhUf9N9bi-hADnmCLTKO7BmP0xBQo-abRlu_5Ug6YAfMirHfrO09EvXDCVWuk1d35GCyApPxPhwtZg40kOq-BXaWwFw"
+	authHeaders := map[string]string{"Authorization": "Bearer " + token}
+	sessionID := s.initializeAndGetSessionID(authHeaders)
 	s.Require().NotEmpty(sessionID, "Failed to get session ID from initialize")
 
 	// Step 2: Test tools/list with session ID
-	s.testToolsListWithSession(sessionID, keycloakHeaders)
+	s.testToolsListWithSession(sessionID, authHeaders)
 }
 
 func (s *testingSuite) TestMCPWorkflow() {
@@ -224,10 +225,6 @@ func (s *testingSuite) waitStaticReady() {
 		metav1.ListOptions{LabelSelector: "app=mcp-website-fetcher"},
 	)
 	s.TestInstallation.Assertions.EventuallyPodsRunning(
-		s.Ctx, "default",
-		metav1.ListOptions{LabelSelector: "app=keycloak"},
-	)
-	s.TestInstallation.Assertions.EventuallyPodsRunning(
 		s.Ctx, "curl",
 		metav1.ListOptions{LabelSelector: defaults.WellKnownAppLabel + "=curl"},
 	)
@@ -236,9 +233,9 @@ func (s *testingSuite) waitStaticReady() {
 	s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(s.Ctx, "mcp-route", "default", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
 }
 
-func (s *testingSuite) waitKeycloakReady() {
+func (s *testingSuite) waitAuth0MockReady() {
 	s.TestInstallation.Assertions.EventuallyPodsRunning(
 		s.Ctx, "default",
-		metav1.ListOptions{LabelSelector: "app=keycloak"},
+		metav1.ListOptions{LabelSelector: "app=auth0-mock"},
 	)
 }

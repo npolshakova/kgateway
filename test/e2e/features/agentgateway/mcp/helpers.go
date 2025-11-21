@@ -20,61 +20,6 @@ import (
 	testmatchers "github.com/kgateway-dev/kgateway/v2/test/gomega/matchers"
 )
 
-// fetchKeycloakTokenWithRetry retrieves an access token from Keycloak with simple retries/backoff.
-func (s *testingSuite) fetchKeycloakTokenWithRetry() string {
-	type tokenResp struct {
-		AccessToken string `json:"access_token"`
-	}
-	// Use the shared curl execution/assertion utilities to avoid raw kubectl execs.
-	resp := s.TestInstallation.Assertions.AssertEventualCurlReturnResponse(
-		s.Ctx,
-		defaults.CurlPodExecOpt,
-		[]curl.Option{
-			curl.WithScheme("http"),
-			curl.WithHost("keycloak.default"),
-			curl.WithPort(7080),
-			curl.WithPath("/realms/mcp/protocol/openid-connect/token"),
-			curl.WithMethod("POST"),
-			curl.WithContentType("application/x-www-form-urlencoded"),
-			curl.WithBody("grant_type=client_credentials&client_id=mcp_proxy&client_secret=supersecret"),
-			// optional retries could be set here via curl.WithRetries if needed
-		},
-		&testmatchers.HttpResponse{
-			StatusCode: 200,
-		},
-	)
-	defer resp.Body.Close()
-
-	var tr tokenResp
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	_ = json.Unmarshal(bodyBytes, &tr)
-	if strings.TrimSpace(tr.AccessToken) != "" {
-		return strings.TrimSpace(tr.AccessToken)
-	}
-	// Fallback: attempt lenient extraction if unexpected whitespace or prefix occurs
-	raw := string(bodyBytes)
-	start := strings.Index(raw, `"access_token"`)
-	if start >= 0 {
-		colon := strings.Index(raw[start:], ":")
-		if colon > 0 {
-			rest := raw[start+colon+1:]
-			first := strings.Index(rest, `"`)
-			if first >= 0 {
-				rest2 := rest[first+1:]
-				second := strings.Index(rest2, `"`)
-				if second > 0 {
-					token := strings.TrimSpace(rest2[:second])
-					if token != "" && token != "null" {
-						return token
-					}
-				}
-			}
-		}
-	}
-	s.Require().Failf("keycloak token", "unable to parse access_token from response: %s", string(bodyBytes))
-	return ""
-}
-
 // buildInitializeRequest is a helper function to build the initialize request for the MCP server
 func buildInitializeRequest(clientName string, id int) string {
 	return fmt.Sprintf(`{

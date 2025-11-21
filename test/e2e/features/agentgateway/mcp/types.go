@@ -82,7 +82,7 @@ var (
 	setupManifest        = filepath.Join(fsutils.MustGetThisDir(), "testdata", "common.yaml")
 	staticSetupManifest  = filepath.Join(fsutils.MustGetThisDir(), "testdata", "static.yaml")
 	dynamicSetupManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "dynamic.yaml")
-	keycloakManifest     = filepath.Join(fsutils.MustGetThisDir(), "testdata", "keycloak.yaml")
+	mockAuth0Manifest    = filepath.Join(fsutils.MustGetThisDir(), "jwt-auth0", "deployment.yaml")
 	authnPolicyManifest  = filepath.Join(fsutils.MustGetThisDir(), "testdata", "authn-policy.yaml")
 
 	// Base test setup - common resources + curl pod
@@ -100,8 +100,8 @@ var (
 		Manifests: []string{staticSetupManifest},
 	}
 
-	// MCP authn keycloak test setup (resources needed for non-dynamic tests)
+	// MCP authn test setup
 	authnSetup = base.TestCase{
-		Manifests: []string{staticSetupManifest, keycloakManifest, authnPolicyManifest},
+		Manifests: []string{staticSetupManifest, mockAuth0Manifest, authnPolicyManifest},
 	}
 )
