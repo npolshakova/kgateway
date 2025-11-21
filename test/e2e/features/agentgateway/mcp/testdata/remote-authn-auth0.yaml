@@ -21,10 +21,83 @@ spec:
   parentRefs:
     - name: gw
   rules:
-    - backendRefs:
-        - name: mcp-backend
-          group: gateway.kgateway.dev
-          kind: Backend
+  - matches:
+      - path:
+          type: PathPrefix
+          value: /.well-known/oauth-protected-resource
+    backendRefs:
+      - name: mcp-backend
+        group: gateway.kgateway.dev
+        kind: Backend
+  - matches:
+      - path:
+          type: PathPrefix
+          value: /.well-known/oauth-authorization-server
+    backendRefs:
+      - name: auth0-mock
+        port: 9000
+  - matches:
+      - path:
+          type: PathPrefix
+          value: /register
+    backendRefs:
+      - name: auth0-mock
+        port: 9000
+  - matches:
+      - path:
+          type: PathPrefix
+          value: /token
+    backendRefs:
+      - name: auth0-mock
+        port: 9000
+  - matches:
+      - path:
+          type: PathPrefix
+          value: /.well-known/jwks.json
+    backendRefs:
+      - name: auth0-mock
+        port: 9000
+  - matches:
+      - path:
+          type: PathPrefix
+          value: /authorize
+    backendRefs:
+      - name: auth0-mock
+        port: 9000
+  - matches:
+      - path:
+          type: PathPrefix
+          value: /
+    backendRefs:
+      - name: mcp-backend
+        group: gateway.kgateway.dev
+        kind: Backend
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mcp-transform
+spec:
+  targetRefs:
+    - name: mcp-route
+      kind: HTTPRoute
+      group: gateway.networking.k8s.io
+  traffic:
+    transformation:
+      response:
+        body: 'request.path == "/.well-known/oauth-protected-resource" ? json(response.body).merge({"resource": "http://localhost:8080"}) : response.body'
+    cors:
+      allowOrigins:
+        - '*'
+      allowMethods:
+        - GET
+        - POST
+        - OPTIONS
+      allowHeaders:
+        - mcp-protocol-version
+        - content-type
+        - authorization
+      allowCredentials: true
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
@@ -50,3 +123,4 @@ spec:
           bearerMethodsSupported: '["header"]'
           resourceDocumentation: http://mcp-website-fetcher.default.svc.cluster.local/docs
           resourcePolicyUri: http://mcp-website-fetcher.default.svc.cluster.local/policies
+

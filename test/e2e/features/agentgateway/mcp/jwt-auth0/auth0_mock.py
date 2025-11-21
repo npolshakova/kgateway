@@ -14,7 +14,7 @@ HARDCODED_CODE = "fixed_auth_code_123"
 HARDCODED_CLIENT_SECRET = "secret_2nGx_bjvo9z72Aw3-hKTWMusEo2-yTfH"
 HARDCODED_ACCESS_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjUzMzM3ODA2ODc1NTEwMzg2NTkifQ.eyJhdWQiOiJhY2NvdW50IiwiZXhwIjoxNzYzNjc2Nzc2LCJpYXQiOjE3NjM2NzMxNzYsImlzcyI6Imh0dHBzOi8va2dhdGV3YXkuZGV2Iiwic3ViIjoidXNlckBrZ2F0ZXdheS5kZXYifQ.Fko5TMFRRJoXyidRaAmzmwlVHIwNxCXqiKf5BRw_sumTnpNmt9Qt_2RUQCn7tTC_gAV50FyV4WKwoyTzAn0S8mmgZumI8E2-Uoq-A8wAohz9rt4a61_gaDeXXn0dF3YitQicR30Q_buoi2Nki6ZRPf9FyE5ulO4Ut_PyQrNXwlwO7vr_U3DXfrzvT9y2aDdNndPr1GB4fWTM84mEdQgx3XevIc7yjnbgKHnvIRp4gEyh-QL0ZYisjD-tZIDloZoSZjNFYu6PIdoxAaz9WhINAkAqX9KS8cd6uO36nPDoDOT1UmCT2VBjNszhLaZqtRKbJUb1HYrn-Gzq8vumLn8sjQ"
 HARDCODED_REFRESH_TOKEN = "fixed_refresh_token_123"
-REDIRECT_URI = "http://127.0.0.1/callback"
+REDIRECT_URI = "http:/localhost:8080/callback"
 
 # Private JWK (for signing JWTs)
 PRIVATE_JWK_JSON = """{
@@ -59,7 +59,14 @@ class AuthServerHandler(BaseHTTPRequestHandler):
     def send_json_response(self, data, status_code=200):
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        origin = self.headers.get('Origin', '*')
+        # Echo specific Origin for credentialed requests; fallback to *
+        self.send_header('Access-Control-Allow-Origin', origin)
+        self.send_header('Vary', 'Origin')
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        # Mirror common request headers used by browsers for CORS flows
+        request_headers = self.headers.get('Access-Control-Request-Headers', 'content-type, authorization')
+        self.send_header('Access-Control-Allow-Headers', request_headers)
         self.end_headers()
         self.wfile.write(json.dumps(data).encode('utf-8'))
 
@@ -95,6 +102,17 @@ class AuthServerHandler(BaseHTTPRequestHandler):
             self.handle_discovery()
         else:
             self.send_json_response({"error": "not_found"}, 404)
+
+    def do_OPTIONS(self):
+        origin = self.headers.get('Origin', '*')
+        request_headers = self.headers.get('Access-Control-Request-Headers', 'content-type')
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', origin)
+        self.send_header('Vary', 'Origin')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', request_headers)
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.end_headers()
 
     # ------------------------------
     # Endpoints
@@ -139,19 +157,10 @@ class AuthServerHandler(BaseHTTPRequestHandler):
             decoded = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
             client_id, client_secret = decoded.split(':', 1)
 
-        if client_id != HARDCODED_CLIENT_ID or client_secret != HARDCODED_CLIENT_SECRET:
-            self.send_json_response({"error": "invalid_client"}, 400)
-            return
-
         if grant_type == 'authorization_code':
-            code = body.get('code', [''])[0]
-            redirect_uri = body.get('redirect_uri', [''])[0]
-
-            if code != HARDCODED_CODE or redirect_uri != REDIRECT_URI:
-                self.send_json_response({"error": "invalid_grant"}, 400)
-                return
-
-            # Issue dynamic JWT
+            # Be lenient for generic MCP inspectors/SPAs using PKCE:
+            # - Do not require client_secret (public client)
+            # - Accept any code/redirect_uri/code_verifier
             response = {
                 "access_token": HARDCODED_ACCESS_TOKEN,
                 "refresh_token": HARDCODED_REFRESH_TOKEN,
@@ -161,10 +170,12 @@ class AuthServerHandler(BaseHTTPRequestHandler):
             self.send_json_response(response)
 
         elif grant_type == 'refresh_token':
-            refresh_token = body.get('refresh_token', [''])[0]
-            if refresh_token != HARDCODED_REFRESH_TOKEN:
-                self.send_json_response({"error": "invalid_grant"}, 400)
+            # For refresh token, still require confidential client auth
+            if client_id != HARDCODED_CLIENT_ID or client_secret != HARDCODED_CLIENT_SECRET:
+                self.send_json_response({"error": "invalid_client"}, 400)
                 return
+            refresh_token = body.get('refresh_token', [''])[0]
+            # Accept any refresh_token for testing purposes
 
             access_token = self.issue_jwt(sub="user@kgateway.dev", aud="account")
             response = {
@@ -194,16 +205,17 @@ class AuthServerHandler(BaseHTTPRequestHandler):
         jwks = {"keys": [json.loads(PUBLIC_JWK_JSON)]}
         self.send_json_response(jwks)
 
+    # for local testing with port-forwarding gateway and mcp inspector
     def handle_discovery(self):
         discovery = {
             "issuer": "https://kgateway.dev",
-            "authorization_endpoint": "http://0.0.0.0:9000/authorize",
-            "token_endpoint": "http://0.0.0.0:9000/token",
-            "jwks_uri": "http://0.0.0.0:9000/.well-known/jwks.json",
-            "registration_endpoint": "http://0.0.0.0:9000/register",
+            "authorization_endpoint": "http://localhost:8080/authorize",
+            "token_endpoint": "http://localhost:8080/token",
+            "jwks_uri": "http://localhost:8080/.well-known/jwks.json",
+            "registration_endpoint": "http://localhost:8080/register",
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
-            "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+            "token_endpoint_auth_methods_supported": ["none", "client_secret_basic", "client_secret_post"],
             "code_challenge_methods_supported": ["S256"]
         }
         self.send_json_response(discovery)

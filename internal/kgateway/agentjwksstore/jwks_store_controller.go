@@ -2,6 +2,7 @@ package agentjwksstore
 
 import (
 	"context"
+	"time"
 
 	"istio.io/istio/pkg/kube/kclient"
 	"istio.io/istio/pkg/kube/krt"
@@ -61,13 +62,31 @@ func (j *JwksStoreController) Init(ctx context.Context) {
 					if provider.JWKS.Remote == nil {
 						continue
 					}
-					toret = append(toret, jwks.JwksSource{JwksURL: provider.JWKS.Remote.JwksUri, Ttl: provider.JWKS.Remote.CacheDuration.Duration})
+					ttl := time.Duration(0)
+					if provider.JWKS.Remote.CacheDuration != nil {
+						ttl = provider.JWKS.Remote.CacheDuration.Duration
+					}
+					if provider.JWKS.Remote.JwksUri != "" {
+						toret = append(toret, jwks.JwksSource{
+							JwksURL: provider.JWKS.Remote.JwksUri,
+							Ttl:     ttl,
+						})
+					}
 				}
 			}
 
 			// enqueue Backend MCP authentication JWKS (if present)
-			if p.Spec.Backend.MCP.Authentication != nil {
-				toret = append(toret, jwks.JwksSource{JwksURL: p.Spec.Backend.MCP.Authentication.JWKS.JwksUri, Ttl: p.Spec.Backend.MCP.Authentication.JWKS.CacheDuration.Duration})
+			if p.Spec.Backend != nil && p.Spec.Backend.MCP != nil && p.Spec.Backend.MCP.Authentication != nil {
+				ttl := time.Duration(0)
+				if p.Spec.Backend.MCP.Authentication.JWKS.CacheDuration != nil {
+					ttl = p.Spec.Backend.MCP.Authentication.JWKS.CacheDuration.Duration
+				}
+				if p.Spec.Backend.MCP.Authentication.JWKS.JwksUri != "" {
+					toret = append(toret, jwks.JwksSource{
+						JwksURL: p.Spec.Backend.MCP.Authentication.JWKS.JwksUri,
+						Ttl:     ttl,
+					})
+				}
 			}
 		}
 
