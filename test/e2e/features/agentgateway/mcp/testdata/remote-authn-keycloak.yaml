@@ -21,10 +21,49 @@ spec:
   parentRefs:
     - name: gw
   rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /.well-known/oauth-authorization-server
+      backendRefs:
+        - name: keycloak
+          port: 7080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /register
+      backendRefs:
+        - name: keycloak
+          port: 7080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /token
+      backendRefs:
+        - name: keycloak
+          port: 7080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /.well-known/jwks.json
+      backendRefs:
+        - name: keycloak
+          port: 7080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /authorize
+      backendRefs:
+        - name: keycloak
+          port: 7080
     - backendRefs:
         - name: mcp-backend
           group: gateway.kgateway.dev
           kind: Backend
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
@@ -50,5 +89,30 @@ spec:
           bearerMethodsSupported: '["header"]'
           resourceDocumentation: http://mcp-website-fetcher.default.svc.cluster.local/docs
           resourcePolicyUri: http://mcp-website-fetcher.default.svc.cluster.local/policies
-
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mcp-transform
+spec:
+  targetRefs:
+    - name: mcp-route
+      kind: HTTPRoute
+      group: gateway.networking.k8s.io
+  traffic:
+    transformation:
+      response:
+        body: 'request.path == "/.well-known/oauth-protected-resource" ? json(response.body).merge({"resource": "http://localhost:8080"}) : response.body'
+    cors:
+      allowOrigins:
+        - '*'
+      allowMethods:
+        - GET
+        - POST
+        - OPTIONS
+      allowHeaders:
+        - mcp-protocol-version
+        - content-type
+        - authorization
+      allowCredentials: true
 

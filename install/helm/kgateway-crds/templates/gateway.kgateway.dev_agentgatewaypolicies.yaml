@@ -875,6 +875,14 @@ spec:
                             - AUTH0
                             - KEYCLOAK
                             type: string
+                          mode:
+                            default: Optional
+                            description: validation mode for JWT authentication.
+                            enum:
+                            - Strict
+                            - Optional
+                            - Permissive
+                            type: string
                           resourceMetadata:
                             additionalProperties:
                               type: string

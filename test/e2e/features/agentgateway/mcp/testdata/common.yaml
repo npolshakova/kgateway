@@ -116,4 +116,4 @@ spec:
       enabled: true
       logLevel: debug
       image:
-        tag: v0.6.0-307-g005351253-dirty
+        tag: v0.6.0-308-gc3540a110-dirty

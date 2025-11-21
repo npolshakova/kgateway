@@ -12,9 +12,10 @@ from jwcrypto import jwk, jwt
 HARDCODED_CLIENT_ID = "mcp_gi3APARn2_uHv2oxfJJqq2yZBDV4OyNo"
 HARDCODED_CODE = "fixed_auth_code_123"
 HARDCODED_CLIENT_SECRET = "secret_2nGx_bjvo9z72Aw3-hKTWMusEo2-yTfH"
-HARDCODED_ACCESS_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjUzMzM3ODA2ODc1NTEwMzg2NTkifQ.eyJhdWQiOiJhY2NvdW50IiwiZXhwIjoxNzYzNjc2Nzc2LCJpYXQiOjE3NjM2NzMxNzYsImlzcyI6Imh0dHBzOi8va2dhdGV3YXkuZGV2Iiwic3ViIjoidXNlckBrZ2F0ZXdheS5kZXYifQ.Fko5TMFRRJoXyidRaAmzmwlVHIwNxCXqiKf5BRw_sumTnpNmt9Qt_2RUQCn7tTC_gAV50FyV4WKwoyTzAn0S8mmgZumI8E2-Uoq-A8wAohz9rt4a61_gaDeXXn0dF3YitQicR30Q_buoi2Nki6ZRPf9FyE5ulO4Ut_PyQrNXwlwO7vr_U3DXfrzvT9y2aDdNndPr1GB4fWTM84mEdQgx3XevIc7yjnbgKHnvIRp4gEyh-QL0ZYisjD-tZIDloZoSZjNFYu6PIdoxAaz9WhINAkAqX9KS8cd6uO36nPDoDOT1UmCT2VBjNszhLaZqtRKbJUb1HYrn-Gzq8vumLn8sjQ"
+# fake expiration date to keep token valid
+HARDCODED_ACCESS_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjUzMzM3ODA2ODc1NTEwMzg2NTkifQ.eyJhdWQiOiJhY2NvdW50IiwiZXhwIjoyMDc5MTA1MTE0LCJpYXQiOjE3NjM3NDUxMTQsImlzcyI6Imh0dHBzOi8va2dhdGV3YXkuZGV2Iiwic3ViIjoidXNlckBrZ2F0ZXdheS5kZXYifQ.W0n1xEPD6dl5CYLi_TEMzqn9REGgN7-MIaivvmHHzUAqsD-Gox2NQ79KFEGMqlZwbfc0p34xloR2dJ616nU9NxqSyBssFgDhRDGnasSwHM6AvbpEEPEK7J_lCbfnaxqEQm8_AhXPgFEY4zbQq3WQ7OE7wQpSPjcAL1PB01SRE5UZsYW_bXqup_2MqVzahCFagrQtOPHN3sCUeLz8dm5DAPgat9WQmiDaUP-_yT_tk4J7MH6SolHBnxRwrP8nhUf9N9bi-hADnmCLTKO7BmP0xBQo-abRlu_5Ug6YAfMirHfrO09EvXDCVWuk1d35GCyApPxPhwtZg40kOq-BXaWwFw"
 HARDCODED_REFRESH_TOKEN = "fixed_refresh_token_123"
-REDIRECT_URI = "http:/localhost:8080/callback"
+REDIRECT_URI = "http://127.0.0.1/callback"
 
 # Private JWK (for signing JWTs)
 PRIVATE_JWK_JSON = """{
@@ -42,14 +43,6 @@ PUBLIC_KEY = jwk.JWK.from_json(PUBLIC_JWK_JSON)
 
 # Track registered clients and codes
 registered_clients = {}
-authorization_codes = {
-    HARDCODED_CODE: {
-        "client_id": HARDCODED_CLIENT_ID,
-        "redirect_uri": REDIRECT_URI,
-        "scope": "openid profile",
-        "expires_at": time.time() + 600
-    }
-}
 
 # ------------------------------
 # HTTP Handler
@@ -145,61 +138,13 @@ class AuthServerHandler(BaseHTTPRequestHandler):
         self.send_json_response({"redirect_to": callback_url})
 
     def handle_token(self):
-        body = self.get_request_body()
-        grant_type = body.get('grant_type', [''])[0]
-
-        # Extract Basic auth header if client_id not in body
-        auth_header = self.headers.get('Authorization', '')
-        client_id = body.get('client_id', [''])[0]
-        client_secret = body.get('client_secret', [''])[0]
-
-        if not client_id and auth_header.startswith('Basic '):
-            decoded = base64.b64decode(auth_header.split(' ')[1]).decode('utf-8')
-            client_id, client_secret = decoded.split(':', 1)
-
-        if grant_type == 'authorization_code':
-            # Be lenient for generic MCP inspectors/SPAs using PKCE:
-            # - Do not require client_secret (public client)
-            # - Accept any code/redirect_uri/code_verifier
-            response = {
-                "access_token": HARDCODED_ACCESS_TOKEN,
-                "refresh_token": HARDCODED_REFRESH_TOKEN,
-                "token_type": "bearer",
-                "expires_in": 3600
-            }
-            self.send_json_response(response)
-
-        elif grant_type == 'refresh_token':
-            # For refresh token, still require confidential client auth
-            if client_id != HARDCODED_CLIENT_ID or client_secret != HARDCODED_CLIENT_SECRET:
-                self.send_json_response({"error": "invalid_client"}, 400)
-                return
-            refresh_token = body.get('refresh_token', [''])[0]
-            # Accept any refresh_token for testing purposes
-
-            access_token = self.issue_jwt(sub="user@kgateway.dev", aud="account")
-            response = {
-                "access_token": access_token,
-                "refresh_token": HARDCODED_REFRESH_TOKEN,
-                "token_type": "bearer",
-                "expires_in": 3600
-            }
-            self.send_json_response(response)
-
-        else:
-            self.send_json_response({"error": "unsupported_grant_type"}, 400)
-
-    def issue_jwt(self, sub, aud):
-        payload = {
-            "iss": "https://kgateway.dev",
-            "sub": sub,
-            "aud": aud,
-            "iat": int(time.time()),
-            "exp": int(time.time()) + 3600
+        response = {
+            "access_token": HARDCODED_ACCESS_TOKEN,
+            "refresh_token": HARDCODED_REFRESH_TOKEN,
+            "token_type": "bearer",
+            "expires_in": 3600
         }
-        token = jwt.JWT(header={"alg": "RS256"}, claims=payload)
-        token.make_signed_token(PRIVATE_KEY)
-        return token.serialize()
+        self.send_json_response(response)
 
     def handle_jwks(self):
         jwks = {"keys": [json.loads(PUBLIC_JWK_JSON)]}
@@ -209,10 +154,10 @@ class AuthServerHandler(BaseHTTPRequestHandler):
     def handle_discovery(self):
         discovery = {
             "issuer": "https://kgateway.dev",
-            "authorization_endpoint": "http://localhost:8080/authorize",
-            "token_endpoint": "http://localhost:8080/token",
-            "jwks_uri": "http://localhost:8080/.well-known/jwks.json",
-            "registration_endpoint": "http://localhost:8080/register",
+            "authorization_endpoint": "http://127.0.0.1:8080/authorize",
+            "token_endpoint": "http://127.0.0.1:8080/token",
+            "jwks_uri": "http://127.0.0.1:8080/.well-known/jwks.json",
+            "registration_endpoint": "http://127.0.0.1:8080/register",
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "token_endpoint_auth_methods_supported": ["none", "client_secret_basic", "client_secret_post"],

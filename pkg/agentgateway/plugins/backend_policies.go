@@ -269,6 +269,15 @@ func translateMCPAuthnPolicy(ctx PolicyCtx, backend *v1alpha1.AgentgatewayPolicy
 		return nil
 	}
 
+	var mode api.BackendPolicySpec_McpAuthentication_Mode
+	if authnPolicy.Mode == v1alpha1.JWTAuthenticationModeOptional {
+		mode = api.BackendPolicySpec_McpAuthentication_OPTIONAL
+	} else if authnPolicy.Mode == v1alpha1.JWTAuthenticationModePermissive {
+		mode = api.BackendPolicySpec_McpAuthentication_PERMISSIVE
+	} else if authnPolicy.Mode == v1alpha1.JWTAuthenticationModeStrict {
+		mode = api.BackendPolicySpec_McpAuthentication_STRICT
+	}
+
 	mcpAuthn := &api.BackendPolicySpec_McpAuthentication{
 		Issuer:    authnPolicy.Issuer,
 		Audiences: authnPolicy.Audiences,
@@ -277,6 +286,7 @@ func translateMCPAuthnPolicy(ctx PolicyCtx, backend *v1alpha1.AgentgatewayPolicy
 			Extra: authnPolicy.ResourceMetadata,
 		},
 		JwksInline: translatedInlineJwks,
+		Mode:       mode,
 	}
 
 	mcpAuthnPolicy := &api.Policy{

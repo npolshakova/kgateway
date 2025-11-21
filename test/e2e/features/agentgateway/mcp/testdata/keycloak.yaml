@@ -7,10 +7,22 @@ data:
     {
       "realm": "mcp",
       "enabled": true,
+      "clientScopes": [
+        {
+          "name": "tools/call/fetch",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true",
+            "display.on.consent.screen": "false"
+          }
+        }
+      ],
+      "defaultOptionalClientScopes": [
+        "tools/call/fetch"
+      ],
       "clients": [
         {
           "clientId": "mcp_proxy",
-          "publicClient": false,
           "publicClient": false,
           "serviceAccountsEnabled": true,
           "clientAuthenticatorType": "client-secret",

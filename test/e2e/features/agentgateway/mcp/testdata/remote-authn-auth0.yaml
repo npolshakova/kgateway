@@ -115,12 +115,13 @@ spec:
         jwks:
           jwksUri: http://auth0-mock.default.svc.cluster.local:9000/.well-known/jwks.json
         mcpIDP: AUTH0
+        mode: Optional
         audiences:
           - "account"
         resourceMetadata:
           resource: http://mcp-website-fetcher.default.svc.cluster.local/mcp
           scopesSupported: '["tools/call/fetch"]'
-          bearerMethodsSupported: '["header"]'
+          bearerMethodsSupported: '["header", "query", "body"]'
           resourceDocumentation: http://mcp-website-fetcher.default.svc.cluster.local/docs
           resourcePolicyUri: http://mcp-website-fetcher.default.svc.cluster.local/policies
 
