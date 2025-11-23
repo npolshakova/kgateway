@@ -3,6 +3,7 @@ package plugins
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
+	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/sslutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
@@ -26,6 +28,7 @@ const (
 	tlsPolicySuffix              = ":tls"
 	backendHttpPolicySuffix      = ":backend-http"
 	mcpAuthorizationPolicySuffix = ":mcp-authorization"
+	mcpAuthenticationPolicySuffix = ":mcp-authentication"
 )
 
 func TranslateInlineBackendPolicy(
@@ -84,8 +87,15 @@ func translateBackendPolicyToAgw(
 	}
 
 	if s := backend.MCP; s != nil {
-		pol := translateBackendMCPAuthorization(policy, policyTarget)
-		agwPolicies = append(agwPolicies, pol...)
+		if backend.MCP.Authorization != nil {
+			pol := translateBackendMCPAuthorization(policy, policyTarget)
+			agwPolicies = append(agwPolicies, pol...)
+		}
+
+		if backend.MCP.Authentication != nil {
+			pol := translateBackendMCPAuthentication(ctx, policy, policyTarget)
+			agwPolicies = append(agwPolicies, pol...)
+		}
 	}
 
 	if s := backend.AI; s != nil {
@@ -265,6 +275,82 @@ func translateBackendMCPAuthorization(policy *v1alpha1.AgentgatewayPolicy, targe
 		"agentgateway_policy", mcpPolicy.Name)
 
 	return []AgwPolicy{{Policy: mcpPolicy}}
+}
+
+func translateBackendMCPAuthentication(ctx PolicyCtx, policy *v1alpha1.AgentgatewayPolicy, target *api.PolicyTarget) []AgwPolicy {
+	backend := policy.Spec.Backend
+	if backend == nil || backend.MCP == nil || backend.MCP.Authentication == nil {
+		return nil
+	}
+	authnPolicy := backend.MCP.Authentication
+	if authnPolicy == nil {
+		return nil
+	}
+
+	var errs []error
+	var idp api.BackendPolicySpec_McpAuthentication_McpIDP
+	if authnPolicy.McpIDP == "AUTH0" {
+		idp = api.BackendPolicySpec_McpAuthentication_AUTH0
+	} else if authnPolicy.McpIDP == "KEYCLOAK" {
+		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
+	}
+
+	// TODO: share logic with jwt translation
+	if _, err := url.Parse(authnPolicy.JWKS.JwksUri); err != nil {
+		logger.Error("invalid jwks url in JWTAuthentication policy", "jwks_uri", authnPolicy.JWKS.JwksUri)
+		errs = append(errs, fmt.Errorf("invalid jwks url in JWTAuthentication policy %w", err))
+		return nil
+	}
+	jwksStoreName := jwks.JwksConfigMapNamespacedName(authnPolicy.JWKS.JwksUri)
+	if jwksStoreName == nil {
+		logger.Error("jwks store name not found", "jwks_uri", authnPolicy.JWKS.JwksUri)
+		errs = append(errs, fmt.Errorf("jwks store hasn't been initialized"))
+		return nil
+	}
+	jwksCM := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Collections.ConfigMaps, krt.FilterObjectName(*jwksStoreName)))
+	if jwksCM == nil {
+		logger.Error("jwks ConfigMap not found", "name", jwksStoreName.Name, "namespace", jwksStoreName.Namespace)
+		errs = append(errs, fmt.Errorf("jwks ConfigMap isn't available"))
+		return nil
+	}
+	jwksForUri, err := jwks.JwksFromConfigMap(jwksCM)
+	if err != nil {
+		logger.Error("error deserializing jwks ConfigMap", "name", jwksStoreName.Name, "namespace", jwksStoreName.Namespace, "error", err)
+		errs = append(errs, fmt.Errorf("error deserializing jwks ConfigMap %w", err))
+		return nil
+	}
+	translatedInlineJwks, ok := jwksForUri[authnPolicy.JWKS.JwksUri]
+	if !ok {
+		logger.Error("jwks is not available in the jwks ConfigMap", "uri", authnPolicy.JWKS.JwksUri)
+		errs = append(errs, fmt.Errorf("jwks %s is not available in the jwks ConfigMap", authnPolicy.JWKS.JwksUri))
+		return nil
+	}
+
+	mcpAuthn := &api.BackendPolicySpec_McpAuthentication{
+		Issuer:    authnPolicy.Issuer,
+		Audiences: authnPolicy.Audiences,
+		Provider:  idp,
+		ResourceMetadata: &api.BackendPolicySpec_McpAuthentication_ResourceMetadata{
+			Extra: authnPolicy.ResourceMetadata,
+		},
+		JwksInline: translatedInlineJwks,
+	}
+	mcpAuthnPolicy := &api.Policy{
+		Name:   policy.Namespace + "/" + policy.Name + mcpAuthenticationPolicySuffix + attachmentName(target),
+		Target: target,
+		Kind: &api.Policy_Backend{
+			Backend: &api.BackendPolicySpec{
+				Kind: &api.BackendPolicySpec_McpAuthentication_{
+					McpAuthentication: mcpAuthn,
+				},
+			}},
+	}
+
+	logger.Debug("generated MCP authentication policy",
+		"policy", policy.Name,
+		"agentgateway_policy", mcpAuthnPolicy.Name)
+
+	return []AgwPolicy{{Policy: mcpAuthnPolicy}}
 }
 
 // translateBackendAI processes AI configuration and creates corresponding Agw policies
