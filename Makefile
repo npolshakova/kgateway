@@ -234,6 +234,9 @@ GOTESTSUM_ARGS ?= --format=standard-verbose
 .PHONY: go-test
 go-test: ## Run all tests, or only run the test package at {TEST_PKG} if it is specified
 go-test: reset-bug-report
+	@if [ "$(TEST_TAG)" = "e2e" ]; then \
+		$(MAKE) --no-print-directory dummy-auth0-docker kind-load-dummy-auth0; \
+	fi
 	$(GO_TEST_ENV) $(GOTESTSUM) $(GOTESTSUM_ARGS) --rerun-fails-abort-on-data-race --rerun-fails=$(GO_TEST_RETRIES) --packages="$(TEST_PKG)" -- -ldflags='$(LDFLAGS)' $(if $(TEST_TAG),-tags=$(TEST_TAG)) $(GO_TEST_ARGS) $(GO_TEST_USER_ARGS)
 
 # https://go.dev/blog/cover#heat-maps
@@ -683,7 +686,7 @@ deploy-kgateway: package-kgateway-charts deploy-kgateway-crd-chart deploy-kgatew
 setup-base: kind-create gw-api-crds gie-crds metallb ## Setup the base infrastructure (kind cluster, CRDs, and MetalLB)
 
 .PHONY: setup
-setup: setup-base kind-build-and-load package-kgateway-charts ## Setup the complete infrastructure (base setup plus images and charts)
+setup: setup-base kind-build-and-load package-kgateway-charts dummy-auth0-docker kind-load-dummy-auth0 ## Setup the complete infrastructure (base setup plus images and charts)
 
 .PHONY: run
 run: setup deploy-kgateway  ## Set up complete development environment

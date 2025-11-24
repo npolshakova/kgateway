@@ -211,8 +211,8 @@ func (s *testingSuite) waitDynamicReady() {
 		metav1.ListOptions{LabelSelector: defaults.WellKnownAppLabel + "=curl"},
 	)
 	s.TestInstallation.Assertions.EventuallyGatewayCondition(s.Ctx, gatewayName, gatewayNamespace, gwv1.GatewayConditionProgrammed, metav1.ConditionTrue)
-	//s.TestInstallation.Assertions.EventuallyAgwBackendCondition(s.Ctx, "admin-mcp-backend", "default", "Accepted", metav1.ConditionTrue)
-	//s.TestInstallation.Assertions.EventuallyAgwBackendCondition(s.Ctx, "user-mcp-backend", "default", "Accepted", metav1.ConditionTrue)
+	s.TestInstallation.Assertions.EventuallyAgwBackendCondition(s.Ctx, "admin-mcp-backend", "default", "Accepted", metav1.ConditionTrue)
+	s.TestInstallation.Assertions.EventuallyAgwBackendCondition(s.Ctx, "user-mcp-backend", "default", "Accepted", metav1.ConditionTrue)
 	s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(
 		s.Ctx, "dynamic-mcp-route", "default",
 		gwv1.RouteConditionAccepted, metav1.ConditionTrue,
@@ -229,13 +229,13 @@ func (s *testingSuite) waitStaticReady() {
 		metav1.ListOptions{LabelSelector: defaults.WellKnownAppLabel + "=curl"},
 	)
 	s.TestInstallation.Assertions.EventuallyGatewayCondition(s.Ctx, gatewayName, gatewayNamespace, gwv1.GatewayConditionProgrammed, metav1.ConditionTrue)
-	//s.TestInstallation.Assertions.EventuallyAgwBackendCondition(s.Ctx, "mcp-backend", "default", "Accepted", metav1.ConditionTrue)
+	s.TestInstallation.Assertions.EventuallyAgwBackendCondition(s.Ctx, "mcp-backend", "default", "Accepted", metav1.ConditionTrue)
 	s.TestInstallation.Assertions.EventuallyHTTPRouteCondition(s.Ctx, "mcp-route", "default", gwv1.RouteConditionAccepted, metav1.ConditionTrue)
 }
 
 func (s *testingSuite) waitAuth0Ready() {
 	s.TestInstallation.Assertions.EventuallyPodsRunning(
 		s.Ctx, "default",
-		metav1.ListOptions{LabelSelector: "app=auth0-mock"},
+		metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=auth0-mock"},
 	)
 }
