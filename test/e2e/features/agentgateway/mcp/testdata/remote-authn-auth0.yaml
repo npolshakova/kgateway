@@ -31,6 +31,24 @@ spec:
   - matches:
       - path:
           type: PathPrefix
+          value: /
+    backendRefs:
+      - name: mcp-backend
+        group: gateway.kgateway.dev
+        kind: AgentgatewayBackend
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: idp-route
+spec:
+  parentRefs:
+    - name: gw
+      sectionName: idp-8081
+  rules:
+  - matches:
+      - path:
+          type: PathPrefix
           value: /.well-known/oauth-authorization-server
     backendRefs:
       - name: auth0-mock
@@ -63,14 +81,6 @@ spec:
     backendRefs:
       - name: auth0-mock
         port: 9000
-  - matches:
-      - path:
-          type: PathPrefix
-          value: /
-    backendRefs:
-      - name: mcp-backend
-        group: gateway.kgateway.dev
-        kind: AgentgatewayBackend
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: AgentgatewayPolicy

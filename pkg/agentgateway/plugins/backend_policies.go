@@ -1,12 +1,14 @@
 package plugins
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
 	"istio.io/istio/pkg/ptr"
@@ -326,12 +328,30 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *v1alpha1.Agentgate
 		return nil
 	}
 
+	var extraResourceMetadata map[string]*structpb.Value
+
+	for k, v := range authnPolicy.ResourceMetadata {
+		if extraResourceMetadata == nil {
+			extraResourceMetadata = make(map[string]*structpb.Value)
+		}
+		var parsed any
+		if err := json.Unmarshal([]byte(v), &parsed); err != nil {
+			parsed = v // fallback to string
+		}
+		pbVal, err := structpb.NewValue(parsed)
+		if err != nil {
+			logger.Error("error deserializing resource metadata", "key", k, "error", err)
+			continue
+		}
+		extraResourceMetadata[k] = pbVal
+	}
+
 	mcpAuthn := &api.BackendPolicySpec_McpAuthentication{
 		Issuer:    authnPolicy.Issuer,
 		Audiences: authnPolicy.Audiences,
 		Provider:  idp,
 		ResourceMetadata: &api.BackendPolicySpec_McpAuthentication_ResourceMetadata{
-			Extra: authnPolicy.ResourceMetadata,
+			Extra: extraResourceMetadata,
 		},
 		JwksInline: translatedInlineJwks,
 	}

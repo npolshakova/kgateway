@@ -93,6 +93,12 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
+  - name: idp-8081
+    protocol: HTTP
+    port: 8081
+    allowedRoutes:
+      namespaces:
+        from: All
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1
@@ -116,4 +122,4 @@ spec:
       enabled: true
       logLevel: debug
       image:
-        tag: v0.6.0-307-g005351253-dirty
+        tag: v0.6.0-310-g8c5e059f4-dirty
