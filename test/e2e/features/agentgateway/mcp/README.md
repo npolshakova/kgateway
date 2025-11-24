@@ -9,7 +9,7 @@ Probably it can be simplified. For now we use two different docker images.
 
 ## MCP Authentication with 0Auth mock server
 
-Apply the configuration from the e2e tests `jwt-auth0/deployment.yaml`, `testdata/common.yaml`, `testdata/static.yaml` and `remote-authn-auth0.yaml`.
+Apply the configuration from the e2e tests `testdata/auth0-mock-server.yaml`, `testdata/common.yaml`, `testdata/static.yaml` and `remote-authn-auth0.yaml`.
 The IDP server is a mock server that mocks the 0Auth 2.0 flows and returns a hard coded JWT token.
 
 Port-forward the gateway:
@@ -70,6 +70,15 @@ And you should get a response:
 ```shell
 data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"prompts":{},"resources":{},"tools":{}},"serverInfo":{"name":"rmcp","version":"0.8.5"},"instructions":"This server is a gateway to a set of mcp servers. It is responsible for routing requests to the correct server and aggregating the results."}}
 ```
+
+You can also test with the MCP inspector via the Guided OAuth tool and the mock mcp inspector config. 
+
+First make sure the idp listener is port-forward on the gateway:
+```shell
+kubectl port-forward svc/gw 8081:8081
+```
+
+Then click `Open Auth Settings` in the mcp inspector follow the guided refresh token flow to setup the tokens to use automatically for server requests.
 
 ## Keycloak MCP Authentication
 

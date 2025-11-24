@@ -14,7 +14,7 @@ HARDCODED_CODE = "fixed_auth_code_123"
 HARDCODED_CLIENT_SECRET = "secret_2nGx_bjvo9z72Aw3-hKTWMusEo2-yTfH"
 HARDCODED_ACCESS_TOKEN = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjUzMzM3ODA2ODc1NTEwMzg2NTkifQ.eyJhdWQiOiJhY2NvdW50IiwiZXhwIjoxNzYzNjc2Nzc2LCJpYXQiOjE3NjM2NzMxNzYsImlzcyI6Imh0dHBzOi8va2dhdGV3YXkuZGV2Iiwic3ViIjoidXNlckBrZ2F0ZXdheS5kZXYifQ.Fko5TMFRRJoXyidRaAmzmwlVHIwNxCXqiKf5BRw_sumTnpNmt9Qt_2RUQCn7tTC_gAV50FyV4WKwoyTzAn0S8mmgZumI8E2-Uoq-A8wAohz9rt4a61_gaDeXXn0dF3YitQicR30Q_buoi2Nki6ZRPf9FyE5ulO4Ut_PyQrNXwlwO7vr_U3DXfrzvT9y2aDdNndPr1GB4fWTM84mEdQgx3XevIc7yjnbgKHnvIRp4gEyh-QL0ZYisjD-tZIDloZoSZjNFYu6PIdoxAaz9WhINAkAqX9KS8cd6uO36nPDoDOT1UmCT2VBjNszhLaZqtRKbJUb1HYrn-Gzq8vumLn8sjQ"
 HARDCODED_REFRESH_TOKEN = "fixed_refresh_token_123"
-REDIRECT_URI = "http:/localhost:8080/callback"
+REDIRECT_URI = "http:/localhost:8081/callback"
 
 # Private JWK (for signing JWTs)
 PRIVATE_JWK_JSON = """{
@@ -209,10 +209,10 @@ class AuthServerHandler(BaseHTTPRequestHandler):
     def handle_discovery(self):
         discovery = {
             "issuer": "https://kgateway.dev",
-            "authorization_endpoint": "http://localhost:8080/authorize",
-            "token_endpoint": "http://localhost:8080/token",
-            "jwks_uri": "http://localhost:8080/.well-known/jwks.json",
-            "registration_endpoint": "http://localhost:8080/register",
+            "authorization_endpoint": "http://localhost:8081/authorize",
+            "token_endpoint": "http://localhost:8081/token",
+            "jwks_uri": "http://localhost:8081/.well-known/jwks.json",
+            "registration_endpoint": "http://localhost:8081/register",
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "token_endpoint_auth_methods_supported": ["none", "client_secret_basic", "client_secret_post"],

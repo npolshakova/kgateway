@@ -19,15 +19,16 @@ metadata:
 spec:
   parentRefs:
     - name: gw
+      sectionName: http-8080
   rules:
   - matches:
+      # need to get redirect address from oauth server as part of OAuth Authentication flow when testing with mcp inspector
       - path:
           type: PathPrefix
-          value: /.well-known/oauth-protected-resource
+          value: /.well-known/oauth-authorization-server
     backendRefs:
-      - name: mcp-backend
-        group: gateway.kgateway.dev
-        kind: AgentgatewayBackend
+      - name: auth0-mock
+        port: 9000
   - matches:
       - path:
           type: PathPrefix
@@ -49,7 +50,7 @@ spec:
   - matches:
       - path:
           type: PathPrefix
-          value: /.well-known/oauth-authorization-server
+          value: /.well-known/oauth-protected-resource
     backendRefs:
       - name: auth0-mock
         port: 9000
@@ -85,7 +86,7 @@ spec:
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:
-  name: mcp-transform
+  name: mcp-policy
 spec:
   targetRefs:
     - name: mcp-route

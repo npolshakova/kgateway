@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/agentgateway/agentgateway/go/api"
@@ -18,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/jwks"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/sslutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
@@ -297,34 +295,10 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *v1alpha1.Agentgate
 		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
 	}
 
-	// TODO: share logic with jwt translation
-	if _, err := url.Parse(authnPolicy.JWKS.JwksUri); err != nil {
-		logger.Error("invalid jwks url in JWTAuthentication policy", "jwks_uri", authnPolicy.JWKS.JwksUri)
-		errs = append(errs, fmt.Errorf("invalid jwks url in JWTAuthentication policy %w", err))
-		return nil
-	}
-	jwksStoreName := jwks.JwksConfigMapNamespacedName(authnPolicy.JWKS.JwksUri)
-	if jwksStoreName == nil {
-		logger.Error("jwks store name not found", "jwks_uri", authnPolicy.JWKS.JwksUri)
-		errs = append(errs, fmt.Errorf("jwks store hasn't been initialized"))
-		return nil
-	}
-	jwksCM := ptr.Flatten(krt.FetchOne(ctx.Krt, ctx.Collections.ConfigMaps, krt.FilterObjectName(*jwksStoreName)))
-	if jwksCM == nil {
-		logger.Error("jwks ConfigMap not found", "name", jwksStoreName.Name, "namespace", jwksStoreName.Namespace)
-		errs = append(errs, fmt.Errorf("jwks ConfigMap isn't available"))
-		return nil
-	}
-	jwksForUri, err := jwks.JwksFromConfigMap(jwksCM)
+	translatedInlineJwks, err := resolveRemoteJWKSInline(ctx, authnPolicy.JWKS.JwksUri)
 	if err != nil {
-		logger.Error("error deserializing jwks ConfigMap", "name", jwksStoreName.Name, "namespace", jwksStoreName.Namespace, "error", err)
-		errs = append(errs, fmt.Errorf("error deserializing jwks ConfigMap %w", err))
-		return nil
-	}
-	translatedInlineJwks, ok := jwksForUri[authnPolicy.JWKS.JwksUri]
-	if !ok {
-		logger.Error("jwks is not available in the jwks ConfigMap", "uri", authnPolicy.JWKS.JwksUri)
-		errs = append(errs, fmt.Errorf("jwks %s is not available in the jwks ConfigMap", authnPolicy.JWKS.JwksUri))
+		logger.Error("failed resolving jwks", "jwks_uri", authnPolicy.JWKS.JwksUri, "error", err)
+		errs = append(errs, err)
 		return nil
 	}
 
