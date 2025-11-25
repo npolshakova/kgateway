@@ -4712,6 +4712,11 @@ func (in *MCPAuthentication) DeepCopyInto(out *MCPAuthentication) {
 			(*out)[key] = val
 		}
 	}
+	if in.McpIDP != nil {
+		in, out := &in.McpIDP, &out.McpIDP
+		*out = new(McpIDP)
+		**out = **in
+	}
 	if in.Audiences != nil {
 		in, out := &in.Audiences, &out.Audiences
 		*out = make([]string, len(*in))

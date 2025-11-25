@@ -288,7 +288,7 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *v1alpha1.Agentgate
 	}
 
 	idp := api.BackendPolicySpec_McpAuthentication_AUTH0
-	if authnPolicy.McpIDP != nil && *authnPolicy.McpIDP == v1alpha1.Keycloak {
+	if authnPolicy.McpIDP != nil && authnPolicy.McpIDP == v1alpha1.Keycloak {
 		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
 	}
 
