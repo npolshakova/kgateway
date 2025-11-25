@@ -195,7 +195,7 @@ metadata:
 spec:
   targetRefs:
     - name: mcp-backend
-      kind: Backend
+      kind: AgentgatewayBackend
       group: gateway.kgateway.dev
   backend:
     mcp:
@@ -205,7 +205,7 @@ spec:
           uri: http://keycloak.default.svc.cluster.local:7080/realms/mcp/protocol/openid-connect/certs
         audiences:
         - "account"
-        mcpIDP: Keycloak
+        idp: Keycloak
         resourceMetadata:
           resource: http://mcp-website-fetcher.default.svc.cluster.local/mcp
           scopesSupported: '["tools/call/fetch"]'

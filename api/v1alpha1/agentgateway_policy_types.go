@@ -802,7 +802,7 @@ type MCPAuthentication struct {
 
 	// McpIDP specifies the identity provider to use for authentication
 	// +kubebuilder:validation:Enum=Auth0;Keycloak
-	McpIDP *McpIDP `json:"mcpIDP,omitempty"`
+	McpIDP *McpIDP `json:"idp,omitempty"`
 
 	// issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
 	// +kubebuilder:validation:MinLength=1
