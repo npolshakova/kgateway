@@ -101,7 +101,7 @@ spec:
       authentication:
         issuer: http://keycloak:7080/realms/mcp
         jwks:
-          jwksUri: http://keycloak.default.svc.cluster.local:7080/realms/mcp/protocol/openid-connect/certs
+          uri: http://keycloak.default.svc.cluster.local:7080/realms/mcp/protocol/openid-connect/certs
         audiences:
           - "account"
         mcpIDP: KEYCLOAK

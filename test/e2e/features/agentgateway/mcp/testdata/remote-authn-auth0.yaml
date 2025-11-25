@@ -123,7 +123,7 @@ spec:
       authentication:
         issuer: https://kgateway.dev
         jwks:
-          jwksUri: http://auth0-mock.default.svc.cluster.local:9000/.well-known/jwks.json
+          uri: http://auth0-mock.default.svc.cluster.local:9000/.well-known/jwks.json
         mcpIDP: AUTH0
         audiences:
           - "account"

@@ -99,27 +99,3 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
----
-kind: GatewayClass
-apiVersion: gateway.networking.k8s.io/v1
-metadata:
-  name: agentgateway
-spec:
-  controllerName: kgateway.dev/agentgateway
-  parametersRef:
-    group: gateway.kgateway.dev
-    kind: GatewayParameters
-    name: kgateway
-    namespace: default
----
-kind: GatewayParameters
-apiVersion: gateway.kgateway.dev/v1alpha1
-metadata:
-  name: kgateway
-spec:
-  kube:
-    agentgateway:
-      enabled: true
-      logLevel: debug
-      image:
-        tag: v0.6.0-310-g8c5e059f4-dirty
