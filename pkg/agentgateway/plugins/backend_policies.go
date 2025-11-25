@@ -22,12 +22,12 @@ import (
 )
 
 const (
-	aiPolicySuffix               = ":ai"
-	backendTlsPolicySuffix       = ":backend-tls"
-	backendauthPolicySuffix      = ":backend-auth"
-	tlsPolicySuffix              = ":tls"
-	backendHttpPolicySuffix      = ":backend-http"
-	mcpAuthorizationPolicySuffix = ":mcp-authorization"
+	aiPolicySuffix                = ":ai"
+	backendTlsPolicySuffix        = ":backend-tls"
+	backendauthPolicySuffix       = ":backend-auth"
+	tlsPolicySuffix               = ":tls"
+	backendHttpPolicySuffix       = ":backend-http"
+	mcpAuthorizationPolicySuffix  = ":mcp-authorization"
 	mcpAuthenticationPolicySuffix = ":mcp-authentication"
 )
 
