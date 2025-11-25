@@ -791,6 +791,7 @@ type BackendMCP struct {
 	// +optional
 	Authorization *Authorization `json:"authorization,omitempty"`
 	// authentication defines MCPBackend specific authentication rules.
+	// +optional
 	Authentication *MCPAuthentication `json:"authentication,omitempty"`
 }
 
