@@ -52,9 +52,7 @@ func mcpHeaders(extraHeaders map[string]string) map[string]string {
 		"Accept":               "application/json, text/event-stream",
 		"MCP-Protocol-Version": mcpProto,
 	}
-	for k, v := range extraHeaders {
-		baseHeaders[k] = v
-	}
+	maps.Copy(baseHeaders, extraHeaders)
 	return baseHeaders
 }
 

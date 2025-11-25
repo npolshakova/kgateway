@@ -1900,6 +1900,14 @@ spec:
                                           maxItems: 64
                                           minItems: 1
                                           type: array
+                                        idp:
+                                          description: McpIDP specifies the identity
+                                            provider to use for authentication. Defaults
+                                            to Auth0 if unset.
+                                          enum:
+                                          - Auth0
+                                          - Keycloak
+                                          type: string
                                         issuer:
                                           description: issuer identifies the IdP that
                                             issued the JWT. This corresponds to the
@@ -2009,14 +2017,6 @@ spec:
                                               [uri backendRef] must be set
                                             rule: '[has(self.uri),has(self.backendRef)].filter(x,x==true).size()
                                               == 1'
-                                        mcpIDP:
-                                          default: AUTH0
-                                          description: McpIDP specifies the identity
-                                            provider to use for authentication
-                                          enum:
-                                          - AUTH0
-                                          - KEYCLOAK
-                                          type: string
                                         resourceMetadata:
                                           additionalProperties:
                                             type: string
@@ -2024,8 +2024,8 @@ spec:
                                             metadata to use for MCP resources.
                                           type: object
                                       required:
+                                      - issuer
                                       - jwks
-                                      - mcpIDP
                                       type: object
                                     authorization:
                                       description: |-
@@ -3293,6 +3293,13 @@ spec:
                             maxItems: 64
                             minItems: 1
                             type: array
+                          idp:
+                            description: McpIDP specifies the identity provider to
+                              use for authentication. Defaults to Auth0 if unset.
+                            enum:
+                            - Auth0
+                            - Keycloak
+                            type: string
                           issuer:
                             description: issuer identifies the IdP that issued the
                               JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
@@ -3395,14 +3402,6 @@ spec:
                                 must be set
                               rule: '[has(self.uri),has(self.backendRef)].filter(x,x==true).size()
                                 == 1'
-                          mcpIDP:
-                            default: AUTH0
-                            description: McpIDP specifies the identity provider to
-                              use for authentication
-                            enum:
-                            - AUTH0
-                            - KEYCLOAK
-                            type: string
                           resourceMetadata:
                             additionalProperties:
                               type: string
@@ -3410,8 +3409,8 @@ spec:
                               use for MCP resources.
                             type: object
                         required:
+                        - issuer
                         - jwks
-                        - mcpIDP
                         type: object
                       authorization:
                         description: |-

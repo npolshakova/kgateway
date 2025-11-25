@@ -287,18 +287,14 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *v1alpha1.Agentgate
 		return nil
 	}
 
-	var errs []error
-	var idp api.BackendPolicySpec_McpAuthentication_McpIDP
-	if authnPolicy.McpIDP == "AUTH0" {
-		idp = api.BackendPolicySpec_McpAuthentication_AUTH0
-	} else if authnPolicy.McpIDP == "KEYCLOAK" {
+	idp := api.BackendPolicySpec_McpAuthentication_AUTH0
+	if authnPolicy.McpIDP != nil && *authnPolicy.McpIDP == v1alpha1.Keycloak {
 		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
 	}
 
 	translatedInlineJwks, err := resolveRemoteJWKSInline(ctx, authnPolicy.JWKS.JwksUri)
 	if err != nil {
 		logger.Error("failed resolving jwks", "jwks_uri", authnPolicy.JWKS.JwksUri, "error", err)
-		errs = append(errs, err)
 		return nil
 	}
 

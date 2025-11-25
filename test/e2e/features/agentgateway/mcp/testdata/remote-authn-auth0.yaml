@@ -22,7 +22,7 @@ spec:
       sectionName: http-8080
   rules:
   - matches:
-      # need to get redirect address from oauth server as part of OAuth Authentication flow when testing with mcp inspector
+      # need to get redirect address from OAuth server as part of OAuth Authentication flow when testing with mcp inspector
       - path:
           type: PathPrefix
           value: /.well-known/oauth-authorization-server
@@ -124,7 +124,7 @@ spec:
         issuer: https://kgateway.dev
         jwks:
           uri: http://auth0-mock.default.svc.cluster.local:9000/.well-known/jwks.json
-        mcpIDP: AUTH0
+        idp: Auth0
         audiences:
           - "account"
         resourceMetadata:
