@@ -1908,7 +1908,7 @@ spec:
                                           - Keycloak
                                           type: string
                                         issuer:
-                                          description: issuer identifies the IdP that
+                                          description: Issuer identifies the IdP that
                                             issued the JWT. This corresponds to the
                                             'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
                                           maxLength: 256
@@ -3299,7 +3299,7 @@ spec:
                             - Keycloak
                             type: string
                           issuer:
-                            description: issuer identifies the IdP that issued the
+                            description: Issuer identifies the IdP that issued the
                               JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
                             maxLength: 256
                             minLength: 1

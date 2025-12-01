@@ -805,8 +805,7 @@ type MCPAuthentication struct {
 	// +optional
 	McpIDP *McpIDP `json:"idp,omitempty"`
 
-	// issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
-	// +kubebuilder:validation:MinLength=1
+	// Issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
 	// +optional
 	Issuer ShortString `json:"issuer,omitempty"`
 
