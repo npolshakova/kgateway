@@ -124,7 +124,7 @@ spec:
         issuer: https://kgateway.dev
         jwks:
           uri: http://auth0-mock.default.svc.cluster.local:9000/.well-known/jwks.json
-        idp: Auth0
+        provider: Auth0
         audiences:
           - "account"
         resourceMetadata:

@@ -1075,13 +1075,6 @@ spec:
                             maxItems: 64
                             minItems: 1
                             type: array
-                          idp:
-                            description: McpIDP specifies the identity provider to
-                              use for authentication
-                            enum:
-                            - Auth0
-                            - Keycloak
-                            type: string
                           issuer:
                             description: Issuer identifies the IdP that issued the
                               JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
@@ -1184,9 +1177,16 @@ spec:
                                 must be set
                               rule: '[has(self.uri),has(self.backendRef)].filter(x,x==true).size()
                                 == 1'
+                          provider:
+                            description: McpIDP specifies the identity provider to
+                              use for authentication
+                            enum:
+                            - Auth0
+                            - Keycloak
+                            type: string
                           resourceMetadata:
                             additionalProperties:
-                              type: string
+                              x-kubernetes-preserve-unknown-fields: true
                             description: ResourceMetadata defines the metadata to
                               use for MCP resources.
                             type: object

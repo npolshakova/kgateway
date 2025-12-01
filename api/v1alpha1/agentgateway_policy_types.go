@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -798,12 +799,12 @@ type BackendMCP struct {
 type MCPAuthentication struct {
 	// ResourceMetadata defines the metadata to use for MCP resources.
 	// +optional
-	ResourceMetadata map[string]string `json:"resourceMetadata"`
+	ResourceMetadata map[string]apiextensionsv1.JSON `json:"resourceMetadata"`
 
 	// McpIDP specifies the identity provider to use for authentication
 	// +kubebuilder:validation:Enum=Auth0;Keycloak
 	// +optional
-	McpIDP *McpIDP `json:"idp,omitempty"`
+	McpIDP *McpIDP `json:"provider,omitempty"`
 
 	// Issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
 	// +optional

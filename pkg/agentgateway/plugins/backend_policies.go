@@ -1,7 +1,6 @@
 package plugins
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -299,20 +298,17 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *v1alpha1.Agentgate
 	}
 
 	var extraResourceMetadata map[string]*structpb.Value
-
 	for k, v := range authnPolicy.ResourceMetadata {
 		if extraResourceMetadata == nil {
 			extraResourceMetadata = make(map[string]*structpb.Value)
 		}
-		var parsed any
-		if err := json.Unmarshal([]byte(v), &parsed); err != nil {
-			parsed = v // fallback to string
-		}
-		pbVal, err := structpb.NewValue(parsed)
+
+		pbVal, err := structpb.NewValue(v)
 		if err != nil {
-			logger.Error("error deserializing resource metadata", "key", k, "error", err)
+			logger.Error("error converting resource metadata", "key", k, "error", err)
 			continue
 		}
+
 		extraResourceMetadata[k] = pbVal
 	}
 
