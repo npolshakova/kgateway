@@ -802,19 +802,23 @@ type MCPAuthentication struct {
 
 	// McpIDP specifies the identity provider to use for authentication
 	// +kubebuilder:validation:Enum=Auth0;Keycloak
+	// +optional
 	McpIDP *McpIDP `json:"idp,omitempty"`
 
 	// issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
 	// +kubebuilder:validation:MinLength=1
+	// +optional
 	Issuer ShortString `json:"issuer,omitempty"`
 
 	// audiences specify the list of allowed audiences that are allowed access. This corresponds to the 'aud' claim (https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3).
 	// If unset, any audience is allowed.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=64
+	// +optional
 	Audiences []string `json:"audiences,omitempty"`
 
 	// jwks defines the remote JSON Web Key used to validate the signature of the JWT.
+	// +required
 	JWKS AgentRemoteJWKS `json:"jwks"`
 }
 
