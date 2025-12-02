@@ -30,8 +30,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	kgateway "github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
-	v1alpha2 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1/shared"
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/shared"
 	deployerinternal "github.com/kgateway-dev/kgateway/v2/internal/kgateway/deployer"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugins/httplistenerpolicy"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
@@ -973,7 +973,7 @@ var _ = Describe("Deployer", func() {
 				EnableStatsRoute:        ptr.To(true),
 				StatsRoutePrefixRewrite: ptr.To("/stats"),
 				Matcher: &kgateway.StatsMatcher{
-					InclusionList: []v1alpha2.StringMatcher{
+					InclusionList: []shared.StringMatcher{
 						{
 							Exact: ptr.To("cluster.my_service.upstream_cx_total"),
 						},
@@ -1068,7 +1068,7 @@ var _ = Describe("Deployer", func() {
 				EnableStatsRoute:        ptr.To(true),
 				StatsRoutePrefixRewrite: ptr.To("/stats"),
 				Matcher: &kgateway.StatsMatcher{
-					ExclusionList: []v1alpha2.StringMatcher{
+					ExclusionList: []shared.StringMatcher{
 						{
 							Exact: ptr.To("cluster.my_service.upstream_cx_total"),
 						},

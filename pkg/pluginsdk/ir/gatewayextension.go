@@ -5,7 +5,7 @@ import (
 
 	"istio.io/istio/pkg/kube/krt"
 
-	kgateway "github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
 )
 
 // GatewayExtension represents the internal representation of a GatewayExtension.

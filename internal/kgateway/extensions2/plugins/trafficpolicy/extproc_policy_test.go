@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	kgateway "github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
 )
 

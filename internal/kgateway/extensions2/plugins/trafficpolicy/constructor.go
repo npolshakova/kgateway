@@ -9,7 +9,7 @@ import (
 	"k8s.io/utils/ptr"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	v1alpha2 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
+	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/kgateway"
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/shared"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/collections"
 	"github.com/kgateway-dev/kgateway/v2/pkg/pluginsdk/ir"
@@ -42,7 +42,7 @@ func NewTrafficPolicyConstructor(
 
 func (c *TrafficPolicyConstructor) ConstructIR(
 	krtctx krt.HandlerContext,
-	policyCR *v1alpha2.TrafficPolicy,
+	policyCR *kgateway.TrafficPolicy,
 ) (*TrafficPolicy, []error) {
 	policyIr := TrafficPolicy{
 		ct: policyCR.CreationTimestamp.Time,
