@@ -290,9 +290,13 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *agentgateway.Agent
 		return nil
 	}
 
-	idp := api.BackendPolicySpec_McpAuthentication_AUTH0
-	if authnPolicy.McpIDP != nil && *authnPolicy.McpIDP == agentgateway.Keycloak {
-		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
+	idp := api.BackendPolicySpec_McpAuthentication_MCP_IDP_UNSPECIFIED
+	if authnPolicy.McpIDP != nil {
+		if *authnPolicy.McpIDP == agentgateway.Auth0 {
+			idp = api.BackendPolicySpec_McpAuthentication_AUTH0
+		} else if *authnPolicy.McpIDP == agentgateway.Keycloak {
+			idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
+		}
 	}
 
 	translatedInlineJwks, err := resolveRemoteJWKSInline(ctx, authnPolicy.JWKS.JwksUri)

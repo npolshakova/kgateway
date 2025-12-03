@@ -824,11 +824,11 @@ type MCPAuthentication struct {
 	// +optional
 	McpIDP *McpIDP `json:"provider,omitempty"`
 
-	// Issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
-	// +optional
-	Issuer ShortString `json:"issuer,omitempty"`
+	// issuer identifies the IdP that issued the JWT. This corresponds to the 'iss' claim (https://tools.ietf.org/html/rfc7519#section-4.1.1).
+	// +required
+	Issuer ShortString `json:"issuer"`
 
-	// audiences specify the list of allowed audiences that are allowed access. This corresponds to the 'aud' claim (https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3).
+	// Audiences specify the list of allowed audiences that are allowed access. This corresponds to the 'aud' claim (https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3).
 	// If unset, any audience is allowed.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=64
