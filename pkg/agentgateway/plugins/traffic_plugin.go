@@ -812,8 +812,8 @@ func processExtAuthPolicy(
 		return nil, fmt.Errorf("failed to build extAuth: %v", err)
 	}
 	spec := &api.TrafficPolicySpec_ExternalAuth{
-		Target:  be,
-		Context: extAuth.ContextExtensions,
+		Target: be,
+		//Context: extAuth.ContextExtensions,
 	}
 	if b := extAuth.ForwardBody; b != nil {
 		spec.IncludeRequestBody = &api.TrafficPolicySpec_ExternalAuth_BodyOptions{
