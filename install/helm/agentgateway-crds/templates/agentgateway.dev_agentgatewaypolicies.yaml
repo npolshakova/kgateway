@@ -1828,6 +1828,10 @@ spec:
                         maxLength: 16384
                         minLength: 1
                         type: string
+                      insecure:
+                        description: Insecure specifies whether to use TLS when communicating
+                          with the OTLP server.
+                        type: boolean
                       protocol:
                         default: HTTP
                         description: protocol specifies the OTLP protocol variant
@@ -1848,9 +1852,6 @@ spec:
                     - backendRef
                     type: object
                 type: object
-                x-kubernetes-validations:
-                - message: tracing is not currently implemented
-                  rule: '!has(self.tracing)'
               targetRefs:
                 description: targetRefs specifies the target resources by reference
                   to attach the policy to.

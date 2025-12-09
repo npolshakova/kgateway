@@ -29,19 +29,20 @@ spec:
         add:
           - expression: 'request.headers["user-agent"]'
             name: http.useragent
-#    tracing:
-#      backendRef:
-#        name: my-otel
-#        namespace: some-other-ns
-#      protocol: GRPC
-#      clientSampling: "true"
-#      randomSampling: "true"
-#      attributes:
-#        remove:
-#          - response.code
-#        add:
-#          - expression: 'request.headers["user-agent"]'
-#            name: http.useragent
+    tracing:
+      backendRef:
+        name: my-otel
+        namespace: some-other-ns
+        port: 4317
+      protocol: GRPC
+      clientSampling: "true"
+      randomSampling: "true"
+      attributes:
+        remove:
+          - response.code
+        add:
+          - expression: 'request.headers["user-agent"]'
+            name: http.useragent
 
 ---
 # Output
@@ -103,6 +104,33 @@ output:
           - response.code
         filter: response.code != 200
     key: frontend/default/agw:frontend-logging:default/test
+    name:
+      kind: AgentgatewayPolicy
+      name: agw
+      namespace: default
+    target:
+      gateway:
+        name: test
+        namespace: default
+- Policy:
+    frontend:
+      tracing:
+        attributes:
+        - name: http.useragent
+          value: request.headers["user-agent"]
+        - name: response.code
+        - name: randomSampling
+          value: "true"
+        insecure: false
+        providerBackend:
+          port: 4317
+          service:
+            hostname: my-otel.some-other-ns.svc.cluster.local
+            namespace: some-other-ns
+        resources:
+        - name: clientSampling
+          value: "true"
+    key: frontend/default/agw:frontend-tracing:default/test
     name:
       kind: AgentgatewayPolicy
       name: agw

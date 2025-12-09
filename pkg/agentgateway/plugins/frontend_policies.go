@@ -10,6 +10,7 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/agentgateway"
 	"github.com/kgateway-dev/kgateway/v2/pkg/kgateway/wellknown"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 const (
@@ -63,18 +64,84 @@ func translateFrontendPolicyToAgw(
 
 func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name string, target *api.PolicyTarget) []AgwPolicy {
 	tracing := policy.Spec.Frontend.Tracing
+	if tracing == nil {
+		return nil
+	}
+
+	insecure := ptr.Of(false)
+	if tracing.Insecure != nil && *tracing.Insecure {
+		insecure = ptr.Of(true)
+	}
+
+	var provider *api.BackendReference
+	ref := tracing.BackendRef
+	if ref.Kind == nil || *ref.Kind == "Service" {
+		ns := policy.GetNamespace()
+		if tracing.BackendRef.Namespace != nil {
+			ns = string(*tracing.BackendRef.Namespace)
+		}
+		var port uint32
+		if ref.Port != nil {
+			port = uint32(*ref.Port)
+		}
+		hostname := kubeutils.GetServiceHostname(string(ref.Name), ns)
+		provider = &api.BackendReference{
+			Kind: &api.BackendReference_Service_{
+				Service: &api.BackendReference_Service{
+					Namespace: ns,
+					Hostname:  hostname,
+				},
+			},
+			Port: port,
+		}
+	} else {
+		// TODO: support other backend ref kinds
+		logger.Error("Backend reference kind is not supported", "kind", string(*ref.Kind))
+	}
+
+	var attributes []*api.FrontendPolicySpec_TracingAttribute
+	if tracing.Attributes != nil {
+		for _, add := range tracing.Attributes.Add {
+			attributes = append(attributes, &api.FrontendPolicySpec_TracingAttribute{
+				Name:  add.Name,
+				Value: string(add.Expression),
+			})
+		}
+		for _, remove := range tracing.Attributes.Remove {
+			attributes = append(attributes, &api.FrontendPolicySpec_TracingAttribute{
+				Name:  remove,
+				Value: "",
+			})
+		}
+	}
+
+	var randomSampling *string
+	if tracing.RandomSampling != nil {
+		randomSampling = ptr.Of(string(*tracing.RandomSampling))
+	}
+
+	var clientSampling *string
+	if tracing.ClientSampling != nil {
+		clientSampling = ptr.Of(string(*tracing.ClientSampling))
+	}
+
 	tracingPolicy := &api.Policy{
 		Key:    name + frontendTracingPolicySuffix + attachmentName(target),
 		Name:   TypedResourceName(wellknown.AgentgatewayPolicyGVK.Kind, policy),
 		Target: target,
 		Kind: &api.Policy_Frontend{
 			Frontend: &api.FrontendPolicySpec{
-				// TODO: implement this
-				Kind: &api.FrontendPolicySpec_Tracing_{Tracing: &api.FrontendPolicySpec_Tracing{}},
+				Kind: &api.FrontendPolicySpec_Tracing_{Tracing: &api.FrontendPolicySpec_Tracing{
+					ProviderBackend: provider,
+					Attributes:      attributes,
+					//Resources:       resources,
+					Insecure:       insecure,
+					RandomSampling: randomSampling,
+					ClientSampling: clientSampling,
+				}},
 			},
 		},
 	}
-	_ = tracing
 
 	logger.Debug("generated tracing policy",
 		"policy", policy.Name,

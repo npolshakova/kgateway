@@ -251,7 +251,6 @@ type BackendTLS struct {
 	AlpnProtocols *[]TinyString `json:"alpnProtocols,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(self.tracing)",message="tracing is not currently implemented"
 type Frontend struct {
 	// tcp defines settings on managing incoming TCP connections.
 	// +optional
@@ -268,7 +267,6 @@ type Frontend struct {
 	AccessLog *AccessLog `json:"accessLog,omitempty"`
 
 	// Tracing contains various settings for OpenTelemetry tracer.
-	// TODO: not currently implemented
 	// +optional
 	Tracing *Tracing `json:"tracing,omitempty"`
 }
@@ -1283,4 +1281,8 @@ type Tracing struct {
 	// 0.0-1.0, or a boolean (true/false) If unspecified, client sampling is 100% enabled.
 	// +optional
 	ClientSampling *shared.CELExpression `json:"clientSampling,omitempty"`
+
+	// Insecure specifies whether to use TLS when communicating with the OTLP server.
+	// +optional
+	Insecure *bool `json:"insecure,omitempty"`
 }
