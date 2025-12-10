@@ -44,11 +44,32 @@ func (s *testingSuite) TestMCPAuthn() {
 	// Ensure auth0 server is ready
 	s.waitAuth0Ready()
 
+	// Test missing token
+	// Step 1: Initialize and get session ID
+	// The token in hard coded in the mock auth0 server
+	sessionID := s.initializeAndGetSessionID(nil)
+	s.Require().NotEmpty(sessionID, "Failed to get session ID from initialize")
+
+	// Step 2: Test tools/list with session ID
+	s.testToolsListWithSession(sessionID, nil)
+
+	// Test invalid token:
+	// Step 1: Initialize and get session ID
+	// The token in hard coded in the mock auth0 server
+	jwtInvalid := "fake"
+	authnHeader := map[string]string{"Authorization": "Bearer " + jwtInvalid}
+	sessionID = s.initializeAndGetSessionID(authnHeader)
+	s.Require().NotEmpty(sessionID, "Failed to get session ID from initialize")
+
+	// Step 2: Test tools/list with session ID
+	s.testToolsListWithSession(sessionID, authnHeader)
+
+	// Test valid token:
 	// Step 1: Initialize and get session ID
 	// The token in hard coded in the mock auth0 server
 	testJwt := "eyJhbGciOiJSUzI1NiIsImtpZCI6IjUzMzM3ODA2ODc1NTEwMzg2NTkifQ.eyJhdWQiOiJhY2NvdW50IiwiZXhwIjoxNzYzNjc2Nzc2LCJpYXQiOjE3NjM2NzMxNzYsImlzcyI6Imh0dHBzOi8va2dhdGV3YXkuZGV2Iiwic3ViIjoidXNlckBrZ2F0ZXdheS5kZXYifQ.Fko5TMFRRJoXyidRaAmzmwlVHIwNxCXqiKf5BRw_sumTnpNmt9Qt_2RUQCn7tTC_gAV50FyV4WKwoyTzAn0S8mmgZumI8E2-Uoq-A8wAohz9rt4a61_gaDeXXn0dF3YitQicR30Q_buoi2Nki6ZRPf9FyE5ulO4Ut_PyQrNXwlwO7vr_U3DXfrzvT9y2aDdNndPr1GB4fWTM84mEdQgx3XevIc7yjnbgKHnvIRp4gEyh-QL0ZYisjD-tZIDloZoSZjNFYu6PIdoxAaz9WhINAkAqX9KS8cd6uO36nPDoDOT1UmCT2VBjNszhLaZqtRKbJUb1HYrn-Gzq8vumLn8sjQ"
-	authnHeader := map[string]string{"Authorization": "Bearer " + testJwt}
-	sessionID := s.initializeAndGetSessionID(authnHeader)
+	authnHeader = map[string]string{"Authorization": "Bearer " + testJwt}
+	sessionID = s.initializeAndGetSessionID(authnHeader)
 	s.Require().NotEmpty(sessionID, "Failed to get session ID from initialize")
 
 	// Step 2: Test tools/list with session ID

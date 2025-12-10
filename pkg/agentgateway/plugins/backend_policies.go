@@ -293,9 +293,22 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *agentgateway.Agent
 		return nil
 	}
 
-	idp := api.BackendPolicySpec_McpAuthentication_AUTH0
-	if authnPolicy.McpIDP != nil && *authnPolicy.McpIDP == agentgateway.Keycloak {
-		idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
+	idp := api.BackendPolicySpec_McpAuthentication_MCP_IDP_UNSPECIFIED
+	if authnPolicy.McpIDP != nil {
+		if *authnPolicy.McpIDP == agentgateway.Keycloak {
+			idp = api.BackendPolicySpec_McpAuthentication_KEYCLOAK
+		} else if *authnPolicy.McpIDP == agentgateway.Auth0 {
+			idp = api.BackendPolicySpec_McpAuthentication_AUTH0
+		}
+	}
+
+	var mode api.BackendPolicySpec_McpAuthentication_Mode
+	if authnPolicy.Mode == "Strict" {
+		mode = api.BackendPolicySpec_McpAuthentication_STRICT
+	} else if authnPolicy.Mode == "Permissive" {
+		mode = api.BackendPolicySpec_McpAuthentication_PERMISSIVE
+	} else if authnPolicy.Mode == "Optional" {
+		mode = api.BackendPolicySpec_McpAuthentication_OPTIONAL
 	}
 
 	translatedInlineJwks, err := resolveRemoteJWKSInline(ctx, authnPolicy.JWKS.JwksUri)
@@ -327,6 +340,7 @@ func translateBackendMCPAuthentication(ctx PolicyCtx, policy *agentgateway.Agent
 			Extra: extraResourceMetadata,
 		},
 		JwksInline: translatedInlineJwks,
+		Mode:       mode,
 	}
 	mcpAuthnPolicy := &api.Policy{
 		Key:    policy.Namespace + "/" + policy.Name + mcpAuthenticationPolicySuffix + attachmentName(target),

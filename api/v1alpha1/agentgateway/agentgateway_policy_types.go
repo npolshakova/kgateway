@@ -853,6 +853,11 @@ type MCPAuthentication struct {
 	// jwks defines the remote JSON Web Key used to validate the signature of the JWT.
 	// +required
 	JWKS RemoteJWKS `json:"jwks"`
+
+	// validation mode for JWT authentication.
+	// +kubebuilder:default=Strict
+	// +optional
+	Mode JWTAuthenticationMode `json:"mode,omitempty"`
 }
 
 type McpIDP string

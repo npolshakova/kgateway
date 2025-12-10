@@ -55,6 +55,8 @@ require (
 
 require sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 
+replace github.com/agentgateway/agentgateway => ../agentgateway
+
 require (
 	github.com/PuerkitoBio/goquery v1.10.1
 	github.com/anthropics/anthropic-sdk-go v1.13.0
