@@ -1,13 +1,12 @@
-kind: GatewayParameters
-apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayParameters
+apiVersion: agentgateway.dev/v1alpha1
 metadata:
   name: kgateway
 spec:
-  kube:
-    agentgateway:
-      logLevel: trace
-      image:
-        tag: v0.6.0-325-g9ba2c27ce
+  logging:
+    level: trace
+  image:
+    tag: v0.6.0-326-ga571eda10
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1
@@ -16,8 +15,8 @@ metadata:
 spec:
   controllerName: kgateway.dev/agentgateway
   parametersRef:
-    group: gateway.kgateway.dev
-    kind: GatewayParameters
+    group: agentgateway.dev
+    kind: AgentgatewayParameters
     name: kgateway
     namespace: default
 ---
@@ -50,7 +49,7 @@ spec:
           value: /.well-known/oauth-authorization-server
     backendRefs:
       - name: auth0-mock
-        port: 9000
+        port: 8443
   - matches:
       - path:
           type: PathPrefix
@@ -75,35 +74,35 @@ spec:
           value: /.well-known/oauth-protected-resource
     backendRefs:
       - name: auth0-mock
-        port: 9000
+        port: 8443
   - matches:
       - path:
           type: PathPrefix
           value: /register
     backendRefs:
       - name: auth0-mock
-        port: 9000
+        port: 8443
   - matches:
       - path:
           type: PathPrefix
           value: /token
     backendRefs:
       - name: auth0-mock
-        port: 9000
+        port: 8443
   - matches:
       - path:
           type: PathPrefix
           value: /.well-known/jwks.json
     backendRefs:
       - name: auth0-mock
-        port: 9000
+        port: 8443
   - matches:
       - path:
           type: PathPrefix
           value: /authorize
     backendRefs:
       - name: auth0-mock
-        port: 9000
+        port: 8443
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
@@ -146,7 +145,7 @@ spec:
         mode: Strict
         issuer: https://kgateway.dev
         jwks:
-          uri: http://auth0-mock.default.svc.cluster.local:9000/.well-known/jwks.json
+          uri: https://auth0-mock.default.svc.cluster.local:8443/.well-known/jwks.json
         provider: Auth0
         audiences:
           - "account"
