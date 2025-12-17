@@ -68,11 +68,6 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 		return nil
 	}
 
-	insecure := ptr.Of(false)
-	if tracing.Insecure != nil && *tracing.Insecure {
-		insecure = ptr.Of(true)
-	}
-
 	var provider *api.BackendReference
 	ref := tracing.BackendRef
 	if ref.Kind == nil || *ref.Kind == "Service" {
@@ -135,7 +130,6 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 					ProviderBackend: provider,
 					Attributes:      attributes,
 					//Resources:       resources,
-					Insecure:       insecure,
 					RandomSampling: randomSampling,
 					ClientSampling: clientSampling,
 				}},

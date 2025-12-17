@@ -121,7 +121,6 @@ output:
         - name: response.code
         - name: randomSampling
           value: "true"
-        insecure: false
         providerBackend:
           port: 4317
           service:
