@@ -1828,10 +1828,6 @@ spec:
                         maxLength: 16384
                         minLength: 1
                         type: string
-                      insecure:
-                        description: Insecure specifies whether to use TLS when communicating
-                          with the OTLP server.
-                        type: boolean
                       protocol:
                         default: HTTP
                         description: protocol specifies the OTLP protocol variant

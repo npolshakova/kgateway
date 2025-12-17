@@ -1,25 +1,24 @@
-kind: GatewayParameters
-apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayParameters
+apiVersion: agentgateway.dev/v1alpha1
 metadata:
-  name: kgateway
+  name: params
 spec:
   kube:
-    agentgateway:
-      enabled: true
-      logLevel: debug
-      image:
-        tag: v0.6.0-324-g0ddfb6554-dirty
+  logging:
+    level: debug
+  image:
+    tag: v0.6.0-340-g0e7bcc3df-dirty
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1
 metadata:
-  name: agentgateway
+  name: agentgateway-v2
 spec:
-  controllerName: kgateway.dev/agentgateway
+  controllerName: agentgateway.dev/agentgateway
   parametersRef:
-    group: gateway.kgateway.dev
-    kind: GatewayParameters
-    name: kgateway
+    group: agentgateway.dev
+    kind: AgentgatewayParameters
+    name: params
     namespace: default
 ---
 apiVersion: agentgateway.dev/v1alpha1
@@ -38,7 +37,6 @@ spec:
         name: opentelemetry-collector
         namespace: default
         port: 4317
-      insecure: true
       protocol: GRPC
       clientSampling: "true"
       randomSampling: "true"
@@ -52,11 +50,22 @@ kind: Gateway
 metadata:
   name: gw
 spec:
-  gatewayClassName: agentgateway
+  gatewayClassName: agentgateway-v2
   listeners:
     - protocol: HTTP
       port: 8080
       name: http
+      allowedRoutes:
+        namespaces:
+          from: All
+    - protocol: HTTPS
+      port: 8443
+      name: https
+      hostname: "grpc.example.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: grpc-example-com-cert
       allowedRoutes:
         namespaces:
           from: All
@@ -95,3 +104,91 @@ spec:
         - path:
             type: PathPrefix
             value: /get
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-echo-route
+  labels:
+    app: grpc-echo
+spec:
+  parentRefs:
+    - name: gw
+      sectionName: grpc
+  hostnames:
+    - "grpc.example.com"
+  rules:
+    - matches:
+        - method:
+            service: "grpc.reflection.v1alpha.ServerReflection"
+      backendRefs:
+        - name: grpcbin-svc
+          namespace: default
+          port: 9000
+    - matches:
+        - method:
+            service: "grpcbin.GRPCBin"
+      backendRefs:
+        - name: grpcbin-svc
+          namespace: default
+          port: 9000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-echo
+spec:
+  selector:
+    matchLabels:
+      app: grpc-echo
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: grpc-echo
+    spec:
+      containers:
+        - name: grpc-echo
+          image: ghcr.io/projectcontour/yages:v0.1.0
+          ports:
+            - containerPort: 9000
+              protocol: TCP
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: GRPC_ECHO_SERVER
+              value: "true"
+            - name: SERVICE_NAME
+              value: grpc-echo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-echo-svc
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      protocol: TCP
+      targetPort: 9000
+      appProtocol: kubernetes.io/h2c
+  selector:
+    app: grpc-echo
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: grpcurl-client
+spec:
+  containers:
+    - name: grpcurl
+      image: docker.io/fullstorydev/grpcurl:v1.8.7-alpine
+      command:
+        - sleep
+        - "infinity"

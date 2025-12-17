@@ -21,6 +21,7 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/agentgateway/remotejwtauth"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/agentgateway/transformation"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/backendtls"
+	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/tracing"
 )
 
 func AgentgatewaySuiteRunner() e2e.SuiteRunner {
@@ -42,6 +43,7 @@ func AgentgatewaySuiteRunner() e2e.SuiteRunner {
 	agentgatewaySuiteRunner.Register("ApiKeyAuth", apikeyauth.NewTestingSuite)
 	agentgatewaySuiteRunner.Register("JwtAuth", jwtauth.NewTestingSuite)
 	agentgatewaySuiteRunner.Register("RemoteJwtAuth", remotejwtauth.NewTestingSuite)
+	agentgatewaySuiteRunner.Register("Tracing", tracing.NewTestingSuite)
 
 	return agentgatewaySuiteRunner
 }

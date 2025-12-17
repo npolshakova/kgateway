@@ -1281,8 +1281,4 @@ type Tracing struct {
 	// 0.0-1.0, or a boolean (true/false) If unspecified, client sampling is 100% enabled.
 	// +optional
 	ClientSampling *shared.CELExpression `json:"clientSampling,omitempty"`
-
-	// Insecure specifies whether to use TLS when communicating with the OTLP server.
-	// +optional
-	Insecure *bool `json:"insecure,omitempty"`
 }
