@@ -7,7 +7,7 @@ spec:
   logging:
     level: debug
   image:
-    tag: v0.6.0-340-g0e7bcc3df-dirty
+    tag: v0.6.0-354-gc09381ed9-dirty
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1
@@ -50,7 +50,7 @@ kind: Gateway
 metadata:
   name: gw
 spec:
-  gatewayClassName: agentgateway-v2
+  gatewayClassName: agentgateway
   listeners:
     - protocol: HTTP
       port: 8080
