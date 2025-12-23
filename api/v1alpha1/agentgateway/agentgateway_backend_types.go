@@ -312,6 +312,11 @@ type MCPBackend struct {
 	// +kubebuilder:validation:XValidation:message="target names must be unique",rule="self.all(t1, self.exists_one(t2, t1.name == t2.name))"
 	// +required
 	Targets []McpTargetSelector `json:"targets"`
+
+	// SessionRouting configures whether to ensure all requests from a session go to the same backend replica
+	// Defaults to stateful session routing if not set.
+	// +optional
+	SessionRouting SessionRouting `json:"sessionRouting,omitempty"`
 }
 
 // McpTargetSelector defines the MCPBackend target to use for this backend.
@@ -331,6 +336,14 @@ type McpTargetSelector struct {
 	// +optional
 	Static *McpTarget `json:"static,omitempty"`
 }
+
+const (
+	Stateful  SessionRouting = "Stateful"
+	Stateless SessionRouting = "Stateless"
+)
+
+// +kubebuilder:validation:Enum=Stateful;Stateless
+type SessionRouting string
 
 // +kubebuilder:validation:AtLeastOneOf=namespaces;services
 type McpSelector struct {
