@@ -120,6 +120,13 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 		clientSampling = ptr.Of(string(*tracing.ClientSampling))
 	}
 
+	protocol := api.FrontendPolicySpec_Tracing_HTTP
+	if tracing.Protocol == agentgateway.TracingProtocolHttp {
+		protocol = api.FrontendPolicySpec_Tracing_HTTP
+	} else if tracing.Protocol == agentgateway.TracingProtocolGrpc {
+		protocol = api.FrontendPolicySpec_Tracing_GRPC
+	}
+
 	tracingPolicy := &api.Policy{
 		Key:    name + frontendTracingPolicySuffix + attachmentName(target),
 		Name:   TypedResourceName(wellknown.AgentgatewayPolicyGVK.Kind, policy),
@@ -130,6 +137,7 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 					ProviderBackend: provider,
 					Attributes:      attributes,
 					//Resources:       resources,
+					Protocol:       protocol,
 					RandomSampling: randomSampling,
 					ClientSampling: clientSampling,
 				}},

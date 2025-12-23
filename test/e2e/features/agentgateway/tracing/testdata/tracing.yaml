@@ -5,14 +5,14 @@ metadata:
 spec:
   kube:
   logging:
-    level: debug
+    level: trace
   image:
     tag: v0.6.0-354-gc09381ed9-dirty
 ---
 kind: GatewayClass
 apiVersion: gateway.networking.k8s.io/v1
 metadata:
-  name: agentgateway-v2
+  name: agentgateway
 spec:
   controllerName: agentgateway.dev/agentgateway
   parametersRef:
@@ -37,6 +37,8 @@ spec:
         name: opentelemetry-collector
         namespace: default
         port: 4317
+#        port: 4318
+#      protocol: HTTP
       protocol: GRPC
       clientSampling: "true"
       randomSampling: "true"
