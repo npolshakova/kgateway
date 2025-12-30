@@ -313,8 +313,8 @@ type MCPBackend struct {
 	// +required
 	Targets []McpTargetSelector `json:"targets"`
 
-	// SessionRouting configures whether to ensure all requests from a session go to the same backend replica
-	// Defaults to stateful session routing if not set.
+	// SessionRouting configures MCP session behavior for requests.
+	// Defaults to Stateful if not set.
 	// +optional
 	SessionRouting SessionRouting `json:"sessionRouting,omitempty"`
 }
@@ -338,6 +338,8 @@ type McpTargetSelector struct {
 }
 
 const (
+	// Stateful mode creates an MCP session (via mcp-session-id) and internally
+	// ensures requests for that session are routed to a consistent backend replica.
 	Stateful  SessionRouting = "Stateful"
 	Stateless SessionRouting = "Stateless"
 )

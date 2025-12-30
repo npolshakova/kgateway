@@ -1737,8 +1737,8 @@ spec:
                 properties:
                   sessionRouting:
                     description: |-
-                      SessionRouting configures whether to ensure all requests from a session go to the same backend replica
-                      Defaults to stateful session routing if not set.
+                      SessionRouting configures MCP session behavior for requests.
+                      Defaults to Stateful if not set.
                     enum:
                     - Stateful
                     - Stateless
