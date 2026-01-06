@@ -94,18 +94,26 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 		logger.Error("Backend reference kind is not supported", "kind", string(*ref.Kind))
 	}
 
-	var attributes []*api.FrontendPolicySpec_TracingAttribute
+	var addAttributes []*api.FrontendPolicySpec_TracingAttribute
+	var rmAttributes []string
 	if tracing.Attributes != nil {
 		for _, add := range tracing.Attributes.Add {
-			attributes = append(attributes, &api.FrontendPolicySpec_TracingAttribute{
+			addAttributes = append(addAttributes, &api.FrontendPolicySpec_TracingAttribute{
 				Name:  add.Name,
 				Value: string(add.Expression),
 			})
 		}
-		for _, remove := range tracing.Attributes.Remove {
-			attributes = append(attributes, &api.FrontendPolicySpec_TracingAttribute{
-				Name:  remove,
-				Value: "",
+		for _, rm := range tracing.Attributes.Remove {
+			rmAttributes = append(rmAttributes, rm)
+		}
+	}
+
+	var addResources []*api.FrontendPolicySpec_TracingAttribute
+	if tracing.Resources != nil {
+		for _, add := range tracing.Resources {
+			addResources = append(addResources, &api.FrontendPolicySpec_TracingAttribute{
+				Name:  add.Name,
+				Value: string(add.Expression),
 			})
 		}
 	}
@@ -135,11 +143,12 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 			Frontend: &api.FrontendPolicySpec{
 				Kind: &api.FrontendPolicySpec_Tracing_{Tracing: &api.FrontendPolicySpec_Tracing{
 					ProviderBackend: provider,
-					Attributes:      attributes,
-					//Resources:       resources,
-					Protocol:       protocol,
-					RandomSampling: randomSampling,
-					ClientSampling: clientSampling,
+					Attributes:      addAttributes,
+					Remove:          rmAttributes,
+					Resources:       addResources,
+					Protocol:        protocol,
+					RandomSampling:  randomSampling,
+					ClientSampling:  clientSampling,
 				}},
 			},
 		},

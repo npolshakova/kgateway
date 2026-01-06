@@ -1267,9 +1267,13 @@ type Tracing struct {
 	// +optional
 	Protocol TracingProtocol `json:"protocol,omitempty"`
 
-	// attributes specifies customizations to the key-value pairs that are included in the trace
+	// attributes specify customizations to the key-value pairs that are included in the trace.
 	// +optional
 	Attributes *LogTracingAttributes `json:"attributes,omitempty"`
+
+	// resources describe the entity producing telemetry and specify the resources to be included in the trace.
+	// +optional
+	Resources []ResourceAdd `json:"resources,omitempty"`
 
 	// randomSampling is an expression to determine the amount of random sampling. Random sampling will initiate a new
 	// trace span if the incoming request does not have a trace initiated already. This should evaluate to a float between
@@ -1281,4 +1285,11 @@ type Tracing struct {
 	// 0.0-1.0, or a boolean (true/false) If unspecified, client sampling is 100% enabled.
 	// +optional
 	ClientSampling *shared.CELExpression `json:"clientSampling,omitempty"`
+}
+
+type ResourceAdd struct {
+	// +required
+	Name ShortString `json:"name"`
+	// +required
+	Expression shared.CELExpression `json:"expression"`
 }

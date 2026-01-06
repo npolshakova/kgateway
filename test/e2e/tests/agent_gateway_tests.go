@@ -19,9 +19,9 @@ import (
 	local_rate_limit "github.com/kgateway-dev/kgateway/v2/test/e2e/features/agentgateway/rate_limit/local"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/agentgateway/rbac"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/agentgateway/remotejwtauth"
+	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/agentgateway/tracing"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/agentgateway/transformation"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/backendtls"
-	"github.com/kgateway-dev/kgateway/v2/test/e2e/features/tracing"
 )
 
 func AgentgatewaySuiteRunner() e2e.SuiteRunner {

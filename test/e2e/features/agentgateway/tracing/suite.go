@@ -1,22 +1,26 @@
 //go:build e2e
 
-package configmap
+package tracing
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/defaults"
 	"github.com/kgateway-dev/kgateway/v2/test/e2e/tests/base"
+	"github.com/kgateway-dev/kgateway/v2/test/gomega/matchers"
 )
 
 var _ e2e.NewSuiteFunc = NewTestingSuite
@@ -25,13 +29,13 @@ var (
 	setupManifest        = filepath.Join(fsutils.MustGetThisDir(), "testdata", "setup.yaml")
 	tracingSetupManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "tracing.yaml")
 
-	tracingAgentGatewayDeploymentMeta = metav1.ObjectMeta{
-		Name:      "agent-gateway",
+	proxyServiceObjectMeta = metav1.ObjectMeta{
+		Name:      "gw",
 		Namespace: "default",
 	}
 
-	// configmap manifests applied before the test
-	tracingConfigMapSetup = base.TestCase{
+	// setup manifests applied before the test
+	setup = base.TestCase{
 		Manifests: []string{
 			setupManifest,
 			defaults.CurlPodManifest,
@@ -40,7 +44,12 @@ var (
 	}
 
 	testCases = map[string]*base.TestCase{
-		"TestTracing": {
+		"TestOTelTracing": {
+			Manifests: []string{
+				tracingSetupManifest,
+			},
+		},
+		"TestOTelTracingSecure": {
 			Manifests: []string{
 				tracingSetupManifest,
 			},
@@ -48,103 +57,95 @@ var (
 	}
 )
 
-// testingSuite is a suite of agentgateway configmap tests
+// testingSuite is a suite of agentgateway tracing tests
 type testingSuite struct {
 	*base.BaseTestingSuite
 }
 
 func NewTestingSuite(ctx context.Context, testInst *e2e.TestInstallation) suite.TestingSuite {
 	return &testingSuite{
-		base.NewBaseTestingSuite(ctx, testInst, tracingConfigMapSetup, testCases),
+		base.NewBaseTestingSuite(ctx, testInst, setup, testCases),
 	}
 }
 
-// TestTracing tests that agentgateway properly applies tracing configuration from ConfigMap
-func (s *testingSuite) TestTracing() {
-	s.T().Log("Testing tracing ConfigMap configuration")
-
-	// Ensure the ConfigMap exists before checking the gateway
-	s.verifyConfigMapExists("agent-gateway-config", "default")
-
-	s.waitForAgentgatewayPodsRunning()
-
-	s.verifyConfigMapMountedInDeployment("agent-gateway-config", tracingAgentGatewayDeploymentMeta)
-
-	// Verify that the tracing configuration is actually loaded and active
-	s.verifyTracingConfigurationActive(tracingAgentGatewayDeploymentMeta)
+func (s *testingSuite) TestOTelTracing() {
+	s.testOTelTracing()
 }
 
-// verifyConfigMapExists ensures the ConfigMap exists before proceeding
-func (s *testingSuite) verifyConfigMapExists(name, namespace string) {
-	s.T().Logf("Verifying ConfigMap %s exists in namespace %s", name, namespace)
-	s.TestInstallation.Assertions.EventuallyObjectsExist(s.T().Context(),
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: "default",
+func (s *testingSuite) TestOTelTracingSecure() {
+	s.testOTelTracing()
+}
+
+// testOTelTracing makes a request to the httpbin service
+// and checks if the collector pod logs contain the expected lines.
+func (s *testingSuite) testOTelTracing() {
+	s.TestInstallation.Assertions.EventuallyAgwPolicyCondition(s.Ctx, "agw", "default", "Accepted", metav1.ConditionTrue)
+
+	// The headerValue passed is used to differentiate between multiple calls by identifying a unique trace per call
+	headerValue := fmt.Sprintf("%v", rand.Intn(10000)) //nolint:gosec // G404: Using math/rand for test trace identification is acceptable
+	s.TestInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
+		// make curl request to httpbin service with the custom header
+		s.TestInstallation.Assertions.AssertEventualCurlResponse(
+			s.Ctx,
+			defaults.CurlPodExecOpt,
+			[]curl.Option{
+				curl.WithHostHeader("www.example.com"),
+				curl.WithHeader("x-header-tag", headerValue),
+				curl.WithPath("/status/200"),
+				curl.WithHost(kubeutils.ServiceFQDN(proxyServiceObjectMeta)),
+				curl.WithPort(8080),
 			},
-		},
-	)
-}
+			&matchers.HttpResponse{
+				StatusCode: 200,
+			},
+			20*time.Second,
+			2*time.Second,
+		)
 
-// waitForAgentgatewayPodsRunning waits for the agentgateway pods to be running
-func (s *testingSuite) waitForAgentgatewayPodsRunning() {
-	s.TestInstallation.Assertions.EventuallyPodsRunning(
-		s.T().Context(),
-		"default",
-		metav1.ListOptions{LabelSelector: defaults.WellKnownAppLabel + "=agent-gateway"},
-		60*time.Second,
-	)
-}
+		// fetch the collector pod logs
+		pods, err := s.TestInstallation.Actions.Kubectl().GetPodsInNsWithLabel(
+			s.Ctx,
+			"default",
+			"app.kubernetes.io/name=opentelemetry-collector",
+		)
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get collector pods")
+		g.Expect(pods).NotTo(gomega.BeEmpty(), "No collector pods found")
 
-// verifyConfigMapMountedInDeployment is a helper function that verifies a specific ConfigMap
-// is mounted as config-volume in the agentgateway deployment
-func (s *testingSuite) verifyConfigMapMountedInDeployment(expectedConfigMapName string, deploymentMeta metav1.ObjectMeta) {
-	deploymentObj := &appsv1.Deployment{}
-	err := s.TestInstallation.ClusterContext.Client.Get(
-		s.T().Context(),
-		client.ObjectKey{
-			Namespace: deploymentMeta.Namespace,
-			Name:      deploymentMeta.Name,
-		},
-		deploymentObj,
-	)
-	s.Require().NoError(err)
+		logs, err := s.TestInstallation.Actions.Kubectl().GetContainerLogs(s.Ctx, "default", pods[0])
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get pod logs")
 
-	found := false
-	for _, volume := range deploymentObj.Spec.Template.Spec.Volumes {
-		if volume.Name == "config-volume" && volume.ConfigMap != nil {
-			if volume.ConfigMap.Name == expectedConfigMapName {
-				found = true
-				break
+		// Check if the logs match the patterns.
+		// Note: the OTel debug exporter format can differ across versions (e.g. http.url vs http.host+http.path).
+		mustContain := []string{
+			`-> http.method: Str(GET)`,
+			// Custom resources configured in the policy
+			`-> deployment.environment.name: Str(production)`,
+			`-> service.version: Str(test)`,
+			// Custom tag passed in the config
+			`-> custom: Str(literal)`,
+			// Custom tag fetched from the request header
+			fmt.Sprintf("-> request: Str(%s)", headerValue),
+		}
+
+		missing := []string{}
+		for _, line := range mustContain {
+			if !strings.Contains(logs, line) {
+				missing = append(missing, line)
 			}
 		}
-	}
-	s.Require().True(found, "ConfigMap %s should be mounted as config-volume", expectedConfigMapName)
-}
+		g.Expect(missing).To(gomega.BeEmpty(), "missing required trace lines")
 
-// verifyTracingConfigurationActive checks that the tracing configuration from ConfigMap is accepted by agentgateway
-func (s *testingSuite) verifyTracingConfigurationActive(deploymentMeta metav1.ObjectMeta) {
-	pods, err := s.TestInstallation.Actions.Kubectl().GetPodsInNsWithLabel(
-		s.T().Context(),
-		deploymentMeta.Namespace,
-		defaults.WellKnownAppLabel+"=agent-gateway",
-	)
-	s.Require().NoError(err)
-	s.Require().NotEmpty(pods, "No agentgateway pods found")
+		// Accept either older/newer semantic conventions for URL fields.
+		hasHTTPURL := strings.Contains(logs, `-> http.url: Str(http://www.example.com/status/200)`) ||
+			(strings.Contains(logs, `-> url.scheme: Str(http)`) &&
+				strings.Contains(logs, `-> http.host: Str(www.example.com)`) &&
+				strings.Contains(logs, `-> http.path: Str(/status/200)`))
+		g.Expect(hasHTTPURL).To(gomega.BeTrue(), "missing expected URL/host/path attributes in traces")
 
-	s.Require().Eventually(func() bool {
-		logs, err := s.TestInstallation.Actions.Kubectl().GetContainerLogs(
-			s.T().Context(),
-			deploymentMeta.Namespace,
-			pods[0],
-		)
-		s.Require().NoError(err, "Failed to get pod logs")
-
-		expectedEndpoint := "endpoint: http://jaeger-collector.observability.svc.cluster.local:4317"
-		s.Require().Contains(logs, expectedEndpoint,
-			"Tracing endpoint %s from ConfigMap should be present in pod logs", expectedEndpoint)
-
-		return true
-	}, 60*time.Second, 5*time.Second)
+		// Accept string or int formats for status code depending on exporter/version.
+		hasHTTPStatus := strings.Contains(logs, `-> http.status_code: Str(200)`) ||
+			strings.Contains(logs, `-> http.status_code: Int(200)`) ||
+			strings.Contains(logs, `-> http.status: Int(200)`)
+		g.Expect(hasHTTPStatus).To(gomega.BeTrue(), "missing expected HTTP status code attribute in traces")
+	}, time.Second*60, time.Second*15, "should find traces in collector pod logs").Should(gomega.Succeed())
 }

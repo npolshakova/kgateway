@@ -37,6 +37,9 @@ spec:
       protocol: GRPC
       clientSampling: "true"
       randomSampling: "true"
+      resources:
+        - name: service.name
+          expression: "agent-gateway"
       attributes:
         remove:
           - response.code
@@ -118,17 +121,19 @@ output:
         attributes:
         - name: http.useragent
           value: request.headers["user-agent"]
-        - name: response.code
-        - name: randomSampling
-          value: "true"
+        clientSampling: "true"
+        protocol: GRPC
         providerBackend:
           port: 4317
           service:
             hostname: my-otel.some-other-ns.svc.cluster.local
             namespace: some-other-ns
+        randomSampling: "true"
+        remove:
+        - response.code
         resources:
-        - name: clientSampling
-          value: "true"
+        - name: service.name
+          value: agent-gateway
     key: frontend/default/agw:frontend-tracing:default/test
     name:
       kind: AgentgatewayPolicy
