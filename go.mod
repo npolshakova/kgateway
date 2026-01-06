@@ -462,4 +462,5 @@ tool (
 	sigs.k8s.io/kind
 )
 
+// TODO: remove and bump agw
 replace github.com/agentgateway/agentgateway => ../agentgateway
