@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/agentgateway/agentgateway/go/api"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1/agentgateway"
 	"github.com/kgateway-dev/kgateway/v2/pkg/kgateway/wellknown"
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 )
 
 const (
@@ -22,6 +22,7 @@ const (
 )
 
 func translateFrontendPolicyToAgw(
+	policyCtx PolicyCtx,
 	policy *agentgateway.AgentgatewayPolicy,
 	policyTarget *api.PolicyTarget,
 ) ([]AgwPolicy, error) {
@@ -55,43 +56,26 @@ func translateFrontendPolicyToAgw(
 	}
 
 	if s := frontend.Tracing; s != nil {
-		pol := translateFrontendTracing(policy, policyName, policyTarget)
+		pol, err := translateFrontendTracing(policyCtx, policy, policyName, policyTarget)
+		if err != nil {
+			logger.Error("error processing tracing", "err", err)
+			errs = append(errs, err)
+		}
 		agwPolicies = append(agwPolicies, pol...)
 	}
 
 	return agwPolicies, errors.Join(errs...)
 }
 
-func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name string, target *api.PolicyTarget) []AgwPolicy {
+func translateFrontendTracing(ctx PolicyCtx, policy *agentgateway.AgentgatewayPolicy, name string, target *api.PolicyTarget) ([]AgwPolicy, error) {
 	tracing := policy.Spec.Frontend.Tracing
 	if tracing == nil {
-		return nil
+		return nil, nil
 	}
 
-	var provider *api.BackendReference
-	ref := tracing.BackendRef
-	if ref.Kind == nil || *ref.Kind == "Service" {
-		ns := policy.GetNamespace()
-		if tracing.BackendRef.Namespace != nil {
-			ns = string(*tracing.BackendRef.Namespace)
-		}
-		var port uint32
-		if ref.Port != nil {
-			port = uint32(*ref.Port)
-		}
-		hostname := kubeutils.GetServiceHostname(string(ref.Name), ns)
-		provider = &api.BackendReference{
-			Kind: &api.BackendReference_Service_{
-				Service: &api.BackendReference_Service{
-					Namespace: ns,
-					Hostname:  hostname,
-				},
-			},
-			Port: port,
-		}
-	} else {
-		// TODO: support other backend ref kinds
-		logger.Error("Backend reference kind is not supported", "kind", string(*ref.Kind))
+	provider, err := buildBackendRef(ctx, tracing.BackendRef, policy.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to translate tracing backend ref: %v", err)
 	}
 
 	var addAttributes []*api.FrontendPolicySpec_TracingAttribute
@@ -128,11 +112,15 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 		clientSampling = ptr.Of(string(*tracing.ClientSampling))
 	}
 
-	protocol := api.FrontendPolicySpec_Tracing_HTTP
-	if tracing.Protocol == agentgateway.TracingProtocolHttp {
-		protocol = api.FrontendPolicySpec_Tracing_HTTP
-	} else if tracing.Protocol == agentgateway.TracingProtocolGrpc {
+	var protocol api.FrontendPolicySpec_Tracing_Protocol
+	switch tracing.Protocol {
+	case agentgateway.TracingProtocolGrpc:
 		protocol = api.FrontendPolicySpec_Tracing_GRPC
+	case agentgateway.TracingProtocolHttp:
+		protocol = api.FrontendPolicySpec_Tracing_HTTP
+	default:
+		// default to HTTP
+		protocol = api.FrontendPolicySpec_Tracing_HTTP
 	}
 
 	tracingPolicy := &api.Policy{
@@ -159,7 +147,7 @@ func translateFrontendTracing(policy *agentgateway.AgentgatewayPolicy, name stri
 		"agentgateway_policy", tracingPolicy.Name,
 		"target", target)
 
-	return []AgwPolicy{{Policy: tracingPolicy}}
+	return []AgwPolicy{{Policy: tracingPolicy}}, nil
 }
 
 func translateFrontendAccessLog(policy *agentgateway.AgentgatewayPolicy, name string, target *api.PolicyTarget) []AgwPolicy {
@@ -247,7 +235,7 @@ func translateFrontendTLS(policy *agentgateway.AgentgatewayPolicy, name string, 
 	tls := policy.Spec.Frontend.TLS
 	spec := &api.FrontendPolicySpec_TLS{}
 	if ka := tls.HandshakeTimeout; ka != nil {
-		spec.TlsHandshakeTimeout = durationpb.New(ka.Duration)
+		spec.HandshakeTimeout = durationpb.New(ka.Duration)
 	}
 
 	if tls.AlpnProtocols != nil {

@@ -1751,7 +1751,7 @@ spec:
                       backendRef:
                         description: |-
                           backendRef references the OTLP server to reach.
-                          Supported types: Service and Backend.
+                          Supported types: Service and AgentgatewayBackend.
                         properties:
                           group:
                             default: ""

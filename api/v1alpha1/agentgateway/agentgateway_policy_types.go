@@ -1258,7 +1258,7 @@ const (
 
 type Tracing struct {
 	// backendRef references the OTLP server to reach.
-	// Supported types: Service and Backend.
+	// Supported types: Service and AgentgatewayBackend.
 	// +required
 	BackendRef gwv1.BackendObjectReference `json:"backendRef"`
 	// protocol specifies the OTLP protocol variant to use.
