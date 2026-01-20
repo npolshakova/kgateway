@@ -2,12 +2,13 @@ package agentgatewaysyncer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	"istio.io/istio/pkg/kube/controllers"
 	"istio.io/istio/pkg/kube/kclient"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -80,8 +81,9 @@ func NewAgwStatusSyncer(
 		extraAgwResourceStatusHandlers: extraHandlers,
 
 		agentgatewayPolicies: StatusSyncer[*agentgateway.AgentgatewayPolicy, *gwv1.PolicyStatus]{
-			name:   "agentgatewayPolicy",
-			client: kclient.NewFilteredDelayed[*agentgateway.AgentgatewayPolicy](client, wellknown.AgentgatewayPolicyGVR, f),
+			name:           "agentgatewayPolicy",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*agentgateway.AgentgatewayPolicy](client, wellknown.AgentgatewayPolicyGVR, f),
 			build: func(om metav1.ObjectMeta, s *gwv1.PolicyStatus) *agentgateway.AgentgatewayPolicy {
 				return &agentgateway.AgentgatewayPolicy{
 					ObjectMeta: om,
@@ -92,8 +94,9 @@ func NewAgwStatusSyncer(
 			},
 		},
 		agentgatewayBackends: StatusSyncer[*agentgateway.AgentgatewayBackend, *agentgateway.AgentgatewayBackendStatus]{
-			name:   "agentgatewayPolicy",
-			client: kclient.NewFilteredDelayed[*agentgateway.AgentgatewayBackend](client, wellknown.AgentgatewayBackendGVR, f),
+			name:           "agentgatewayPolicy",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*agentgateway.AgentgatewayBackend](client, wellknown.AgentgatewayBackendGVR, f),
 			build: func(om metav1.ObjectMeta, s *agentgateway.AgentgatewayBackendStatus) *agentgateway.AgentgatewayBackend {
 				return &agentgateway.AgentgatewayBackend{
 					ObjectMeta: om,
@@ -102,8 +105,9 @@ func NewAgwStatusSyncer(
 			},
 		},
 		httpRoutes: StatusSyncer[*gwv1.HTTPRoute, *gwv1.HTTPRouteStatus]{
-			name:   "httpRoute",
-			client: kclient.NewFilteredDelayed[*gwv1.HTTPRoute](client, wellknown.HTTPRouteGVR, f),
+			name:           "httpRoute",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*gwv1.HTTPRoute](client, wellknown.HTTPRouteGVR, f),
 			build: func(om metav1.ObjectMeta, s *gwv1.HTTPRouteStatus) *gwv1.HTTPRoute {
 				return &gwv1.HTTPRoute{
 					ObjectMeta: om,
@@ -112,8 +116,9 @@ func NewAgwStatusSyncer(
 			},
 		},
 		grpcRoutes: StatusSyncer[*gwv1.GRPCRoute, *gwv1.GRPCRouteStatus]{
-			name:   "grpcRoute",
-			client: kclient.NewFilteredDelayed[*gwv1.GRPCRoute](client, wellknown.GRPCRouteGVR, f),
+			name:           "grpcRoute",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*gwv1.GRPCRoute](client, wellknown.GRPCRouteGVR, f),
 			build: func(om metav1.ObjectMeta, s *gwv1.GRPCRouteStatus) *gwv1.GRPCRoute {
 				return &gwv1.GRPCRoute{
 					ObjectMeta: om,
@@ -122,8 +127,9 @@ func NewAgwStatusSyncer(
 			},
 		},
 		tlsRoutes: StatusSyncer[*gwv1a2.TLSRoute, *gwv1a2.TLSRouteStatus]{
-			name:   "tlsRoute",
-			client: kclient.NewFilteredDelayed[*gwv1a2.TLSRoute](client, wellknown.TLSRouteGVR, f),
+			name:           "tlsRoute",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*gwv1a2.TLSRoute](client, wellknown.TLSRouteGVR, f),
 			build: func(om metav1.ObjectMeta, s *gwv1a2.TLSRouteStatus) *gwv1a2.TLSRoute {
 				return &gwv1a2.TLSRoute{
 					ObjectMeta: om,
@@ -132,8 +138,9 @@ func NewAgwStatusSyncer(
 			},
 		},
 		tcpRoutes: StatusSyncer[*gwv1a2.TCPRoute, *gwv1a2.TCPRouteStatus]{
-			name:   "tcpRoute",
-			client: kclient.NewFilteredDelayed[*gwv1a2.TCPRoute](client, wellknown.TCPRouteGVR, f),
+			name:           "tcpRoute",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*gwv1a2.TCPRoute](client, wellknown.TCPRouteGVR, f),
 			build: func(om metav1.ObjectMeta, s *gwv1a2.TCPRouteStatus) *gwv1a2.TCPRoute {
 				return &gwv1a2.TCPRoute{
 					ObjectMeta: om,
@@ -142,8 +149,9 @@ func NewAgwStatusSyncer(
 			},
 		},
 		listenerSets: StatusSyncer[*gwxv1a1.XListenerSet, *gwxv1a1.ListenerSetStatus]{
-			name:   "listenerSet",
-			client: kclient.NewFilteredDelayed[*gwxv1a1.XListenerSet](client, wellknown.XListenerSetGVR, f),
+			name:           "listenerSet",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*gwxv1a1.XListenerSet](client, wellknown.XListenerSetGVR, f),
 			build: func(om metav1.ObjectMeta, s *gwxv1a1.ListenerSetStatus) *gwxv1a1.XListenerSet {
 				return &gwxv1a1.XListenerSet{
 					ObjectMeta: om,
@@ -152,8 +160,9 @@ func NewAgwStatusSyncer(
 			},
 		},
 		gateways: StatusSyncer[*gwv1.Gateway, *gwv1.GatewayStatus]{
-			name:   "gateway",
-			client: kclient.NewFilteredDelayed[*gwv1.Gateway](client, wellknown.GatewayGVR, f),
+			name:           "gateway",
+			controllerName: controllerName,
+			client:         kclient.NewFilteredDelayed[*gwv1.Gateway](client, wellknown.GatewayGVR, f),
 			build: func(om metav1.ObjectMeta, s *gwv1.GatewayStatus) *gwv1.Gateway {
 				return &gwv1.Gateway{
 					ObjectMeta: om,
@@ -232,6 +241,27 @@ func (s *AgentGwStatusSyncer) SyncStatus(ctx context.Context, resource status.Re
 	}
 }
 
+func mergePolicyAncestorStatuses(ourControllerName string, existing []gwv1.PolicyAncestorStatus, desired []gwv1.PolicyAncestorStatus) []gwv1.PolicyAncestorStatus {
+	out := make([]gwv1.PolicyAncestorStatus, 0, len(existing)+len(desired))
+
+	// Preserve any entries not owned by our controller.
+	for _, a := range existing {
+		if string(a.ControllerName) != ourControllerName {
+			out = append(out, a)
+		}
+	}
+
+	// Only add entries owned by our controller from the desired status.
+	// This ensures we can clear stale entries by publishing an empty desired list.
+	for _, a := range desired {
+		if string(a.ControllerName) == ourControllerName {
+			out = append(out, a)
+		}
+	}
+
+	return out
+}
+
 func (s *AgentGwStatusSyncer) NewStatusWorker(ctx context.Context) *status.WorkerPool {
 	return status.NewWorkerPool(ctx, s.SyncStatus, 100)
 }
@@ -239,6 +269,11 @@ func (s *AgentGwStatusSyncer) NewStatusWorker(ctx context.Context) *status.Worke
 type StatusSyncer[O controllers.ComparableObject, S any] struct {
 	// Name for logging
 	name string
+
+	// controllerName is the controller whose status entries this syncer owns.
+	// We preserve entries owned by other controllers and only publish entries owned by this controller. This
+	// avoids clobbering status from other controllers or subsystems.
+	controllerName string
 
 	client kclient.Client[O]
 
@@ -254,6 +289,83 @@ func (s StatusSyncer[O, S]) ApplyStatus(ctx context.Context, obj status.Resource
 	logger := logger.With("kind", s.name, "resource", obj.NamespacedName.String())
 	// TODO: move this to retry by putting it back on the queue, with some limit on the retry attempts allowed
 	err := retry.Do(func() error {
+		// Fetch the current object so we can preserve status written by other controllers/subsystems.
+		// NOTE: This is especially important for Gateway.status.addresses (written by the gateway reconciler),
+		// and for Route status Parents (multi-controller field).
+		current := s.client.Get(obj.Name, obj.Namespace)
+		var zero O
+		if current == zero {
+			// Harmless race: status write after resource was deleted.
+			logger.Debug("resource not found, skipping status update")
+			return nil
+		}
+
+		// Prefer the latest resourceVersion to avoid avoidable conflicts.
+		// Conflicts are still handled (and expected), but using the latest RV reduces churn.
+		rv := obj.ResourceVersion
+		if crv := current.GetResourceVersion(); crv != "" {
+			rv = crv
+		}
+
+		mergedAny := any(status)
+		switch desired := mergedAny.(type) {
+		case *gwv1.PolicyStatus:
+			// PolicyStatus is multi-writer across controllers, so preserve entries not owned by our controller.
+			// NOTE: We can only merge if the current object is the expected type.
+			curPol, ok := any(current).(*agentgateway.AgentgatewayPolicy)
+			if ok {
+				merged := *desired
+				merged.Ancestors = mergePolicyAncestorStatuses(s.controllerName, curPol.Status.Ancestors, desired.Ancestors)
+				mergedAny = &merged
+			}
+		case *gwv1.GatewayStatus:
+			// Preserve addresses unless the desired status explicitly sets them.
+			// Addresses are computed from the generated Service by the gateway reconciler and are not
+			// part of the agentgateway translation report.
+			curGw, ok := any(current).(*gwv1.Gateway)
+			if ok {
+				merged := *desired
+				merged.Addresses = mergeGatewayAddresses(curGw.Status.Addresses, desired.Addresses)
+				mergedAny = &merged
+			}
+		case *gwv1.HTTPRouteStatus:
+			cur, ok := any(current).(*gwv1.HTTPRoute)
+			if ok {
+				merged := *desired
+				merged.Parents = mergeRouteParentStatuses(s.controllerName, cur.Status.Parents, desired.Parents)
+				mergedAny = &merged
+			}
+		case *gwv1.GRPCRouteStatus:
+			cur, ok := any(current).(*gwv1.GRPCRoute)
+			if ok {
+				merged := *desired
+				merged.Parents = mergeRouteParentStatuses(s.controllerName, cur.Status.Parents, desired.Parents)
+				mergedAny = &merged
+			}
+		case *gwv1a2.TCPRouteStatus:
+			cur, ok := any(current).(*gwv1a2.TCPRoute)
+			if ok {
+				merged := *desired
+				merged.Parents = mergeRouteParentStatuses(s.controllerName, cur.Status.Parents, desired.Parents)
+				mergedAny = &merged
+			}
+		case *gwv1a2.TLSRouteStatus:
+			cur, ok := any(current).(*gwv1a2.TLSRoute)
+			if ok {
+				merged := *desired
+				merged.Parents = mergeRouteParentStatuses(s.controllerName, cur.Status.Parents, desired.Parents)
+				mergedAny = &merged
+			}
+		}
+
+		merged, ok := mergedAny.(S)
+		if !ok {
+			// This should never happen; indicates a mismatch between the syncer's type parameter S
+			// and the object being published.
+			logger.Error("unexpected status type; skipping status update", "status_type", fmt.Sprintf("%T", mergedAny))
+			return nil
+		}
+
 		// Pass only the status and minimal part of ObjectMetadata to find the resource and validate it.
 		// Passing Spec is ignored by the API server but has costs.
 		// Passing ResourceVersion is important to ensure we are not writing stale data. The collection is responsible for
@@ -261,12 +373,17 @@ func (s StatusSyncer[O, S]) ApplyStatus(ctx context.Context, obj status.Resource
 		_, err := s.client.UpdateStatus(s.build(metav1.ObjectMeta{
 			Name:            obj.Name,
 			Namespace:       obj.Namespace,
-			ResourceVersion: obj.ResourceVersion,
-		}, status))
+			ResourceVersion: rv,
+		}, merged))
 		if err != nil {
-			if errors.IsConflict(err) {
+			if apierrors.IsConflict(err) {
 				// This is normal. It is expected the collection will re-enqueue the write
 				logger.Debug("updating stale status, skipping", logKeyError, err)
+				return nil
+			}
+			if apierrors.IsNotFound(err) {
+				// ignore status write after resource was deleted.
+				logger.Debug("resource not found, skipping status update", logKeyError, err)
 				return nil
 			}
 			logger.Error("error updating status", logKeyError, err)
@@ -283,7 +400,35 @@ func (s StatusSyncer[O, S]) ApplyStatus(ctx context.Context, obj status.Resource
 	}
 }
 
+func mergeRouteParentStatuses(ourControllerName string, existing []gwv1.RouteParentStatus, desired []gwv1.RouteParentStatus) []gwv1.RouteParentStatus {
+	out := make([]gwv1.RouteParentStatus, 0, len(existing)+len(desired))
+
+	// Preserve any entries not owned by our controller.
+	for _, a := range existing {
+		if string(a.ControllerName) != ourControllerName {
+			out = append(out, a)
+		}
+	}
+
+	// Only add entries owned by our controller from the desired status.
+	// This ensures we can clear stale entries by publishing an empty desired list.
+	for _, a := range desired {
+		if string(a.ControllerName) == ourControllerName {
+			out = append(out, a)
+		}
+	}
+
+	return out
+}
+
+func mergeGatewayAddresses(existing []gwv1.GatewayStatusAddress, desired []gwv1.GatewayStatusAddress) []gwv1.GatewayStatusAddress {
+	if len(desired) > 0 {
+		return desired
+	}
+	return existing
+}
+
 // NeedLeaderElection returns true to ensure that the AgentGwStatusSyncer runs only on the leader
-func (r *AgentGwStatusSyncer) NeedLeaderElection() bool {
+func (s *AgentGwStatusSyncer) NeedLeaderElection() bool {
 	return true
 }
