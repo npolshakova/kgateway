@@ -1,0 +1,195 @@
+# Copyright Istio Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This image is inspired by Istio's `build-tools` image from istio/common-files.
+# It is intended to be used as a GitHub Codespaces devcontainer base for this repo.
+
+ARG GO_VERSION=1.25.6
+FROM golang:${GO_VERSION}-bookworm AS go_context
+
+FROM ubuntu:noble AS build_tools
+
+ARG TARGETARCH
+ARG VERSION=dev
+
+LABEL "io.kgateway.repo"="https://github.com/kgateway-dev/kgateway"
+LABEL "io.kgateway.version"="${VERSION}"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Pinned tool versions (keep aligned with `go.mod` and repo tooling where possible)
+ENV RUST_VERSION=1.86.0
+ENV KUBECTL_VERSION=1.35.0
+ENV KIND_VERSION=v0.31.0
+ENV HELM_VERSION=v3.19.2
+ENV PROTOC_VERSION=33.2
+ENV BUF_VERSION=v1.62.1
+ENV YQ_VERSION=4.50.1
+ENV GOLANGCI_LINT_VERSION=v2.8.0
+ENV GOIMPORTS_VERSION=v0.40.0
+ENV SU_EXEC_VERSION=0.3.1
+
+# General env
+ENV HOME=/home
+ENV LANG=C.UTF-8
+ENV CARGO_HOME=/home/.cargo
+ENV RUSTUP_HOME=/home/.rustup
+
+# Go env
+ENV GO111MODULE=on
+ENV GOTOOLCHAIN=local
+ENV GOPROXY=https://proxy.golang.org
+ENV GOSUMDB=sum.golang.org
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
+ENV GOCACHE=/gocache
+ENV GOBIN=/gobin
+ENV PATH=/usr/local/go/bin:/gobin:/usr/local/bin:/usr/bin:/bin
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      wget \
+      git \
+      openssh-client \
+      rsync \
+      jq \
+      unzip \
+      xz-utils \
+      file \
+      make \
+      gcc \
+      g++ \
+      libc-dev \
+      pkg-config \
+      python3 \
+      python3-pip \
+      python3-setuptools \
+      python3-yaml \
+      sudo \
+      gnupg \
+      lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI + buildx plugin (Codespaces uses docker-outside-of-docker)
+RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc \
+    && chmod a+r /etc/apt/keyrings/docker.asc \
+    && echo "deb [arch=${TARGETARCH} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+      docker-ce-cli \
+      docker-buildx-plugin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Go toolchain (copy from official golang image to match go.mod)
+COPY --from=go_context /usr/local/go /usr/local/go
+
+# Install protoc
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) PROTOC_ZIP="protoc-${PROTOC_VERSION}-linux-x86_64.zip" ;; \
+      arm64) PROTOC_ZIP="protoc-${PROTOC_VERSION}-linux-aarch_64.zip" ;; \
+      *) echo "unsupported TARGETARCH ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    wget -nv -O "/tmp/${PROTOC_ZIP}" "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${PROTOC_ZIP}"; \
+    unzip -q "/tmp/${PROTOC_ZIP}" -d /tmp/protoc; \
+    mv /tmp/protoc/bin/protoc /usr/local/bin/protoc; \
+    chmod 555 /usr/local/bin/protoc; \
+    rm -rf /tmp/protoc "/tmp/${PROTOC_ZIP}"
+
+# kubectl
+RUN set -eux; \
+    curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl"; \
+    chmod 555 /usr/local/bin/kubectl
+
+# kind
+RUN set -eux; \
+    curl -fsSL -o /usr/local/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-${TARGETARCH}"; \
+    chmod 555 /usr/local/bin/kind
+
+# helm
+RUN set -eux; \
+    curl -fsSL -o /tmp/helm.tgz "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz"; \
+    mkdir -p /tmp/helm; \
+    tar -xzf /tmp/helm.tgz -C /tmp/helm; \
+    mv "/tmp/helm/linux-${TARGETARCH}/helm" /usr/local/bin/helm; \
+    chmod 555 /usr/local/bin/helm; \
+    rm -rf /tmp/helm /tmp/helm.tgz
+
+# buf
+RUN set -eux; \
+    arch="$(uname -m)"; \
+    curl -fsSL -o /usr/local/bin/buf "https://github.com/bufbuild/buf/releases/download/${BUF_VERSION}/buf-Linux-${arch}"; \
+    chmod 555 /usr/local/bin/buf
+
+# yq
+RUN set -eux; \
+    curl -fsSL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${TARGETARCH}"; \
+    chmod 555 /usr/local/bin/yq
+
+# Install common Go dev tools (pinned)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
+    CGO_ENABLED=0 go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION}; \
+    CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}; \
+    mv /root/go/bin/* /usr/local/bin/; \
+    chmod 555 /usr/local/bin/goimports /usr/local/bin/golangci-lint
+
+# Rust toolchain (for internal/envoyinit)
+RUN set -eux; \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}" --profile minimal --component rustfmt --component clippy; \
+    ln -s "${CARGO_HOME}/bin/"* /usr/local/bin/
+
+# Install su-exec (like Istio: small, reliable privilege drop for entrypoint)
+RUN set -eux; \
+    curl -fsSL -o "/tmp/su-exec.tgz" "https://github.com/NobodyXu/su-exec/archive/refs/tags/v${SU_EXEC_VERSION}.tar.gz"; \
+    tar -xzf /tmp/su-exec.tgz -C /tmp; \
+    pushd "/tmp/su-exec-${SU_EXEC_VERSION}" >/dev/null; \
+      LDFLAGS="-fvisibility=hidden -Wl,-O2 -Wl,--discard-all -Wl,--strip-all -Wl,--as-needed -Wl,--gc-sections" make; \
+      cp -a su-exec /usr/local/bin/su-exec; \
+      chmod u+sx /usr/local/bin/su-exec; \
+    popd >/dev/null; \
+    rm -rf /tmp/su-exec.tgz "/tmp/su-exec-${SU_EXEC_VERSION}"
+
+# When building with repo-root context (e.g. devcontainer build.context=".."), copy from full repo path.
+COPY tools/build-tools/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+RUN chmod +x /usr/local/bin/docker-entrypoint
+
+COPY tools/build-tools/prow-entrypoint.sh /usr/local/bin/prow-entrypoint
+RUN chmod +x /usr/local/bin/prow-entrypoint
+
+COPY tools/build-tools/bashrc /home/.bashrc
+
+# Mountpoints for host mounts (Codespaces & local devcontainers)
+RUN mkdir -p /go /gocache /gobin \
+    && mkdir -p /config/.docker /config/.config/gcloud /config/.kube \
+    && mkdir -p /config-copy \
+    && mkdir -p /home/.cache /home/.cargo/registry /home/.cargo/git \
+    && chmod -R 777 /go /gocache /gobin /config /config-copy /home/.cache /home/.cargo
+
+WORKDIR /
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint"]
+CMD ["bash"]
+
+

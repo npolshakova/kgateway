@@ -35,6 +35,30 @@ z := $(shell mkdir -p $(OUTPUT_DIR))
 
 BUILDX_BUILD ?= docker buildx build -q
 
+#----------------------------------------------------------------------------------
+# Devcontainer build-tools image
+#----------------------------------------------------------------------------------
+BUILD_TOOLS_DIR ?= tools/build-tools
+BUILD_TOOLS_IMAGE ?= kgateway-build-tools:dev
+BUILD_TOOLS_VERSION ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo dev)
+
+.PHONY: build-tools-image
+build-tools-image: ## Build the devcontainer build-tools image locally (override BUILD_TOOLS_IMAGE=... to change tag)
+	docker build \
+		-t $(BUILD_TOOLS_IMAGE) \
+		--build-arg VERSION=$(BUILD_TOOLS_VERSION) \
+		-f $(BUILD_TOOLS_DIR)/Dockerfile \
+		.
+
+.PHONY: build-tools-imagex
+build-tools-imagex: ## Build the devcontainer build-tools image with buildx (override BUILD_TOOLS_IMAGE=...; defaults to --load for local use)
+	docker buildx build \
+		--load \
+		-t $(BUILD_TOOLS_IMAGE) \
+		--build-arg VERSION=$(BUILD_TOOLS_VERSION) \
+		-f $(BUILD_TOOLS_DIR)/Dockerfile \
+		.
+
 # Helper variable for escaping commas in Make functions
 comma := ,
 
