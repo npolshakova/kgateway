@@ -148,12 +148,13 @@ RUN set -eux; \
     chmod 555 /usr/local/bin/yq
 
 # Install common Go dev tools (pinned)
+# Note: we set GOBIN explicitly here so we don't rely on GOPATH defaults (/root/go/bin),
+# which may not match our global env (GOBIN=/gobin).
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eux; \
-    CGO_ENABLED=0 go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION}; \
-    CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}; \
-    mv /root/go/bin/* /usr/local/bin/; \
+    GOBIN=/usr/local/bin CGO_ENABLED=0 go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION}; \
+    GOBIN=/usr/local/bin CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}; \
     chmod 555 /usr/local/bin/goimports /usr/local/bin/golangci-lint
 
 # Rust toolchain (for internal/envoyinit)
