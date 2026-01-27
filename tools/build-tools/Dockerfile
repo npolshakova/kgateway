@@ -1,20 +1,4 @@
-# Copyright Istio Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# This image is inspired by Istio's `build-tools` image from istio/common-files.
-# It is intended to be used as a GitHub Codespaces devcontainer base for this repo.
-
+# Based on Istio's build-tools image: https://github.com/istio/tools/tree/228d21452fd640bf7389d7d41fecaa715ce73249/docker/build-tools 
 ARG GO_VERSION=1.25.6
 FROM golang:${GO_VERSION}-bookworm AS go_context
 
@@ -175,14 +159,107 @@ RUN set -eux; \
     popd >/dev/null; \
     rm -rf /tmp/su-exec.tgz "/tmp/su-exec-${SU_EXEC_VERSION}"
 
-# When building with repo-root context (e.g. devcontainer build.context=".."), copy from full repo path.
-COPY tools/build-tools/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+# Note: devcontainer build contexts can vary (and may not include the full repo tree).
+# To make this image robust, generate small helper scripts directly in the image
+# rather than relying on COPY from the build context.
+RUN cat > /usr/local/bin/docker-entrypoint <<'EOF' \
+set -euo pipefail
+
+# Copy credentials from mountpoints using su-exec
+uid=$(id -u)
+gid=$(id -g)
+
+shopt -s dotglob
+
+if [[ -d /config ]]; then
+  # Make a copy of the host's config secrets. Do not copy docker sockets.
+  su-exec 0:0 rsync -a --exclude=docker*.sock --exclude=/config/.config/gcloud/logs/* /config/ /config-copy/ || true
+
+  # Set the ownership of the host's config secrets to that of the container
+  su-exec 0:0 chown -R "${uid}":"${gid}" /config-copy || true
+
+  # Permit only the UID:GID to read the copy of the host's config secrets
+  chmod -R 700 /config-copy || true
+
+  # If docker_for_mac plaintext-passwords.json exists, import it into config.json
+  if [[ -f /config-copy/.docker/plaintext-passwords.json ]]; then
+    auth_value=$(jq -r '.auths."https://index.docker.io/v1/".auth' /config-copy/.docker/plaintext-passwords.json)
+    if [[ "${auth_value}" == "null" ]]; then
+      echo "Missing docker credentials."
+    fi
+    encode_value=$(echo "${auth_value}" | base64 --decode | base64)
+    jq --arg auth "${encode_value}" '.auths."https://index.docker.io/v1/".auth=$auth' /config-copy/.docker/config.json > /config-copy/.docker/config-tmp.json
+    jq 'del(.credsStore)' /config-copy/.docker/config-tmp.json > /config-copy/.docker/config.json
+  fi
+fi
+
+# Add user based upon passed UID. Skip if run as root.
+if [[ "${uid}" -ne 0 ]]; then
+  su-exec 0:0 useradd --uid "${uid}" --system user || true
+fi
+
+# Set ownership of /home to UID:GID
+su-exec 0:0 chown "${uid}":"${gid}" /home || true
+
+# Copy the config secrets without changing permissions nor ownership
+if [[ -d /config-copy ]]; then
+  cp -R /config-copy/* /home/ 2>/dev/null || true
+fi
+
+exec "$@"
+EOF
 RUN chmod +x /usr/local/bin/docker-entrypoint
 
-COPY tools/build-tools/prow-entrypoint.sh /usr/local/bin/prow-entrypoint
+RUN cat > /usr/local/bin/prow-entrypoint <<'EOF' \
+
+set -euo pipefail
+
+# Minimal entrypoint for CI environments that want a running dockerd inside the container.
+# Codespaces generally uses docker-outside-of-docker; this file exists for parity with Istio.
+
+if command -v dockerd >/dev/null 2>&1; then
+  dockerd --host=unix:///var/run/docker.sock &
+fi
+
+exec "$@"
+EOF
 RUN chmod +x /usr/local/bin/prow-entrypoint
 
-COPY tools/build-tools/bashrc /home/.bashrc
+RUN cat > /home/.bashrc <<'EOF'
+# Copyright Istio Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Override prompt to avoid the annoying "I have no name!" in the default prompt
+PS1="build-tools:\w\\$ \[$(tput sgr0)\]"
+export PS1
+
+# Tab completion for make that works with monorepos.
+# In Codespaces the repo is typically under /workspaces/<repo>.
+root="${REPO_ROOT:-}"
+if [[ -z "${root}" ]]; then
+  if [[ -d /work ]]; then
+    root="/work"
+  elif [[ -d /workspaces ]]; then
+    root="/workspaces"
+  else
+    root="/"
+  fi
+fi
+
+make_options=$(find "${root}" -maxdepth 6 -iname "Makefile*" 2>/dev/null | xargs -r -I {} grep -hoE '^[a-zA-Z0-9_.-]+:([^=]|$)' {} | sed 's/[^a-zA-Z0-9_.-]*$//' | sort -u)
+complete -W "$make_options" make
+EOF
 
 # Mountpoints for host mounts (Codespaces & local devcontainers)
 RUN mkdir -p /go /gocache /gobin \
