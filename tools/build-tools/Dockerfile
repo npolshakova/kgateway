@@ -55,7 +55,8 @@ ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV GOCACHE=/gocache
 ENV GOBIN=/gobin
-ENV PATH=/usr/local/go/bin:/gobin:/usr/local/bin:/usr/bin:/bin
+# Include /usr/sbin and /sbin so devcontainer features can find admin tools like groupadd.
+ENV PATH=/usr/local/go/bin:/gobin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
