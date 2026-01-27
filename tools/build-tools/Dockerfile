@@ -79,6 +79,7 @@ RUN --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
       g++ \
       libc-dev \
       pkg-config \
+      passwd \
       python3 \
       python3-pip \
       python3-setuptools \
