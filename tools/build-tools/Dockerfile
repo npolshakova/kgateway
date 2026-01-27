@@ -162,7 +162,7 @@ RUN set -eux; \
 # Note: devcontainer build contexts can vary (and may not include the full repo tree).
 # To make this image robust, generate small helper scripts directly in the image
 # rather than relying on COPY from the build context.
-RUN cat > /usr/local/bin/docker-entrypoint <<'EOF' \
+RUN cat > /usr/local/bin/docker-entrypoint <<'EOF'
 set -euo pipefail
 
 # Copy credentials from mountpoints using su-exec
@@ -209,21 +209,6 @@ fi
 exec "$@"
 EOF
 RUN chmod +x /usr/local/bin/docker-entrypoint
-
-RUN cat > /usr/local/bin/prow-entrypoint <<'EOF' \
-
-set -euo pipefail
-
-# Minimal entrypoint for CI environments that want a running dockerd inside the container.
-# Codespaces generally uses docker-outside-of-docker; this file exists for parity with Istio.
-
-if command -v dockerd >/dev/null 2>&1; then
-  dockerd --host=unix:///var/run/docker.sock &
-fi
-
-exec "$@"
-EOF
-RUN chmod +x /usr/local/bin/prow-entrypoint
 
 RUN cat > /home/.bashrc <<'EOF'
 # Copyright Istio Authors
