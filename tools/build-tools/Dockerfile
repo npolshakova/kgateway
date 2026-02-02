@@ -17,7 +17,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Pinned tool versions (keep aligned with `go.mod` and repo tooling where possible)
 ENV RUST_VERSION=1.86.0
 ENV KUBECTL_VERSION=1.35.0
-ENV KIND_VERSION=v0.31.0
 ENV HELM_VERSION=v3.19.2
 ENV PROTOC_VERSION=33.2
 ENV BUF_VERSION=v1.62.1
@@ -109,10 +108,9 @@ RUN set -eux; \
     curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl"; \
     chmod 555 /usr/local/bin/kubectl
 
-# kind
-RUN set -eux; \
-    curl -fsSL -o /usr/local/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-${TARGETARCH}"; \
-    chmod 555 /usr/local/bin/kind
+# kind (pinned via go.mod tool dependency; wrapper script avoids version drift)
+COPY kind /usr/local/bin/kind
+RUN chmod 555 /usr/local/bin/kind
 
 # helm
 RUN set -eux; \

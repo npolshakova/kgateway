@@ -722,6 +722,7 @@ release-notes: ## Generate release notes (PREVIOUS_TAG required, CURRENT_TAG opt
 #----------------------------------------------------------------------------------
 
 KIND ?= go tool kind
+KIND_VERSION ?= v0.31.0
 CLUSTER_NAME ?= kind
 # Default namespace for kgateway installation
 INSTALL_NAMESPACE ?= kgateway-system
