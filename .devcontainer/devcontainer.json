@@ -5,7 +5,6 @@
     "dockerfile": "../tools/build-tools/Dockerfile",
     "context": ".."
   },
-  "privileged": true,
   "remoteEnv": {
     "USE_GKE_GCLOUD_AUTH_PLUGIN": "True",
     "BUILD_WITH_CONTAINER": "0",

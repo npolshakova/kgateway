@@ -11,11 +11,13 @@ published to GitHub Container Registry (GHCR) so GitHub Codespaces can pull it q
 - Rust toolchain (for `internal/envoyinit/`)
 - Common build tooling: `git`, `make`, `gcc`, `jq`, `yq`, `kubectl`, `kind`, `helm`, `protoc`, `buf`
 - Docker CLI (for `docker-outside-of-docker` feature)
+- `vim` (for editing) 
 
 ### Building locally
 
+You can build the image locally with the make target:
 ```bash
-docker build -t kgateway-build-tools:dev -f tools/build-tools/Dockerfile .
+make build-tools-image
 ```
 
 

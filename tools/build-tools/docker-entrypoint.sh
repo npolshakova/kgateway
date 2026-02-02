@@ -1,4 +1,6 @@
-# Based on Istio's build-tools image: https://github.com/istio/tools/tree/228d21452fd640bf7389d7d41fecaa715ce73249/docker/build-tools 
+#!/usr/bin/env bash
+
+# Based on Istio's build-tools image: https://github.com/istio/tools/tree/228d21452fd640bf7389d7d41fecaa715ce73249/docker/build-tools
 set -euo pipefail
 
 # Copy credentials from mountpoints using su-exec
