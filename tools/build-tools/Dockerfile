@@ -1,5 +1,5 @@
 # Based on Istio's build-tools image: https://github.com/istio/tools/tree/228d21452fd640bf7389d7d41fecaa715ce73249/docker/build-tools
-ARG GO_VERSION=1.25.6
+ARG GO_VERSION=1.25.7
 ARG GO_BASE_IMAGE=golang:${GO_VERSION}-bookworm
 ARG UBUNTU_BASE_IMAGE=ubuntu:noble
 
@@ -109,7 +109,7 @@ RUN set -eux; \
     chmod 555 /usr/local/bin/kubectl
 
 # kind (pinned via go.mod tool dependency; wrapper script avoids version drift)
-COPY kind /usr/local/bin/kind
+COPY tools/build-tools/kind /usr/local/bin/kind
 RUN chmod 555 /usr/local/bin/kind
 
 # helm
@@ -149,10 +149,10 @@ RUN set -eux; \
     rm -rf /tmp/su-exec.tgz "/tmp/su-exec-${SU_EXEC_VERSION}"
 
 # Copy helper scripts from build context (shellcheck can lint these more easily than inlined scripts)
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+COPY tools/build-tools/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
 RUN chmod +x /usr/local/bin/docker-entrypoint
 
-COPY bashrc /home/.bashrc
+COPY tools/build-tools/bashrc /home/.bashrc
 
 # Mountpoints for host mounts (Codespaces & local devcontainers)
 RUN mkdir -p /go /gocache /gobin \

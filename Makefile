@@ -49,7 +49,7 @@ build-tools-image: ## Build the devcontainer build-tools image locally (override
 		-t $(BUILD_TOOLS_IMAGE) \
 		--build-arg VERSION=$(BUILD_TOOLS_VERSION) \
 		-f $(BUILD_TOOLS_DIR)/Dockerfile \
-		$(BUILD_TOOLS_DIR)
+		.
 
 # Helper variable for escaping commas in Make functions
 comma := ,
