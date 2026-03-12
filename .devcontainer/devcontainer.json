@@ -1,10 +1,14 @@
 {
   "name": "kgateway build-tools",
+  // Official kgateway-dev container image
   // "image": "ghcr.io/kgateway-dev/devcontainer:kubeconeu-2026",
-  "build": {
-    "dockerfile": "../tools/build-tools/Dockerfile",
-    "context": ".."
-   },
+  // npolshakova's branch testing image 
+  "image": "ghcr.io/npolshakova/devcontainer:kubeconeu-2026",
+  // Use this for building before the image is published to GHCR
+  // "build": {
+  //   "dockerfile": "../tools/build-tools/Dockerfile",
+  //   "context": ".."
+  //  },
   "remoteEnv": {
     "USE_GKE_GCLOUD_AUTH_PLUGIN": "True",
     "BUILD_WITH_CONTAINER": "0",
