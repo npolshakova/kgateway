@@ -13,7 +13,8 @@
     "USE_GKE_GCLOUD_AUTH_PLUGIN": "True",
     "BUILD_WITH_CONTAINER": "0",
     "CARGO_HOME": "/home/.cargo",
-    "RUSTUP_HOME": "/home/.rustup"
+    "RUSTUP_HOME": "/home/.rustup",
+    "DOCKER_API_VERSION": "1.43"
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
@@ -22,7 +23,7 @@
     },
     "ghcr.io/mpriscella/features/kind:1": {}
   },
-  "onCreateCommand": "VERSION=v1.0.0-ci1 make kgateway-docker sds-docker envoy-wrapper-docker dummy-idp-docker extproc-server-docker",
+  "onCreateCommand": "for img in kgateway:v1.0.0-ci1 sds:v1.0.0-ci1 envoy-wrapper:v1.0.0-ci1 dummy-idp:0.0.1 extproc-server:0.0.1; do docker pull ghcr.io/npolshakova/$img || echo \"Warning: failed to pull $img, build it locally with: IMAGE_REGISTRY=ghcr.io/npolshakova VERSION=v1.0.0-ci1 make <target>-docker\"; done",
   "customizations": {
     "vscode": {
       "extensions": [
