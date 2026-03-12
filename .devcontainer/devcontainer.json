@@ -24,6 +24,7 @@
     "ghcr.io/mpriscella/features/kind:1": {}
   },
   "onCreateCommand": "for img in kgateway:v1.0.0-ci1 sds:v1.0.0-ci1 envoy-wrapper:v1.0.0-ci1 dummy-idp:0.0.1 extproc-server:0.0.1; do docker pull ghcr.io/npolshakova/$img || echo \"Warning: failed to pull $img, build it locally with: IMAGE_REGISTRY=ghcr.io/npolshakova VERSION=v1.0.0-ci1 make <target>-docker\"; done",
+  "postCreateCommand": "make setup-base && for img in kgateway:v1.0.0-ci1 sds:v1.0.0-ci1 envoy-wrapper:v1.0.0-ci1 dummy-idp:0.0.1 extproc-server:0.0.1; do kind load docker-image ghcr.io/npolshakova/$img --name kind; done && IMAGE_REGISTRY=ghcr.io/npolshakova VERSION=v1.0.0-ci1 make package-kgateway-charts",
   "customizations": {
     "vscode": {
       "extensions": [
