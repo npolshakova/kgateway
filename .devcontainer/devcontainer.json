@@ -1,6 +1,10 @@
 {
   "name": "kgateway build-tools",
-  "image": "ghcr.io/kgateway-dev/devcontainer:kubeconeu-2026",
+  // "image": "ghcr.io/kgateway-dev/devcontainer:kubeconeu-2026",
+  "build": {
+    "dockerfile": "../tools/build-tools/Dockerfile",
+    "context": ".."
+   },
   "remoteEnv": {
     "USE_GKE_GCLOUD_AUTH_PLUGIN": "True",
     "BUILD_WITH_CONTAINER": "0",
