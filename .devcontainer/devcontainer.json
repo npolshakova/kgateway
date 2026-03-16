@@ -14,7 +14,11 @@
     "BUILD_WITH_CONTAINER": "0",
     "CARGO_HOME": "/home/.cargo",
     "RUSTUP_HOME": "/home/.rustup",
-    "DOCKER_API_VERSION": "1.43"
+    "DOCKER_API_VERSION": "1.43",
+    "IMAGE_REGISTRY": "ghcr.io/npolshakova",
+    "VERSION": "v1.0.0-ci1",
+    "DEVCONTAINER_IMAGE_REGISTRY": "ghcr.io/npolshakova",
+    "DEVCONTAINER_VERSION": "v1.0.0-ci1"
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
@@ -24,8 +28,8 @@
     "ghcr.io/mpriscella/features/kind:1": {}
   },
   // TODO: change this to use ghcr.io/kgateway-dev once images are published
-  "onCreateCommand": "for img in kgateway:v1.0.0-ci1 sds:v1.0.0-ci1 envoy-wrapper:v1.0.0-ci1 dummy-idp:0.0.1 extproc-server:0.0.1; do docker pull ghcr.io/npolshakova/$img || echo \"Warning: failed to pull $img, build it locally with: IMAGE_REGISTRY=ghcr.io/npolshakova VERSION=v1.0.0-ci1 make <target>-docker\"; done",
-  "postCreateCommand": "make setup-base && for img in kgateway:v1.0.0-ci1 sds:v1.0.0-ci1 envoy-wrapper:v1.0.0-ci1 dummy-idp:0.0.1 extproc-server:0.0.1; do docker pull ghcr.io/npolshakova/$img && go tool kind load docker-image ghcr.io/npolshakova/$img --name kind || echo \"Warning: failed to load $img into kind\"; done && IMAGE_REGISTRY=ghcr.io/npolshakova VERSION=v1.0.0-ci1 make package-kgateway-charts",
+  "onCreateCommand": "sh -ec 'for img in kgateway:$DEVCONTAINER_VERSION sds:$DEVCONTAINER_VERSION envoy-wrapper:$DEVCONTAINER_VERSION dummy-idp:0.0.1 extproc-server:0.0.1; do docker pull \"$DEVCONTAINER_IMAGE_REGISTRY/$img\" || echo \"Warning: failed to pull $img, build it locally with: IMAGE_REGISTRY=$DEVCONTAINER_IMAGE_REGISTRY VERSION=$DEVCONTAINER_VERSION make <target>-docker\"; done'",
+  "postCreateCommand": "make setup-base && sh -ec 'for img in kgateway:$DEVCONTAINER_VERSION sds:$DEVCONTAINER_VERSION envoy-wrapper:$DEVCONTAINER_VERSION dummy-idp:0.0.1 extproc-server:0.0.1; do full_image=\"$DEVCONTAINER_IMAGE_REGISTRY/$img\"; docker image inspect \"$full_image\" >/dev/null 2>&1 || docker pull \"$full_image\" || { echo \"Warning: failed to pull $img, skipping kind load\"; continue; }; go tool kind load docker-image \"$full_image\" --name kind || echo \"Warning: failed to load $img into kind\"; done' && IMAGE_REGISTRY=$DEVCONTAINER_IMAGE_REGISTRY VERSION=$DEVCONTAINER_VERSION make package-kgateway-charts",
   "customizations": {
     "vscode": {
       "extensions": [
