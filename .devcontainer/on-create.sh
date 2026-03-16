@@ -17,3 +17,7 @@ for img in "${images[@]}"; do
   docker pull "${full_image}" || \
     echo "Warning: failed to pull ${full_image}, build it locally with: IMAGE_REGISTRY=${DEVCONTAINER_IMAGE_REGISTRY} VERSION=${DEVCONTAINER_VERSION} make <target>-docker"
 done
+
+# Package Helm charts so e2e tests can find _test/index.yaml even if
+# postCreateCommand fails (e.g. due to Codespaces caching an old command).
+IMAGE_REGISTRY="${DEVCONTAINER_IMAGE_REGISTRY}" VERSION="${DEVCONTAINER_VERSION}" make package-kgateway-charts
