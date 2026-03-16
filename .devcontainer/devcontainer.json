@@ -28,8 +28,8 @@
     "ghcr.io/mpriscella/features/kind:1": {}
   },
   // TODO: change this to use ghcr.io/kgateway-dev once images are published
-  "onCreateCommand": "sh -ec 'for img in kgateway:$DEVCONTAINER_VERSION sds:$DEVCONTAINER_VERSION envoy-wrapper:$DEVCONTAINER_VERSION dummy-idp:0.0.1 extproc-server:0.0.1; do docker pull \"$DEVCONTAINER_IMAGE_REGISTRY/$img\" || echo \"Warning: failed to pull $img, build it locally with: IMAGE_REGISTRY=$DEVCONTAINER_IMAGE_REGISTRY VERSION=$DEVCONTAINER_VERSION make <target>-docker\"; done'",
-  "postCreateCommand": "make setup-base && sh -ec 'for img in kgateway:$DEVCONTAINER_VERSION sds:$DEVCONTAINER_VERSION envoy-wrapper:$DEVCONTAINER_VERSION dummy-idp:0.0.1 extproc-server:0.0.1; do full_image=\"$DEVCONTAINER_IMAGE_REGISTRY/$img\"; docker image inspect \"$full_image\" >/dev/null 2>&1 || docker pull \"$full_image\" || { echo \"Warning: failed to pull $img, skipping kind load\"; continue; }; go tool kind load docker-image \"$full_image\" --name kind || echo \"Warning: failed to load $img into kind\"; done' && IMAGE_REGISTRY=$DEVCONTAINER_IMAGE_REGISTRY VERSION=$DEVCONTAINER_VERSION make package-kgateway-charts",
+  "onCreateCommand": ".devcontainer/on-create.sh",
+  "postCreateCommand": ".devcontainer/post-create.sh",
   "customizations": {
     "vscode": {
       "extensions": [
