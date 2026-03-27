@@ -1,0 +1,82 @@
+version: 2
+updates:
+  # v2.3.x - current main branch. Update this when we create a new branch for 2.3.x
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  # v2.2.x
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "v2.2.x"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "v2.2.x"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "v2.2.x"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  # v2.1.x
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "v2.1.x"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "v2.1.x"
+    labels:
+      - "dependencies"
+      - "area/ci"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "v2.1.x"
+    labels:
+      - "dependencies"
+      - "area/ci"
