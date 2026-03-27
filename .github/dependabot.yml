@@ -10,7 +10,11 @@ updates:
       - "area/ci"
 
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/cmd/envoyinit"
+      - "/tools/build-tools"
+      - "/test/e2e/defaults/extproc"
+      - "/test/e2e/testutils/helper/docker"
     schedule:
       interval: "weekly"
     labels:
@@ -36,7 +40,11 @@ updates:
       - "area/ci"
 
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/cmd/envoyinit"
+      - "/tools/build-tools"
+      - "/test/e2e/defaults/extproc"
+      - "/test/e2e/testutils/helper/docker"
     schedule:
       interval: "weekly"
     target-branch: "v2.2.x"
@@ -64,7 +72,11 @@ updates:
       - "area/ci"
 
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/cmd/envoyinit"
+      - "/tools/build-tools"
+      - "/test/e2e/defaults/extproc"
+      - "/test/e2e/testutils/helper/docker"
     schedule:
       interval: "weekly"
     target-branch: "v2.1.x"
